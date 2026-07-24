@@ -1,13 +1,14 @@
 {
   "workflow_version": 2,
   "project_kind": "legacy",
-  "phase": "build",
+  "phase": "ready",
   "active_change": null,
   "approvals": {
     "baseline": {
-      "valid": true,
+      "valid": false,
       "digest": "user-confirmed-fix3-arch-plan",
-      "approved_at": "2026-07-24T12:00:00+08:00"
+      "approved_at": "2026-07-24T12:00:00+08:00",
+      "invalidated_at": "2026-07-24T19:40:29+08:00"
     },
     "spec": {
       "valid": false,

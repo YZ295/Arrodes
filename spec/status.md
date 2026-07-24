@@ -1,8 +1,8 @@
 # Wu5 Dev Flow 状态
 
-- 阶段：`baseline-review`
+- 阶段：`build`
 - 项目类型：`legacy`
-- 当前分支：`master`
+- 当前分支：`develop`
 - 活动变更：`none`
 - 变更模式：`none`
 
