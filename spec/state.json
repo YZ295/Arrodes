@@ -21,9 +21,9 @@
       "approved_at": null
     },
     "hotfix": {
-      "valid": false,
-      "digest": null,
-      "approved_at": null
+      "valid": true,
+      "digest": "hotfix_20260724_01",
+      "approved_at": "2026-07-24T13:45:00+08:00"
     }
   },
   "dependency_approvals": [],
