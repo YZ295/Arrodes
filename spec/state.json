@@ -1,0 +1,32 @@
+{
+  "workflow_version": 2,
+  "project_kind": "legacy",
+  "phase": "build",
+  "active_change": null,
+  "approvals": {
+    "baseline": {
+      "valid": true,
+      "digest": "user-confirmed-fix3-arch-plan",
+      "approved_at": "2026-07-24T12:00:00+08:00"
+    },
+    "spec": {
+      "valid": false,
+      "digest": null,
+      "approved_at": null
+    },
+    "plan": {
+      "valid": false,
+      "digest": null,
+      "approved_at": null
+    },
+    "hotfix": {
+      "valid": false,
+      "digest": null,
+      "approved_at": null
+    }
+  },
+  "dependency_approvals": [],
+  "verification": null,
+  "task_progress": [],
+  "last_completed": null
+}

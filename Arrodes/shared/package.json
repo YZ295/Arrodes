@@ -1,0 +1,13 @@
+{
+  "name": "arrodes-shared",
+  "version": "0.1.0",
+  "description": "阿罗德斯共享类型定义",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "type": "module"
+}

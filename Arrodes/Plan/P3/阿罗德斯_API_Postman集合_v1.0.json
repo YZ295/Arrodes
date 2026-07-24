@@ -1,0 +1,533 @@
+{
+  "info": {
+    "_postman_id": "arodes-api-v1",
+    "name": "阿罗德斯 API v1.0",
+    "description": "阿罗德斯（Arodes）- 愚者的仆人 API 集合\n\nBase URL: http://localhost:3000/api/v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "🏥 健康检查",
+      "item": [
+        {
+          "name": "健康检查",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👤 用户",
+      "item": [
+        {
+          "name": "获取当前用户",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "更新用户设置",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"voice_type\": \"female\",\n  \"speech_rate\": 1.2,\n  \"auto_play_tts\": true,\n  \"theme\": \"abyss\",\n  \"ai_name\": \"阿罗德斯\",\n  \"user_title\": \"愚者大人\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "settings"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💬 会话",
+      "item": [
+        {
+          "name": "创建会话",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"项目A\",\n  \"topic\": \"work\",\n  \"parentId\": null,\n  \"initialMessage\": \"我们来讨论项目A的计划\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sessions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "获取会话树",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/tree",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions",
+                "tree"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "获取单个会话",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions",
+                "{{session_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "更新会话",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"项目A（已重命名）\",\n  \"topic\": \"work\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions",
+                "{{session_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "删除会话",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions",
+                "{{session_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "搜索会话",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/search?q=项目&limit=5",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "项目"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📝 消息",
+      "item": [
+        {
+          "name": "获取消息历史",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}/messages?limit=20&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions",
+                "{{session_id}}",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "发送消息（HTTP 非流式）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"帮我新建一个工作会话\",\n  \"isVoice\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}/messages",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "sessions",
+                "{{session_id}}",
+                "messages"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎙️ 语音",
+      "item": [
+        {
+          "name": "语音转文字",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": "/path/to/audio.webm"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/voice/transcribe",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "voice",
+                "transcribe"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "文字转语音",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"遵命，愚者大人。已为您记录。\",\n  \"voice\": \"female\",\n  \"speed\": 1.0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/voice/synthesize",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "voice",
+                "synthesize"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔖 书签",
+      "item": [
+        {
+          "name": "获取书签列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/bookmarks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bookmarks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "添加书签",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{session_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/bookmarks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bookmarks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "删除书签",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/bookmarks/{{bookmark_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bookmarks",
+                "{{bookmark_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "your-jwt-token-here",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "bookmark_id",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    }
+  ]
+}
