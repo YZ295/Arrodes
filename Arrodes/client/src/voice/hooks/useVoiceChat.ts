@@ -71,6 +71,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
   const lastSpokenContent = useRef<string>('');
   const hasInitializedSession = useRef(false);
   const reconnectAttempt = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     isRecording,
@@ -124,12 +125,15 @@ export function useVoiceChat(): UseVoiceChatReturn {
     const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:3001';
     const wsUrl = `${protocol}//${wsHost}/v1/chat`;
     let ws: WebSocket;
+    let closed = false;
 
     const connect = () => {
+      if (closed) return;
       ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (closed) return;
         setIsConnected(true);
         reconnectAttempt.current = 0;
 
@@ -169,10 +173,12 @@ export function useVoiceChat(): UseVoiceChatReturn {
         // 指数退避重连: 3s -> 6s -> 12s -> max 30s
         const delay = Math.min(3000 * Math.pow(2, reconnectAttempt.current), 30000);
         reconnectAttempt.current++;
-        setTimeout(connect, delay);
+        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = setTimeout(connect, delay);
       };
 
       ws.onmessage = (event: MessageEvent) => {
+        if (closed) return;
         try {
           const serverMsg: WSServerMessage = JSON.parse(event.data as string);
           handleServerMessage(serverMsg);
@@ -182,6 +188,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
       };
 
       ws.onerror = () => {
+        if (closed) return;
         ws.close();
       };
     };
@@ -189,6 +196,11 @@ export function useVoiceChat(): UseVoiceChatReturn {
     connect();
 
     return () => {
+      closed = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
       ws?.close();
       window.speechSynthesis?.cancel();
     };
