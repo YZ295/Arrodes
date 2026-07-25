@@ -1,7 +1,7 @@
 {
   "workflow_version": 2,
   "project_kind": "legacy",
-  "phase": "ready",
+  "phase": "ready-to-push",
   "active_change": null,
   "approvals": {
     "baseline": {
@@ -21,13 +21,20 @@
       "approved_at": null
     },
     "hotfix": {
-      "valid": true,
+      "valid": false,
       "digest": "hotfix_20260724_01",
-      "approved_at": "2026-07-24T13:45:00+08:00"
+      "approved_at": "2026-07-24T23:00:00+08:00",
+      "invalidated_at": "2026-07-24T22:00:58+08:00"
     }
   },
   "dependency_approvals": [],
   "verification": null,
   "task_progress": [],
-  "last_completed": null
+  "last_completed": {
+    "change_id": "fix3",
+    "type": "hotfix",
+    "description": "精简 voice 子组件，消除构建竞态",
+    "archive_path": "spec/archive/2026-07-24-fix3/",
+    "completed_at": "2026-07-24T23:30:00+08:00"
+  }
 }

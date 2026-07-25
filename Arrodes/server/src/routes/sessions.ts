@@ -1,46 +1,41 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { SessionRepository } from '../db/session-repo.js';
+import { MessageRepository } from '../db/message-repo.js';
+import type { CreateSessionRequest } from '../../../shared/types/index.js';
 
 export function createSessionRouter(): Router {
   const router = Router();
+  const sessionRepo = new SessionRepository();
+  const messageRepo = new MessageRepository();
 
   // GET /api/sessions - 获取所有会话
   router.get('/', (_req: Request, res: Response) => {
-    res.json({ sessions: [] });
+    const sessions = sessionRepo.findAll();
+    res.json({ sessions });
   });
 
   // POST /api/sessions - 创建新会话
   router.post('/', (req: Request, res: Response) => {
-    const { title, topic, initialMessage } = req.body;
-    // TODO: 创建会话逻辑
-    res.status(201).json({
-      id: 'placeholder',
-      title,
-      topic,
-      messageCount: 0,
-      createdAt: new Date().toISOString(),
-    });
+    const { title, topic, parentId, initialMessage } = req.body as CreateSessionRequest;
+    const session = sessionRepo.create({ title, topic, parentId, initialMessage });
+    res.status(201).json(session);
   });
 
-  // GET /api/sessions/:id - 获取会话详情
-  router.get('/:id', (req: Request, res: Response) => {
-    res.json({
-      id: req.params.id,
-      title: '',
-      topic: 'other',
-      parentId: null,
-      messageCount: 0,
-      lastActiveAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      summary: '',
-      keyMemories: [],
-      messages: [],
-    });
+  // GET /api/sessions/:id - 获取会话详情（含消息和记忆）
+  router.get('/:id', (req: Request<{ id: string }>, res: Response) => {
+    const detail = sessionRepo.findById(req.params.id);
+    if (!detail) {
+      res.status(404).json({ error: '会话未找到', code: 'SESSION_NOT_FOUND' });
+      return;
+    }
+    res.json(detail);
   });
 
   // DELETE /api/sessions/:id - 删除会话
-  router.delete('/:id', (req: Request, res: Response) => {
-    res.json({ deleted: true, id: req.params.id });
+  router.delete('/:id', (req: Request<{ id: string }>, res: Response) => {
+    const deleted = sessionRepo.delete(req.params.id);
+    res.json({ deleted, id: req.params.id });
   });
 
   return router;

@@ -7,6 +7,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
+import { initSchema } from './db/schema.js';
 import { createSessionRouter } from './routes/sessions.js';
 import { createMessageRouter } from './routes/messages.js';
 import { createWebSocketHandler } from './ws/handler.js';
@@ -17,6 +18,9 @@ const server = createServer(app);
 // ---- 中间件 ----
 app.use(cors());
 app.use(express.json());
+
+// ---- 初始化数据库 schema ----
+initSchema();
 
 // ---- 健康检查 ----
 app.get('/api/health', (_req, res) => {

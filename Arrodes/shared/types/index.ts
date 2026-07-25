@@ -110,6 +110,8 @@ export interface WSClientMessage {
   sessionId: string;
   content: string;
   isVoice: boolean;
+  /** 客户端检测到的意图（Phase 1 透传服务端处理） */
+  intent?: IntentResult;
 }
 
 export interface WSServerMessage {

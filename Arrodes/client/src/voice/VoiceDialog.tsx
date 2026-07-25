@@ -4,9 +4,11 @@
  *
  * 包含：VoiceDialog（主面板）、ChatInput（输入区）、MessageList（消息列表）、MessageBubble（消息气泡）
  */
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react';
+import VoiceInputBlurText from './components/VoiceInputBlurText';
 import type { Message } from '@shared/types';
 import { useVoiceChat } from './hooks/useVoiceChat';
+import { eventBus, EVENTS } from '../shared/events/EventBus';
 
 /* ============================================================
  * MessageBubble — 消息气泡（用户 / AI）
@@ -70,7 +72,9 @@ function MessageList({ messages, isLoading }: MessageListProps) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm opacity-40 select-none">
         <div className="text-center">
-          <div className="text-3xl mb-2">✦</div>
+          <svg className="w-8 h-8 mx-auto mb-2 opacity-60" viewBox="0 0 24 24" fill="var(--color-home-gold)">
+            <path d="M12 2.5a1 1 0 011 1v1.3a6.5 6.5 0 015.2 5.2h1.3a1 1 0 110 2h-1.3a6.5 6.5 0 01-5.2 5.2v1.3a1 1 0 11-2 0v-1.3a6.5 6.5 0 01-5.2-5.2H4.5a1 1 0 110-2h1.3a6.5 6.5 0 015.2-5.2V3.5a1 1 0 011-1z" />
+          </svg>
           <p>点击麦克风开始对话</p>
           <p className="text-xs mt-1">或输入文字消息</p>
         </div>
@@ -109,6 +113,7 @@ interface ChatInputProps {
   onStartRecording: () => void;
   onStopRecording: () => void;
   isRecording: boolean;
+  interimText: string;
   disabled?: boolean;
 }
 
@@ -117,18 +122,10 @@ function ChatInput({
   onStartRecording,
   onStopRecording,
   isRecording,
+  interimText,
   disabled,
 }: ChatInputProps) {
   const [text, setText] = useState('');
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // 自动调整 textarea 高度
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px';
-    }
-  }, [text]);
 
   const handleSend = () => {
     const trimmed = text.trim();
@@ -147,6 +144,10 @@ function ChatInput({
   const handleMicClick = () => {
     if (disabled) return;
     if (isRecording) {
+      // 停止录制时，将尚未确认的语音转写结果追加到输入框
+      if (interimText) {
+        setText((prev) => prev + interimText);
+      }
       onStopRecording();
     } else {
       onStartRecording();
@@ -156,23 +157,16 @@ function ChatInput({
   return (
     <div className="border-t border-white/10 px-4 py-3">
       <div className="flex items-end gap-2">
-        {/* 文本输入框 */}
-        <textarea
-          ref={inputRef}
+        {/* 文本输入框 + 语音模糊转写 */}
+        <VoiceInputBlurText
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
           onKeyDown={handleKeyDown}
+          interimText={interimText}
+          isRecording={isRecording}
+          disabled={disabled}
           placeholder="输入消息..."
-          rows={1}
-          disabled={disabled || isRecording}
-          className={`
-            flex-1 bg-white/5 rounded-xl px-3 py-2 text-sm
-            text-[var(--color-text-primary)] placeholder-gray-500
-            resize-none outline-none
-            transition-colors duration-200
-            focus:bg-white/10
-            disabled:opacity-40
-          `}
+          className="flex-1"
         />
 
         {/* 语音录制按钮 */}
@@ -221,16 +215,43 @@ function ChatInput({
  * VoiceDialog — 主面板
  * ============================================================ */
 export default function VoiceDialog() {
+  const [isOpen, setIsOpen] = useState(false);
+
   const {
     messages,
     isRecording,
     isLoading,
     isConnected,
+    interimText,
+    isSpeaking,
     startRecording,
     stopRecording,
     sendTextMessage,
     currentSessionId,
   } = useVoiceChat();
+
+  // Cmd/Ctrl + K 切换面板显示/隐藏
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown as EventListener);
+    return () => window.removeEventListener('keydown', handleKeyDown as EventListener);
+  }, []);
+
+  // 点击星球时打开面板
+  useEffect(() => {
+    const unsubscribe = eventBus.on(EVENTS.UNIVERSE_PLANET_CLICK, () => {
+      setIsOpen(true);
+    });
+    return unsubscribe;
+  }, []);
+
+  if (!isOpen) return null;
 
   const handleSendText = useCallback((text: string) => {
     sendTextMessage(text);
@@ -246,6 +267,7 @@ export default function VoiceDialog() {
 
   return (
     <div
+      onPointerDown={(e) => e.stopPropagation()}
       className="
         absolute bottom-6 right-6 z-50
         w-[380px] h-[520px] max-h-[80vh]
@@ -271,6 +293,14 @@ export default function VoiceDialog() {
         </div>
 
         <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+          {isSpeaking && (
+            <span className="flex items-center gap-1 text-yellow-400">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-8.464a5 5 0 000 7.072" />
+              </svg>
+              播放中
+            </span>
+          )}
           {currentSessionId ? (
             <span className="truncate max-w-[120px]">
               ID: {currentSessionId.slice(0, 8)}
@@ -290,6 +320,7 @@ export default function VoiceDialog() {
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         isRecording={isRecording}
+        interimText={interimText}
         disabled={!isConnected}
       />
     </div>

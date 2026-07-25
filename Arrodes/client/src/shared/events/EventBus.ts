@@ -90,6 +90,7 @@ export default EventBus;
  * "voice:reply:complete"        - AI 回复完成 { sessionId: string }
  * "voice:session:create"        - 创建新会话 { title: string, topic: string }
  * "voice:session:switch"        - 切换会话 { sessionId: string }
+ * "voice:intent:action"         - 客户端意图触发 { intent: IntentResult }
  *
  * ===== 导航系统事件 =====
  * "nav:search:select"           - 搜索选中 { sessionId: string }
@@ -112,6 +113,7 @@ export const EVENTS = {
   VOICE_REPLY_COMPLETE: 'voice:reply:complete',
   VOICE_SESSION_CREATE: 'voice:session:create',
   VOICE_SESSION_SWITCH: 'voice:session:switch',
+  VOICE_INTENT_ACTION: 'voice:intent:action',
 
   // 导航
   NAV_SEARCH_SELECT: 'nav:search:select',

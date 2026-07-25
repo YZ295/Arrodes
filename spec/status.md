@@ -1,8 +1,8 @@
 # Wu5 Dev Flow 状态
 
-- 阶段：`build`
+- 阶段：`ready-to-push`
 - 项目类型：`legacy`
-- 当前分支：`develop`
+- 当前分支：`fix/fix3`
 - 活动变更：`none`
 - 变更模式：`none`
 
