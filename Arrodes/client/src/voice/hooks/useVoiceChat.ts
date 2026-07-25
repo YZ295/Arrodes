@@ -23,6 +23,7 @@ interface UseVoiceChatReturn {
   interimText: string;
   isSpeaking: boolean;
   isMuted: boolean;
+  error: string | null;
   startRecording: () => void;
   stopRecording: () => void;
   sendTextMessage: (text: string) => void;
@@ -69,6 +70,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
   const hasLoadedHistory = useRef(false);
   const lastSpokenContent = useRef<string>('');
   const hasInitializedSession = useRef(false);
+  const reconnectAttempt = useRef(0);
 
   const {
     isRecording,
@@ -129,6 +131,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
 
       ws.onopen = () => {
         setIsConnected(true);
+        reconnectAttempt.current = 0;
 
         if (!hasInitializedSession.current) {
           // 首次连接：创建新会话
@@ -163,8 +166,10 @@ export function useVoiceChat(): UseVoiceChatReturn {
       ws.onclose = () => {
         setIsConnected(false);
         wsRef.current = null;
-        // 断线重连
-        setTimeout(connect, 3000);
+        // 指数退避重连: 3s -> 6s -> 12s -> max 30s
+        const delay = Math.min(3000 * Math.pow(2, reconnectAttempt.current), 30000);
+        reconnectAttempt.current++;
+        setTimeout(connect, delay);
       };
 
       ws.onmessage = (event: MessageEvent) => {
@@ -463,6 +468,9 @@ export function useVoiceChat(): UseVoiceChatReturn {
     });
   }, [stopAudioRecorder, startStt, sendMessage, currentSessionId]);
 
+  // 合并录音/STT错误为单一提示
+  const voiceError = recorderError || sttError || null;
+
   return {
     messages,
     isRecording,
@@ -472,6 +480,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
     interimText,
     isSpeaking,
     isMuted,
+    error: voiceError,
     startRecording,
     stopRecording,
     sendTextMessage,

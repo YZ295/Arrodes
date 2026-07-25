@@ -224,6 +224,7 @@ export default function VoiceDialog() {
     isConnected,
     interimText,
     isSpeaking,
+    error: voiceError,
     startRecording,
     stopRecording,
     sendTextMessage,
@@ -310,6 +311,13 @@ export default function VoiceDialog() {
           )}
         </div>
       </div>
+
+      {/* 错误提示 */}
+      {voiceError && (
+        <div className="px-4 py-2 text-xs text-red-300 bg-red-500/10 border-b border-red-500/20">
+          {voiceError}
+        </div>
+      )}
 
       {/* 消息列表 */}
       <MessageList messages={messages} isLoading={isLoading} />
