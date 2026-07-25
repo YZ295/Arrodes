@@ -148,20 +148,27 @@ export function useVoiceChat(): UseVoiceChatReturn {
             .then((r) => r.json())
             .then((data: { sessions: SessionNode[] }) => {
               const sessions = data.sessions || [];
-              if (sessions.length > 0) {
+              // 过滤掉无消息的空会话（测试/幽灵会话）
+              const validSessions = sessions.filter((s) => s.messageCount > 0);
+              if (validSessions.length > 0) {
                 // 有历史会话：渲染星球，默认选中最新活跃的（第一条）
                 const store = useUniverseStore.getState();
-                store.setPlanets(sessions);
-                const firstSession = sessions[0];
+                store.setPlanets(validSessions);
+                const firstSession = validSessions[0];
                 setCurrentSessionId(firstSession.id);
                 recordingSessionId.current = firstSession.id;
                 loadMessages(firstSession.id);
               } else {
                 // 无历史会话：兜底创建默认会话（系统行为，不自动切换相机）
+                // 带初始消息确保 messageCount > 0，避免被过滤
                 return fetch('/api/v1/sessions', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ title: '新对话', topic: 'other' }),
+                  body: JSON.stringify({
+                    title: '新对话',
+                    topic: 'other',
+                    initialMessage: '你好，阿罗德斯',
+                  }),
                 })
                   .then((r) => r.json())
                   .then((session: SessionNode) => {
