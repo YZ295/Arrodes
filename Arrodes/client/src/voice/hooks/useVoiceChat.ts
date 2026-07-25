@@ -68,6 +68,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
   const recordingSessionId = useRef<string | null>(null);
   const hasLoadedHistory = useRef(false);
   const lastSpokenContent = useRef<string>('');
+  const hasInitializedSession = useRef(false);
 
   const {
     isRecording,
@@ -118,7 +119,8 @@ export function useVoiceChat(): UseVoiceChatReturn {
   // 建立 WebSocket 连接
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/v1/chat`;
+    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:3001';
+    const wsUrl = `${protocol}//${wsHost}/v1/chat`;
     let ws: WebSocket;
 
     const connect = () => {
@@ -127,27 +129,35 @@ export function useVoiceChat(): UseVoiceChatReturn {
 
       ws.onopen = () => {
         setIsConnected(true);
-        hasLoadedHistory.current = false;
 
-        // 新会话 — 先创建会话
-        fetch('/api/v1/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: '新对话', topic: 'other' }),
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            setCurrentSessionId(data.id);
-            recordingSessionId.current = data.id;
-            // 加载历史消息
-            loadMessages(data.id);
+        if (!hasInitializedSession.current) {
+          // 首次连接：创建新会话
+          hasInitializedSession.current = true;
+          hasLoadedHistory.current = false;
+
+          fetch('/api/v1/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: '新对话', topic: 'other' }),
           })
-          .catch(() => {
-            // 降级：使用临时 ID
-            const tmpId = uid();
-            setCurrentSessionId(tmpId);
-            recordingSessionId.current = tmpId;
-          });
+            .then((r) => r.json())
+            .then((data) => {
+              setCurrentSessionId(data.id);
+              recordingSessionId.current = data.id;
+              loadMessages(data.id);
+            })
+            .catch(() => {
+              const tmpId = uid();
+              setCurrentSessionId(tmpId);
+              recordingSessionId.current = tmpId;
+            });
+        } else {
+          // 重连：恢复已有 session
+          hasLoadedHistory.current = false;
+          if (currentSessionId) {
+            loadMessages(currentSessionId);
+          }
+        }
       };
 
       ws.onclose = () => {
@@ -179,6 +189,21 @@ export function useVoiceChat(): UseVoiceChatReturn {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 监听会话切换事件（如通过语音新建会话后自动切换）
+  useEffect(() => {
+    const unsubscribe = eventBus.on(EVENTS.VOICE_SESSION_SWITCH, (data: unknown) => {
+      const { sessionId } = (data as { sessionId: string }) || {};
+      if (sessionId) {
+        setCurrentSessionId(sessionId);
+        recordingSessionId.current = sessionId;
+        hasLoadedHistory.current = false;
+        setMessages([]);
+        loadMessages(sessionId);
+      }
+    });
+    return unsubscribe;
+  }, [loadMessages]);
 
   // TTS 播放辅助回复
   const speakReply = useCallback((content: string) => {

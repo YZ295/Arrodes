@@ -251,8 +251,6 @@ export default function VoiceDialog() {
     return unsubscribe;
   }, []);
 
-  if (!isOpen) return null;
-
   const handleSendText = useCallback((text: string) => {
     sendTextMessage(text);
   }, [sendTextMessage]);
@@ -264,6 +262,8 @@ export default function VoiceDialog() {
   const handleStopRecording = useCallback(() => {
     stopRecording();
   }, [stopRecording]);
+
+  if (!isOpen) return null;
 
   return (
     <div

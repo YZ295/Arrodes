@@ -9,6 +9,9 @@ import { eventBus, EVENTS } from '../shared/events/EventBus';
 import { useUniverseStore } from '../shared/stores/useUniverseStore';
 import type { SessionNode } from '@shared/types';
 
+// 新会话默认带一条消息，让星球初始尺寸可见
+const INITIAL_MESSAGE_COUNT = 1;
+
 const ORBIT_R = 8;
 const ORBIT_STEP = 3.5;
 
@@ -49,8 +52,14 @@ export default function SessionSpawner() {
         const nonHomeCount = planets.filter((p) => !p.isHome).length;
         const position = calcSpawnPosition(nonHomeCount);
 
+        // 补充初始消息数，让星球可见
+        const sessionWithCount = { ...session, messageCount: INITIAL_MESSAGE_COUNT };
+
         // 添加到宇宙（会自动触发 UNIVERSE_PLANET_SPAWNED）
-        addPlanet(session, position);
+        addPlanet(sessionWithCount, position);
+
+        // 通知语音系统切换到新会话
+        eventBus.emit(EVENTS.VOICE_SESSION_SWITCH, { sessionId: session.id });
 
         // 相机聚焦新星球
         setCameraTarget(session.id);

@@ -1,0 +1,23 @@
+# SQLite database files
+server/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Node modules
+node_modules/
+
+# Build output
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# Windows reserved device name (prevents fatal: invalid path)
+nul
