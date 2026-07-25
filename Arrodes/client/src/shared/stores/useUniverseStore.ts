@@ -4,6 +4,7 @@
  */
 import { create } from 'zustand';
 import type { SessionNode, SessionTopic } from '@shared/types';
+import { eventBus, EVENTS } from '../events/EventBus';
 
 export interface PlanetVisualData {
   id: string;
@@ -100,6 +101,8 @@ export const useUniverseStore = create<UniverseState>((set, get) => ({
       isHome: false,
     };
     set((state) => ({ planets: [...state.planets, newPlanet] }));
+    // 通知宇宙系统新星球已生成
+    eventBus.emit(EVENTS.UNIVERSE_PLANET_SPAWNED, { sessionId: session.id, position });
   },
 
   removePlanet: (id) => {

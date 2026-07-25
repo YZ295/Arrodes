@@ -10,6 +10,7 @@ import SolarSystem from './SolarSystem';
 import CameraController from './CameraController';
 import ParticleSystem from './effects/ParticleSystem';
 import Bloom from './effects/Bloom';
+import SessionSpawner from './SessionSpawner';
 
 export default function Universe() {
   return (
@@ -43,6 +44,9 @@ export default function Universe() {
 
       {/* 会话星球轨道系统 */}
       <SolarSystem />
+
+      {/* 语音创建会话事件桥接 */}
+      <SessionSpawner />
 
       {/* 相机控制 */}
       <CameraController />

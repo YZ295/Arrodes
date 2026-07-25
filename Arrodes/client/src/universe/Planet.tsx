@@ -39,12 +39,15 @@ export default function Planet({
   // 跟踪悬停状态
   const hoverRef = useRef(false);
   const currentScale = useRef(1);
+  // 入场生长动画
+  const spawnProgress = useRef(0);
 
   // 大气层着色器 uniforms（持久化引用避免重建）
   const atmoUniforms = useMemo(
     () => ({
       uColor: { value: new THREE.Color(hexColor) },
       uTime: { value: 0 },
+      uSpawn: { value: 0 },
     }),
     [],
   );
@@ -55,8 +58,18 @@ export default function Planet({
     colorObj.set(hexColor);
   }, [hexColor, colorObj, atmoUniforms.uColor.value]);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const elapsed = state.clock.elapsedTime;
+
+    // ---- 入场生长动画 ----
+    if (spawnProgress.current < 1) {
+      spawnProgress.current = Math.min(1, spawnProgress.current + delta / 0.8);
+    }
+    const spawn = spawnProgress.current;
+    // easeOutBack 让生长更有生命力
+    const spawnScale = spawn < 1
+      ? 1.7 * spawn * spawn * spawn - 2.1 * spawn * spawn + 1.2 * spawn
+      : 1;
 
     // ---- 浮沉呼吸动画 ----
     if (groupRef.current) {
@@ -73,10 +86,12 @@ export default function Planet({
     // ---- 大气层动画 ----
     if (atmoRef.current) {
       atmoRef.current.uniforms.uTime.value = elapsed;
+      atmoRef.current.uniforms.uSpawn.value = spawn;
     }
 
     // ---- 缩放过渡 ----
-    const targetScale = hoverRef.current || isActive ? 1.15 : 1;
+    const baseScale = spawn < 1 ? spawnScale : 1;
+    const targetScale = baseScale * (hoverRef.current || isActive ? 1.15 : 1);
     currentScale.current += (targetScale - currentScale.current) * 0.08;
     if (meshRef.current) {
       meshRef.current.scale.setScalar(currentScale.current);
@@ -149,6 +164,7 @@ export default function Planet({
           fragmentShader={`
             uniform vec3  uColor;
             uniform float uTime;
+            uniform float uSpawn;
             varying vec3  vNormal;
             varying vec3  vPosition;
 
@@ -157,7 +173,7 @@ export default function Planet({
               float fresnel = 1.0 - max(dot(viewDir, vNormal), 0.0);
               fresnel = pow(fresnel, 2.5);
               float pulse  = 0.85 + 0.15 * sin(uTime * 1.8);
-              float alpha  = fresnel * 0.7 * pulse;
+              float alpha  = fresnel * 0.7 * pulse * uSpawn;
               gl_FragColor = vec4(uColor, alpha);
             }
           `}
@@ -173,7 +189,7 @@ export default function Planet({
         <spriteMaterial
           color={hexColor}
           transparent
-          opacity={isActive ? 0.12 : 0.05}
+          opacity={(isActive ? 0.12 : 0.05) * spawnProgress.current}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
@@ -213,7 +229,7 @@ export default function Planet({
         <meshBasicMaterial
           color={hexColor}
           transparent
-          opacity={isActive ? 0.15 : 0.04}
+          opacity={(isActive ? 0.15 : 0.04) * spawnProgress.current}
           depthWrite={false}
         />
       </mesh>
@@ -228,7 +244,7 @@ export default function Planet({
           anchorY="top"
           outlineWidth={0.02}
           outlineColor="#000000"
-          fillOpacity={0.9}
+          fillOpacity={0.9 * spawnProgress.current}
           maxWidth={size * 6}
         >
           {title}

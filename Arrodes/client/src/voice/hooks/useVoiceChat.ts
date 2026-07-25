@@ -321,7 +321,16 @@ export function useVoiceChat(): UseVoiceChatReturn {
             },
           ]);
         }
-        eventBus.emit(EVENTS.VOICE_INTENT_ACTION, { intent: detection.intent });
+        // 新建会话意图直接走 voice:session:create 事件
+        if (detection.intent.type === 'new_session') {
+          const params = detection.intent.params as { title?: string };
+          eventBus.emit(EVENTS.VOICE_SESSION_CREATE, {
+            title: params.title || '新会话',
+            topic: 'other',
+          });
+        } else {
+          eventBus.emit(EVENTS.VOICE_INTENT_ACTION, { intent: detection.intent });
+        }
         return;
       }
 
