@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import type { SessionNode, SessionTopic } from '@shared/types';
 import { eventBus, EVENTS } from '../events/EventBus';
+import { calcSpawnPosition } from '../../universe/utils/spawnPosition';
 
 export interface PlanetVisualData {
   id: string;
@@ -73,7 +74,7 @@ export const useUniverseStore = create<UniverseState>((set, get) => ({
         velocity: { x: 0, y: 0, z: 0 },
         isHome: true,
       },
-      ...sessions.map((s) => ({
+      ...sessions.map((s, index) => ({
         id: s.id,
         title: s.title,
         topic: s.topic,
@@ -81,6 +82,8 @@ export const useUniverseStore = create<UniverseState>((set, get) => ({
         messageCount: s.messageCount,
         lastActiveAt: s.lastActiveAt,
         createdAt: s.createdAt,
+        position: calcSpawnPosition(index),
+        velocity: { x: 0, y: 0, z: 0 },
         isHome: false,
       })),
     ];

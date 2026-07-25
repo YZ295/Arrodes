@@ -3,8 +3,10 @@
  * 管理 WebSocket 连接、消息状态、录制、STT/TTS 和消息加载
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { Message, WSClientMessage, WSServerMessage } from '@shared/types';
+import type { Message, WSClientMessage, WSServerMessage, SessionNode } from '@shared/types';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
+import { useUniverseStore } from '../../shared/stores/useUniverseStore';
+import { calcSpawnPosition } from '../../universe/utils/spawnPosition';
 import { useAudioRecorder } from './useAudioRecorder';
 import { useSpeechToText } from './useSpeechToText';
 import {
@@ -138,20 +140,38 @@ export function useVoiceChat(): UseVoiceChatReturn {
         reconnectAttempt.current = 0;
 
         if (!hasInitializedSession.current) {
-          // 首次连接：创建新会话
+          // 首次连接：先拉取已有会话列表
           hasInitializedSession.current = true;
           hasLoadedHistory.current = false;
 
-          fetch('/api/v1/sessions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: '新对话', topic: 'other' }),
-          })
+          fetch('/api/v1/sessions')
             .then((r) => r.json())
-            .then((data) => {
-              setCurrentSessionId(data.id);
-              recordingSessionId.current = data.id;
-              loadMessages(data.id);
+            .then((data: { sessions: SessionNode[] }) => {
+              const sessions = data.sessions || [];
+              if (sessions.length > 0) {
+                // 有历史会话：渲染星球，默认选中最新活跃的（第一条）
+                const store = useUniverseStore.getState();
+                store.setPlanets(sessions);
+                const firstSession = sessions[0];
+                setCurrentSessionId(firstSession.id);
+                recordingSessionId.current = firstSession.id;
+                loadMessages(firstSession.id);
+              } else {
+                // 无历史会话：兜底创建默认会话（系统行为，不自动切换相机）
+                return fetch('/api/v1/sessions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title: '新对话', topic: 'other' }),
+                })
+                  .then((r) => r.json())
+                  .then((session: SessionNode) => {
+                    const store = useUniverseStore.getState();
+                    store.addPlanet(session, calcSpawnPosition(0));
+                    setCurrentSessionId(session.id);
+                    recordingSessionId.current = session.id;
+                    loadMessages(session.id);
+                  });
+              }
             })
             .catch(() => {
               const tmpId = uid();
@@ -201,7 +221,13 @@ export function useVoiceChat(): UseVoiceChatReturn {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
-      ws?.close();
+      // StrictMode 下 useEffect 会跑两次：
+      // 第一次的 cleanup 会关闭还在 CONNECTING 的 WebSocket，
+      // 导致 "closed before establishment" 报错。
+      // 只在 OPEN/CLOSING 时关，CONNECTING 的让浏览器自己收尾。
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING)) {
+        ws.close();
+      }
       window.speechSynthesis?.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,6 +238,21 @@ export function useVoiceChat(): UseVoiceChatReturn {
     const unsubscribe = eventBus.on(EVENTS.VOICE_SESSION_SWITCH, (data: unknown) => {
       const { sessionId } = (data as { sessionId: string }) || {};
       if (sessionId) {
+        setCurrentSessionId(sessionId);
+        recordingSessionId.current = sessionId;
+        hasLoadedHistory.current = false;
+        setMessages([]);
+        loadMessages(sessionId);
+      }
+    });
+    return unsubscribe;
+  }, [loadMessages]);
+
+  // 监听星球点击事件（用户手动切换会话）
+  useEffect(() => {
+    const unsubscribe = eventBus.on(EVENTS.UNIVERSE_PLANET_CLICK, (data: unknown) => {
+      const { sessionId } = (data as { sessionId?: string }) || {};
+      if (sessionId && sessionId !== 'home') {
         setCurrentSessionId(sessionId);
         recordingSessionId.current = sessionId;
         hasLoadedHistory.current = false;
