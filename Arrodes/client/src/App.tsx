@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
+import { memo, useEffect } from 'react';
 import { eventBus, EVENTS } from './shared/events/EventBus';
 import Universe from './universe/Universe';
 import VoiceDialog from './voice/VoiceDialog';
 
-function App() {
+const App = memo(function App() {
   useEffect(() => {
     // 应用初始化完成
     eventBus.emit(EVENTS.APP_READY);
@@ -18,6 +18,6 @@ function App() {
       <VoiceDialog />
     </div>
   );
-}
+});
 
 export default App;

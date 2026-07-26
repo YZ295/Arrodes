@@ -1,17 +1,17 @@
 /**
  * 太阳系群组
- * 管理所有非主星球的轨道运动
+ * 管理所有非主星球的显示与轨道运动
+ *
+ * ⚠️ 注意：星球初始位置由 SessionSpawner.calcSpawnPosition 计算并存入 zustand store，
+ *   此处直接使用 store 中的 position，不再自行重算。
+ *   以前版本每次 sessionPlanets.length 变就重算所有轨道 → 所有星球跳位 → 闪烁。
  */
-import { useRef, useMemo } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import Planet from './Planet';
 import { useUniverseStore } from '../shared/stores/useUniverseStore';
 import { eventBus, EVENTS } from '../shared/events/EventBus';
-
-// 轨道半径常量
-const ORBIT_R = 8;
-const ORBIT_STEP = 3.5;
 
 export default function SolarSystem() {
   const groupRef = useRef<THREE.Group>(null);
@@ -20,26 +20,13 @@ export default function SolarSystem() {
   const selectPlanet = useUniverseStore((s) => s.selectPlanet);
   const setCameraTarget = useUniverseStore((s) => s.setCameraTarget);
 
-  // 为非主星球计算轨道位置
-  const sessionPlanets = useMemo(() => {
-    return planets.filter((p) => !p.isHome);
-  }, [planets]);
+  // 过滤主星球，只看会话星球
+  const sessionPlanets = planets.filter((p) => !p.isHome);
 
-  // 轨道位置
-  const orbits = useMemo(() => {
-    return sessionPlanets.map((p, i) => {
-      const angle = (i / sessionPlanets.length) * Math.PI * 2;
-      const radius = ORBIT_R + (i % 3) * ORBIT_STEP;
-      return {
-        id: p.id,
-        angle,
-        radius,
-        speed: 0.1 + Math.random() * 0.15,
-        offsetY: (i % 5 - 2) * 2,
-      };
-    });
-  }, [sessionPlanets.length]);
+  // 直接从 store 取存入的位置，不自己算轨道
+  // 以前版本每次 planets 变就重算所有轨道 → 所有星球跳位 → 闪烁
 
+  // 微缓旋转整个星群
   useFrame((_state, delta) => {
     if (groupRef.current) {
       groupRef.current.rotation.y += delta * 0.02;
@@ -54,18 +41,13 @@ export default function SolarSystem() {
 
   return (
     <group ref={groupRef}>
-      {sessionPlanets.map((planet, i) => {
-        const orbit = orbits[i];
-        if (!orbit) return null;
-
-        const x = Math.cos(orbit.angle) * orbit.radius;
-        const z = Math.sin(orbit.angle) * orbit.radius;
-        const y = orbit.offsetY;
-
+      {sessionPlanets.map((planet) => {
+        // 直接从 store 取存入的位置，不自己算
+        const pos = planet.position || { x: 0, y: 0, z: 0 };
         return (
           <Planet
             key={planet.id}
-            position={[x, y, z]}
+            position={[pos.x, pos.y, pos.z]}
             color={planet.topic}
             size={0.5 + Math.min(planet.messageCount * 0.05, 0.8)}
             isActive={planet.id === selectedPlanetId}

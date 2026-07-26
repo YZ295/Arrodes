@@ -3,13 +3,11 @@
  * 使用 React Three Fiber 渲染的沉浸式星系空间
  */
 import { Canvas } from '@react-three/fiber';
-import { EffectComposer } from '@react-three/postprocessing';
 import Starfield from './Starfield';
 import HomePlanet from './HomePlanet';
 import SolarSystem from './SolarSystem';
 import CameraController from './CameraController';
 import ParticleSystem from './effects/ParticleSystem';
-import Bloom from './effects/Bloom';
 import SessionSpawner from './SessionSpawner';
 
 export default function Universe() {
@@ -27,6 +25,8 @@ export default function Universe() {
         powerPreference: 'high-performance',
       }}
       dpr={[1, 1.5]}
+      style={{ background: '#0a0e27' }}
+      onCreated={({ gl }) => { gl.setClearColor('#0a0e27'); }}
     >
       {/* 环境光 + 点光源 */}
       <ambientLight intensity={0.4} />
@@ -51,10 +51,10 @@ export default function Universe() {
       {/* 相机控制 */}
       <CameraController />
 
-      {/* 后期特效：Bloom */}
-      <EffectComposer>
+      {/* 后期特效：Bloom — 临时注释掉排查闪屏 */}
+      {/* <EffectComposer>
         <Bloom />
-      </EffectComposer>
+      </EffectComposer> */}
     </Canvas>
   );
 }

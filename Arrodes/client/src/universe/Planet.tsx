@@ -2,7 +2,7 @@
  * 会话星球
  * 根据主题显示不同颜色，包含大气层辉光、轨道环和动画交互
  */
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -18,7 +18,9 @@ interface PlanetProps {
   onClick?: () => void;
 }
 
-export default function Planet({
+// memo 防止新增星球时老星球全部重渲染
+// 自定义比较：只关心实际值是否变，不关心引用地址
+function Planet({
   position,
   color = 'other',
   size = 0.6,
@@ -253,3 +255,17 @@ export default function Planet({
     </group>
   );
 }
+
+
+const PlanetMemo = memo(Planet, (prev, next) =>
+  prev.position[0] === next.position[0] &&
+  prev.position[1] === next.position[1] &&
+  prev.position[2] === next.position[2] &&
+  prev.color === next.color &&
+  prev.size === next.size &&
+  prev.isActive === next.isActive &&
+  prev.title === next.title &&
+  prev.onClick === next.onClick
+);
+
+export default PlanetMemo;
