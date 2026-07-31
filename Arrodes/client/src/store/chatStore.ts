@@ -17,12 +17,8 @@ import type {
   MemoryNode,
   CreateSessionRequest,
 } from '@shared/types';
-
-// ---- 工具 ----
-
-function uid(): string {
-  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
+import { uid } from '../shared/utils/uid';
+import { api } from '../shared/utils/apiClient';
 
 // ---- 类型 ----
 
@@ -112,10 +108,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadSessions: async () => {
     set({ sessionsLoading: true, sessionsError: null });
     try {
-      const res = await fetch('/api/v1/sessions');
-      if (!res.ok) throw new Error(`loadSessions failed: ${res.status}`);
-      const data = await res.json();
-      set({ sessions: data.sessions ?? data, sessionsLoading: false });
+      const data = await api.get<{ sessions: SessionNode[] }>('/sessions');
+      set({ sessions: data.sessions ?? (data as unknown as SessionNode[]), sessionsLoading: false });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'loadSessions failed';
       set({ sessionsError: msg, sessionsLoading: false });
@@ -123,30 +117,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   createSession: async (data) => {
-    const res = await fetch('/api/v1/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error(`createSession failed: ${res.status}`);
-    const session: SessionNode = await res.json();
-
+    const session = await api.post<SessionNode>('/sessions', data);
     set((state) => ({
       sessions: [session, ...state.sessions],
       currentSessionId: session.id,
       messages: [],
       memories: [],
     }));
-
     return session.id;
   },
 
   deleteSession: async (id) => {
-    const res = await fetch(`/api/v1/sessions/${id}`, { method: 'DELETE' });
-    if (!res.ok && res.status !== 404) {
-      throw new Error(`deleteSession failed: ${res.status}`);
+    try {
+      await api.delete(`/sessions/${id}`);
+    } catch (e) {
+      if (e instanceof Error && !e.message.includes('404')) {
+        throw e;
+      }
     }
-
     set((state) => {
       const sessions = state.sessions.filter((s) => s.id !== id);
       const isCurrent = state.currentSessionId === id;
@@ -161,14 +149,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   switchSession: async (id) => {
     if (id === get().currentSessionId) return;
-
     set({ currentSessionId: id, messages: [], memories: [], messagesLoading: true, messagesError: null });
-
     try {
-      const res = await fetch(`/api/v1/sessions/${id}`);
-      if (!res.ok) throw new Error(`switchSession failed: ${res.status}`);
-      const data = await res.json();
-
+      const data = await api.get<SessionNode & { messages: Message[]; keyMemories: MemoryNode[] }>(`/sessions/${id}`);
       set({
         messages: data.messages ?? [],
         memories: data.keyMemories ?? [],
@@ -186,7 +169,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const sessionId = get().currentSessionId;
     if (!sessionId) return;
 
-    // 乐观添加用户消息
     const userMsgId = uid();
     const userMessage: Message = {
       id: userMsgId,
@@ -202,28 +184,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     try {
-      const res = await fetch(`/api/v1/chat/${sessionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, isVoice }),
-      });
-
-      if (!res.ok) throw new Error(`sendMessage failed: ${res.status}`);
-
-      const data = await res.json();
-
-      // 添加 AI 回复
-      const aiMsgId = uid();
-      const aiMessage: Message = {
-        id: aiMsgId,
-        role: 'assistant',
-        content: data.reply ?? '',
-        timestamp: new Date().toISOString(),
-        isVoice: false,
-      };
+      const data = await api.post<{ reply?: string; memories?: MemoryNode[] }>(
+        `/chat/${sessionId}`,
+        { content, isVoice },
+      );
 
       set((state) => ({
-        messages: [...state.messages, aiMessage],
+        messages: [
+          ...state.messages,
+          {
+            id: uid(),
+            role: 'assistant',
+            content: data.reply ?? '',
+            timestamp: new Date().toISOString(),
+            isVoice: false,
+          },
+        ],
         memories: data.memories ?? state.memories,
         isAiResponding: false,
       }));

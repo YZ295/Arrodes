@@ -33,7 +33,6 @@ function Planet({
   const glowRef = useRef<THREE.Sprite>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   const ring2Ref = useRef<THREE.Mesh>(null);
-  const atmoRef = useRef<THREE.ShaderMaterial>(null);
 
   const hexColor = TOPIC_COLOR_HEX[color] ?? 0x6b7280;
   const colorObj = useMemo(() => new THREE.Color(hexColor), []);
@@ -43,22 +42,6 @@ function Planet({
   const currentScale = useRef(1);
   // 入场生长动画
   const spawnProgress = useRef(0);
-
-  // 大气层着色器 uniforms（持久化引用避免重建）
-  const atmoUniforms = useMemo(
-    () => ({
-      uColor: { value: new THREE.Color(hexColor) },
-      uTime: { value: 0 },
-      uSpawn: { value: 0 },
-    }),
-    [],
-  );
-
-  // 颜色变化时同步更新 uniform
-  useMemo(() => {
-    atmoUniforms.uColor.value.set(hexColor);
-    colorObj.set(hexColor);
-  }, [hexColor, colorObj, atmoUniforms.uColor.value]);
 
   useFrame((state, delta) => {
     const elapsed = state.clock.elapsedTime;
@@ -83,12 +66,6 @@ function Planet({
     if (meshRef.current) {
       meshRef.current.rotation.y += 0.008;
       meshRef.current.rotation.x = Math.sin(elapsed * 0.25) * 0.08;
-    }
-
-    // ---- 大气层动画 ----
-    if (atmoRef.current) {
-      atmoRef.current.uniforms.uTime.value = elapsed;
-      atmoRef.current.uniforms.uSpawn.value = spawn;
     }
 
     // ---- 缩放过渡 ----
@@ -134,7 +111,6 @@ function Planet({
           hoverRef.current = false;
           document.body.style.cursor = 'default';
         }}
-        castShadow
       >
         <sphereGeometry args={[size, 32, 32]} />
         <meshPhysicalMaterial
@@ -148,40 +124,17 @@ function Planet({
         />
       </mesh>
 
-      {/* ===== 大气层辉光（Fresnel 着色器） ===== */}
+      {/* ===== 大气层辉光（标准材质替换自定义着色器，避免GPU驱动崩溃） ===== */}
       <mesh>
-        <sphereGeometry args={[size * 1.18, 32, 32]} />
-        <shaderMaterial
-          ref={atmoRef}
-          uniforms={atmoUniforms}
-          vertexShader={`
-            varying vec3 vNormal;
-            varying vec3 vPosition;
-            void main() {
-              vNormal   = normalize(normalMatrix * normal);
-              vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
-              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-          `}
-          fragmentShader={`
-            uniform vec3  uColor;
-            uniform float uTime;
-            uniform float uSpawn;
-            varying vec3  vNormal;
-            varying vec3  vPosition;
-
-            void main() {
-              vec3  viewDir = normalize(-vPosition);
-              float fresnel = 1.0 - max(dot(viewDir, vNormal), 0.0);
-              fresnel = pow(fresnel, 2.5);
-              float pulse  = 0.85 + 0.15 * sin(uTime * 1.8);
-              float alpha  = fresnel * 0.7 * pulse * uSpawn;
-              gl_FragColor = vec4(uColor, alpha);
-            }
-          `}
+        <sphereGeometry args={[size * 1.2, 16, 16]} />
+        <meshPhysicalMaterial
+          color={hexColor}
           transparent
+          opacity={0.08}
           side={THREE.BackSide}
-          blending={THREE.AdditiveBlending}
+          envMapIntensity={0.4}
+          roughness={0.2}
+          metalness={0.1}
           depthWrite={false}
         />
       </mesh>

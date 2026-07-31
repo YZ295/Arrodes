@@ -1,24 +1,25 @@
 /**
- * 语音聊天 Hook
- * 管理 WebSocket 连接、消息状态、录制、STT/TTS 和消息加载
+ * 语音聊天 Hook v4.4
+ * 多会话管理 + STT Promise 竞态修复 + 管道编排
  */
-import { useState, useRef, useCallback, useEffect } from 'react';
-import type { Message, WSClientMessage, WSServerMessage, SessionNode } from '@shared/types';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import type { Message, WSClientMessage, SessionNode, WSChunkData, WSCompleteData, WSMemoryData } from '@shared/types';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
 import { useUniverseStore } from '../../shared/stores/useUniverseStore';
 import { calcSpawnPosition } from '../../universe/utils/spawnPosition';
+import { uid } from '../../shared/utils/uid';
+import { api } from '../../shared/utils/apiClient';
+import { MessageChannel, useMessageChannel } from '../../core/MessageChannel';
+import { createVoicePipeline } from '../../pipeline/voicePipeline';
 import { useAudioRecorder } from './useAudioRecorder';
 import { useSpeechToText } from './useSpeechToText';
-import {
-  detectIntent,
-  isLocalOnlyIntent,
-  isEventDrivenIntent,
-  getIntentLocalReply
-} from '../utils/intentDetector';
+import { useTTS } from './useTTS';
 
 interface UseVoiceChatReturn {
   messages: Message[];
   isRecording: boolean;
+  recordingDuration: number;
+  recordingVolume: number;
   isLoading: boolean;
   isConnected: boolean;
   currentSessionId: string | null;
@@ -26,37 +27,25 @@ interface UseVoiceChatReturn {
   isSpeaking: boolean;
   isMuted: boolean;
   error: string | null;
+  showMemoryToast: boolean;
+  memoryToastText: string;
   startRecording: () => void;
   stopRecording: () => void;
   sendTextMessage: (text: string) => void;
-}
-
-// 简易 ID 生成
-function uid(): string {
-  return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-// TTS: 语音合成
-function speakText(text: string, onStart?: () => void, onEnd?: () => void): void {
-  if (!window.speechSynthesis) return;
-  // 取消之前正在播放的
-  window.speechSynthesis.cancel();
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 1.0;
-  utterance.pitch = 1.0;
-
-  // 尝试选择中文语音
-  const voices = window.speechSynthesis.getVoices();
-  const zhVoice = voices.find((v) => v.lang.startsWith('zh'));
-  if (zhVoice) utterance.voice = zhVoice;
-
-  utterance.onstart = () => onStart?.();
-  utterance.onend = () => onEnd?.();
-  utterance.onerror = () => onEnd?.();
-
-  window.speechSynthesis.speak(utterance);
+  switchSession: (sessionId: string) => void;
+  createNewSession: (title?: string) => Promise<string | null>;
+  /** TTS 错误信息（如果有） */
+  ttsError: string | null;
+  /** 手动重播最近一段语音 */
+  replayTTS: () => void;
+  /** 解锁音频（首次交互后调用） */
+  unlockAudio: () => Promise<void>;
+  /** 当前 TTS 配置 */
+  ttsConfig: { engine: string; voiceId: string; rate: number; pitch: number };
+  /** 可用音色列表 */
+  ttsVoices: Array<{ id: string; name: string; gender: string; style: string }>;
+  /** 实时更新 TTS 配置（立即生效） */
+  setTtsConfig: (config: Partial<{ engine: 'server' | 'web'; voiceId: string; rate: number; pitch: number }>) => void;
 }
 
 export function useVoiceChat(): UseVoiceChatReturn {
@@ -65,484 +54,220 @@ export function useVoiceChat(): UseVoiceChatReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isMuted] = useState(false);
+  const [showMemoryToast, setShowMemoryToast] = useState(false);
+  const [memoryToastText, setMemoryToastText] = useState('');
 
-  const wsRef = useRef<WebSocket | null>(null);
+  const channel = useMemo(() => MessageChannel.getInstance(), []);
+  const { state: channelState } = useMessageChannel();
+  const { speak: ttsSpeak, stop: ttsStop, isSpeaking: ttsSpeaking, error: ttsError, replay: replayTTS, unlockAudio, config: ttsConfig, voices: ttsVoices, setConfig: setTtsConfigRaw } = useTTS();
+  const pipeline = useMemo(() => createVoicePipeline({ ttsSpeak }), [ttsSpeak]);
+
   const recordingSessionId = useRef<string | null>(null);
-  const hasLoadedHistory = useRef(false);
-  const lastSpokenContent = useRef<string>('');
-  const hasInitializedSession = useRef(false);
-  const reconnectAttempt = useRef(0);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasInitialized = useRef(false);
+  const sttPromiseRef = useRef<Promise<string> | null>(null);
 
   const {
-    isRecording,
-    startRecording: startAudioRecorder,
-    stopRecording: stopAudioRecorder,
+    isRecording, duration: recordingDuration, volume: recordingVolume,
+    startRecording: startAudioRecorder, stopRecording: stopAudioRecorder,
     error: recorderError,
   } = useAudioRecorder();
 
   const {
-    isListening: isSttListening,
-    interimText,
-    startListening: startStt,
-    stopListening: stopStt,
-    error: sttError,
+    interimText, startListening: startStt, stopListening: stopStt, error: sttError,
   } = useSpeechToText();
 
-  // 录音错误监控
-  useEffect(() => {
-    if (recorderError) {
-      console.warn('[VoiceChat] 录音器异常:', recorderError);
+  useEffect(() => { if (recorderError) console.warn('[VoiceChat] 录音器异常:', recorderError); }, [recorderError]);
+  useEffect(() => { if (sttError) console.warn('[VoiceChat] 语音识别异常:', sttError); }, [sttError]);
+
+  // ---- 消息加载 ----
+  const loadMessages = useCallback(async (sessionId: string) => {
+    try {
+      const data = await api.get<{ messages?: Message[] }>(`/messages/${sessionId}`);
+      if (data.messages) setMessages(data.messages);
+    } catch {
+      /* 静默降级 */
     }
-  }, [recorderError]);
-
-  // STT 错误监控
-  useEffect(() => {
-    if (sttError) {
-      console.warn('[VoiceChat] 语音识别异常:', sttError);
-    }
-  }, [sttError]);
-
-  // 加载消息历史
-  const loadMessages = useCallback((sessionId: string) => {
-    if (hasLoadedHistory.current) return;
-    hasLoadedHistory.current = true;
-
-    fetch(`/api/v1/messages/${sessionId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.messages && data.messages.length > 0) {
-          setMessages(data.messages);
-        }
-      })
-      .catch(() => {
-        // 静默降级
-      });
   }, []);
 
-  // 建立 WebSocket 连接
+  // ---- 会话初始化：加载/创建第一个有效会话 ----
+  const initSession = useCallback(async () => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    try {
+      const data = await api.get<{ sessions: SessionNode[] }>('/sessions');
+      const sessions = data.sessions || [];
+      const valid = sessions.filter((s) => s.messageCount > 0);
+
+      if (valid.length > 0) {
+        // 加载第一个有效会话
+        const first = valid[0];
+        setCurrentSessionId(first.id);
+        recordingSessionId.current = first.id;
+        loadMessages(first.id);
+      } else {
+        // 无历史 → 创建默认会话
+        const session = await api.post<SessionNode>('/sessions', { title: '新对话', topic: 'other' });
+        setCurrentSessionId(session.id);
+        recordingSessionId.current = session.id;
+      }
+    } catch {
+      const tmpId = uid();
+      setCurrentSessionId(tmpId);
+      recordingSessionId.current = tmpId;
+    }
+  }, [loadMessages]);
+
   useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:3001';
-    const wsUrl = `${protocol}//${wsHost}/v1/chat`;
-    let ws: WebSocket;
-    let closed = false;
+    setIsConnected(channelState === 'connected');
+    if (channelState === 'connected') initSession();
+  }, [channelState, initSession]);
 
-    const connect = () => {
-      if (closed) return;
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        if (closed) return;
-        setIsConnected(true);
-        reconnectAttempt.current = 0;
-
-        if (!hasInitializedSession.current) {
-          // 首次连接：先拉取已有会话列表
-          hasInitializedSession.current = true;
-          hasLoadedHistory.current = false;
-
-          fetch('/api/v1/sessions')
-            .then((r) => r.json())
-            .then((data: { sessions: SessionNode[] }) => {
-              const sessions = data.sessions || [];
-              // 过滤掉无消息的空会话（测试/幽灵会话）
-              const validSessions = sessions.filter((s) => s.messageCount > 0);
-              if (validSessions.length > 0) {
-                // 有历史会话：渲染星球，默认选中最新活跃的（第一条）
-                const store = useUniverseStore.getState();
-                store.setPlanets(validSessions);
-                const firstSession = validSessions[0];
-                setCurrentSessionId(firstSession.id);
-                recordingSessionId.current = firstSession.id;
-                loadMessages(firstSession.id);
-              } else {
-                // 无历史会话：兜底创建默认会话（系统行为，不自动切换相机）
-                // 带初始消息确保 messageCount > 0，避免被过滤
-                return fetch('/api/v1/sessions', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    title: '新对话',
-                    topic: 'other',
-                    initialMessage: '你好，阿罗德斯',
-                  }),
-                })
-                  .then((r) => r.json())
-                  .then((session: SessionNode) => {
-                    const store = useUniverseStore.getState();
-                    store.addPlanet(session, calcSpawnPosition(0));
-                    setCurrentSessionId(session.id);
-                    recordingSessionId.current = session.id;
-                    loadMessages(session.id);
-                  });
-              }
-            })
-            .catch(() => {
-              const tmpId = uid();
-              setCurrentSessionId(tmpId);
-              recordingSessionId.current = tmpId;
-            });
-        } else {
-          // 重连：恢复已有 session
-          hasLoadedHistory.current = false;
-          if (currentSessionId) {
-            loadMessages(currentSessionId);
-          }
-        }
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        wsRef.current = null;
-        // 指数退避重连: 3s -> 6s -> 12s -> max 30s
-        const delay = Math.min(3000 * Math.pow(2, reconnectAttempt.current), 30000);
-        reconnectAttempt.current++;
-        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = setTimeout(connect, delay);
-      };
-
-      ws.onmessage = (event: MessageEvent) => {
-        if (closed) return;
-        try {
-          const serverMsg: WSServerMessage = JSON.parse(event.data as string);
-          handleServerMessage(serverMsg);
-        } catch {
-          // 忽略解析失败的消息
-        }
-      };
-
-      ws.onerror = () => {
-        if (closed) return;
-        ws.close();
-      };
-    };
-
-    connect();
-
-    return () => {
-      closed = true;
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
+  // ---- MessageChannel 回调 ----
+  const handleChunk = useCallback((data: WSChunkData) => {
+    if (!data.content) return;
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === 'assistant' && !last.id.endsWith('-done')) {
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...last, content: last.content + data.content };
+        return updated;
       }
-      // StrictMode 下 useEffect 会跑两次：
-      // 第一次的 cleanup 会关闭还在 CONNECTING 的 WebSocket，
-      // 导致 "closed before establishment" 报错。
-      // 只在 OPEN/CLOSING 时关，CONNECTING 的让浏览器自己收尾。
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING)) {
-        ws.close();
-      }
-      window.speechSynthesis?.cancel();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      return [...prev, { id: uid(), role: 'assistant', content: data.content, timestamp: new Date().toISOString(), isVoice: false }];
+    });
   }, []);
 
-  // 监听会话切换事件（如通过语音新建会话后自动切换）
+  const handleComplete = useCallback((data: WSCompleteData) => {
+    setIsLoading(false);
+    if (!data.content) return;
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (!last || last.role !== 'assistant') return prev;
+      const updated = [...prev];
+      updated[updated.length - 1] = { ...last, id: last.id + '-done', content: data.content };
+      return updated;
+    });
+    eventBus.emit(EVENTS.VOICE_REPLY_COMPLETE, { content: data.content, sessionId: recordingSessionId.current });
+  }, []);
+
+  const handleMemory = useCallback((data: WSMemoryData) => {
+    if (data.memories?.length) {
+      setShowMemoryToast(true);
+      setMemoryToastText(`${data.memories.length} 条记忆已存储`);
+      setTimeout(() => setShowMemoryToast(false), 3000);
+    }
+  }, []);
+
+  const handleError = useCallback((error: string) => {
+    setIsLoading(false);
+    setMessages((prev) => [...prev, { id: uid(), role: 'assistant', content: `⚠️ ${error || '发生未知错误'}`, timestamp: new Date().toISOString(), isVoice: false }]);
+  }, []);
+
   useEffect(() => {
-    const unsubscribe = eventBus.on(EVENTS.VOICE_SESSION_SWITCH, (data: unknown) => {
+    channel.setCallbacks({ onChunk: handleChunk, onComplete: handleComplete, onMemory: handleMemory, onError: handleError });
+  }, [channel, handleChunk, handleComplete, handleMemory, handleError]);
+
+  useEffect(() => { setIsSpeaking(ttsSpeaking); }, [ttsSpeaking]);
+
+  // ---- 切换会话 ----
+  const switchSession = useCallback((sessionId: string) => {
+    if (sessionId === currentSessionId) return;
+    setCurrentSessionId(sessionId);
+    recordingSessionId.current = sessionId;
+    setMessages([]);
+    loadMessages(sessionId);
+  }, [currentSessionId, loadMessages]);
+
+  // ---- 创建新会话 ----
+  const createNewSession = useCallback(async (title = '新会话'): Promise<string | null> => {
+    try {
+      const session = await api.post<SessionNode>('/sessions', { title, topic: 'other' });
+      switchSession(session.id);
+      return session.id;
+    } catch (err) {
+      console.error('[VoiceChat] 创建会话失败:', err);
+      return null;
+    }
+  }, [switchSession]);
+
+  // ---- 事件驱动：会话切换 ----
+  useEffect(() => {
+    const u1 = eventBus.on(EVENTS.VOICE_SESSION_SWITCH, (data: unknown) => {
       const { sessionId } = (data as { sessionId: string }) || {};
-      if (sessionId) {
-        setCurrentSessionId(sessionId);
-        recordingSessionId.current = sessionId;
-        hasLoadedHistory.current = false;
-        setMessages([]);
-        loadMessages(sessionId);
-      }
+      if (sessionId) switchSession(sessionId);
     });
-    return unsubscribe;
-  }, [loadMessages]);
+    return u1;
+  }, [switchSession]);
 
-  // 监听星球点击事件（用户手动切换会话）
+  // ---- 事件驱动：新建会话 ----
   useEffect(() => {
-    const unsubscribe = eventBus.on(EVENTS.UNIVERSE_PLANET_CLICK, (data: unknown) => {
-      const { sessionId } = (data as { sessionId?: string }) || {};
-      if (sessionId && sessionId !== 'home') {
-        setCurrentSessionId(sessionId);
-        recordingSessionId.current = sessionId;
-        hasLoadedHistory.current = false;
-        setMessages([]);
-        loadMessages(sessionId);
-      }
+    const u2 = eventBus.on(EVENTS.VOICE_SESSION_CREATE, (data: unknown) => {
+      const { title } = (data as { title?: string }) || {};
+      createNewSession(title);
     });
-    return unsubscribe;
-  }, [loadMessages]);
+    return u2;
+  }, [createNewSession]);
 
-  // TTS 播放辅助回复
-  const speakReply = useCallback((content: string) => {
-    if (!content || content === lastSpokenContent.current) return;
-    lastSpokenContent.current = content;
-
-    speakText(
-      content,
-      () => setIsSpeaking(true),
-      () => setIsSpeaking(false),
-    );
-  }, []);
-
-  // 处理服务端消息
-  const handleServerMessage = useCallback((msg: WSServerMessage) => {
-    switch (msg.type) {
-      case 'chunk': {
-        const { content } = msg.data as { content?: string };
-        if (content) {
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant' && !last.id.endsWith('-done')) {
-              // 追加到上一条 AI 消息
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                ...last,
-                content: last.content + content,
-              };
-              return updated;
-            }
-            // 创建新的 AI 消息
-            return [
-              ...prev,
-              {
-                id: uid(),
-                role: 'assistant',
-                content,
-                timestamp: new Date().toISOString(),
-                isVoice: false,
-              },
-            ];
-          });
-        }
-        break;
-      }
-      case 'complete': {
-        setIsLoading(false);
-        const { content } = msg.data as { content?: string };
-        if (content) {
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === 'assistant') {
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                ...last,
-                id: last.id + '-done',
-                content: content || last.content,
-              };
-              return updated;
-            }
-            return prev;
-          });
-          // TTS 播放
-          speakReply(content);
-          eventBus.emit(EVENTS.VOICE_REPLY_COMPLETE, { sessionId: currentSessionId });
-        }
-        break;
-      }
-      case 'error': {
-        setIsLoading(false);
-        const { error } = msg.data as { error?: string };
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: uid(),
-            role: 'assistant',
-            content: `⚠️ ${error || '发生未知错误'}`,
-            timestamp: new Date().toISOString(),
-            isVoice: false,
-          },
-        ]);
-        break;
-      }
-      default:
-        break;
-    }
-  }, [currentSessionId, speakReply]);
-
-  // 发送消息到 WS
+  // ---- 发送消息 ----
   const sendMessage = useCallback((content: string, isVoice: boolean) => {
     const sessionId = recordingSessionId.current;
-
-    // === 客户端意图检测 ===
-    const detection = detectIntent(content);
-    if (detection.matched && detection.intent) {
-      // 无论是否在线，先添加用户消息
+    if (!sessionId || !channel.isConnected()) {
       setMessages((prev) => [
         ...prev,
-        {
-          id: uid(),
-          role: 'user',
-          content,
-          timestamp: new Date().toISOString(),
-          isVoice,
-        },
-      ]);
-
-      if (isLocalOnlyIntent(detection.intent.type)) {
-        // 纯本地意图：不上报服务端，直接返回本地回复
-        const reply = getIntentLocalReply(detection.intent.type, detection.intent.params);
-        if (reply) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: uid(),
-              role: 'assistant',
-              content: reply,
-              timestamp: new Date().toISOString(),
-              isVoice: false,
-            },
-          ]);
-        }
-        // 本地意图不改变 isLoading
-        eventBus.emit(EVENTS.VOICE_INTENT_ACTION, { intent: detection.intent });
-        return;
-      }
-
-      if (isEventDrivenIntent(detection.intent.type)) {
-        // 事件驱动意图：本地回复 + 事件发射，不上报服务端
-        const reply = getIntentLocalReply(detection.intent.type, detection.intent.params);
-        if (reply) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: uid(),
-              role: 'assistant',
-              content: reply,
-              timestamp: new Date().toISOString(),
-              isVoice: false,
-            },
-          ]);
-        }
-        // 新建会话意图直接走 voice:session:create 事件
-        if (detection.intent.type === 'new_session') {
-          const params = detection.intent.params as { title?: string };
-          eventBus.emit(EVENTS.VOICE_SESSION_CREATE, {
-            title: params.title || '新会话',
-            topic: 'other',
-          });
-        } else {
-          eventBus.emit(EVENTS.VOICE_INTENT_ACTION, { intent: detection.intent });
-        }
-        return;
-      }
-
-      // 意图需要服务端处理：附加 intent 到消息，继续发送
-      setIsLoading(true);
-      const clientMsg: WSClientMessage = {
-        type: 'message',
-        sessionId: sessionId!,
-        content,
-        isVoice,
-        intent: detection.intent,
-      };
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(clientMsg));
-      }
-      eventBus.emit(EVENTS.VOICE_MESSAGE_SEND, { content, sessionId, intent: detection.intent, isVoice });
-      return;
-    }
-
-    // === 无意图/普通消息：原有逻辑 ===
-    if (!sessionId || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      // 降级：添加本地消息（离线模式）
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: uid(),
-          role: 'user',
-          content,
-          timestamp: new Date().toISOString(),
-          isVoice,
-        },
-        {
-          id: uid(),
-          role: 'assistant',
-          content: '⚠️ 无法连接到服务器，消息将在恢复连接后发送',
-          timestamp: new Date().toISOString(),
-          isVoice: false,
-        },
+        { id: uid(), role: 'user', content, timestamp: new Date().toISOString(), isVoice },
+        { id: uid(), role: 'assistant', content: '⚠️ 无法连接到服务器', timestamp: new Date().toISOString(), isVoice: false },
       ]);
       return;
     }
 
-    // 添加用户消息
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: uid(),
-        role: 'user',
-        content,
-        timestamp: new Date().toISOString(),
-        isVoice,
-      },
-    ]);
-
+    setMessages((prev) => [...prev, { id: uid(), role: 'user', content, timestamp: new Date().toISOString(), isVoice }]);
     setIsLoading(true);
 
-    const clientMsg: WSClientMessage = {
-      type: 'message',
-      sessionId,
-      content,
-      isVoice,
-    };
-    wsRef.current.send(JSON.stringify(clientMsg));
     eventBus.emit(EVENTS.VOICE_MESSAGE_SEND, { content, sessionId, isVoice });
-  }, []);
-
-  // 文本消息
-  const sendTextMessage = useCallback((text: string) => {
-    sendMessage(text, false);
-  }, [sendMessage]);
-
-  // 开始录制
-  const startRecording = useCallback(() => {
-    if (isSttListening) {
-      stopStt();
-    }
-    startAudioRecorder().catch(() => {
-      // 错误已经在 hook 内部处理
+    pipeline.run(content, sessionId, isVoice).catch((err) => {
+      console.warn('[VoiceChat] 管道执行失败:', err);
+      setIsLoading(false);
     });
+  }, [channel, pipeline]);
+
+  const sendTextMessage = useCallback((text: string) => sendMessage(text, false), [sendMessage]);
+
+  // ---- 录制 ----
+  const startRecording = useCallback(() => {
+    startAudioRecorder().catch(() => {});
+    sttPromiseRef.current = startStt().catch(() => '');
     eventBus.emit(EVENTS.VOICE_RECORDING_START);
-  }, [startAudioRecorder, isSttListening, stopStt]);
+  }, [startAudioRecorder, startStt]);
 
-  // 停止录制并转写发送
   const stopRecording = useCallback(() => {
-    stopAudioRecorder().then(async (blob) => {
-      if (!blob) return;
+    stopAudioRecorder();
+    stopStt();
+    const sttPromise = sttPromiseRef.current;
+    sttPromiseRef.current = null;
 
-      // 录音结束后启动 STT 转写
-      try {
-        const transcribedText = await startStt();
-        const text = transcribedText || '[无法识别语音]';
+    (sttPromise || Promise.resolve('')).then((sttText) => {
+      if (sttText && sttText.length > 2) {
+        sendMessage(sttText, true);
+        eventBus.emit(EVENTS.VOICE_RECORDING_END, { text: sttText, sessionId: currentSessionId });
+      } else {
+        const text = '[语音消息]';
         sendMessage(text, true);
-        eventBus.emit(EVENTS.VOICE_RECORDING_END, {
-          text,
-          sessionId: currentSessionId,
-        });
-      } catch {
-        // 如果 STT 失败，降级发送占位文本
-        sendMessage('[语音消息]', true);
-        eventBus.emit(EVENTS.VOICE_RECORDING_END, {
-          text: '[语音消息]',
-          sessionId: currentSessionId,
-        });
+        eventBus.emit(EVENTS.VOICE_RECORDING_END, { text, sessionId: currentSessionId });
       }
     });
-  }, [stopAudioRecorder, startStt, sendMessage, currentSessionId]);
+  }, [stopAudioRecorder, stopStt, sendMessage, currentSessionId]);
 
-  // 合并录音/STT错误为单一提示
-  const voiceError = recorderError || sttError || null;
+  useEffect(() => () => { ttsStop(); }, [ttsStop]);
 
   return {
-    messages,
-    isRecording,
-    isLoading,
-    isConnected,
-    currentSessionId,
-    interimText,
-    isSpeaking,
-    isMuted,
-    error: voiceError,
-    startRecording,
-    stopRecording,
-    sendTextMessage,
+    messages, isRecording, recordingDuration, recordingVolume,
+    isLoading, isConnected, currentSessionId, interimText,
+    isSpeaking, isMuted: false, error: recorderError || sttError || null,
+    showMemoryToast, memoryToastText,
+    startRecording, stopRecording, sendTextMessage,
+    switchSession, createNewSession,
+    ttsError, replayTTS, unlockAudio,
+    ttsConfig: { engine: ttsConfig.engine, voiceId: ttsConfig.voiceId, rate: ttsConfig.rate, pitch: ttsConfig.pitch },
+    ttsVoices, setTtsConfig: setTtsConfigRaw,
   };
 }

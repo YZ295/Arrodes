@@ -1,0 +1,333 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Fool 鈥?3D Particle Tarot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0d8c8;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      overflow: hidden;
+      width: 100vw; height: 100vh;
+    }
+    #canvas-container {
+      width: 100%; height: 100%;
+      position: absolute; top: 0; left: 0;
+    }
+    #overlay {
+      position: absolute;
+      bottom: 32px; left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0.85;
+      transition: opacity 0.6s;
+    }
+    #overlay h1 {
+      font-size: 2rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+      text-shadow: 0 0 12px rgba(212, 175, 55, 0.4);
+      color: #d4af37;
+    }
+    #overlay p {
+      font-size: 0.9rem;
+      color: #a09888;
+      letter-spacing: 0.08em;
+    }
+    #loading {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.2rem;
+      letter-spacing: 0.2em;
+      color: #d4af37;
+      z-index: 20;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    #controls-hint {
+      position: absolute;
+      top: 20px; right: 24px;
+      font-size: 0.75rem;
+      color: #6a6350;
+      letter-spacing: 0.05em;
+      text-align: right;
+      line-height: 1.6;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+  <!-- Three.js & OrbitControls from CDN -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="loading">SUMMONING THE FOOL...</div>
+  <div id="canvas-container"></div>
+  <div id="controls-hint">
+    LMB 鈥?Rotate<br>
+    RMB 鈥?Pan<br>
+    Scroll 鈥?Zoom<br>
+    Double Click 鈥?Reset
+  </div>
+  <div id="overlay">
+    <h1>The Fool</h1>
+    <p>0 路 The Beginning of the Journey</p>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const IMAGE_URL = './the-fool.png';
+    const MAX_DIM = 240;      // resize target: controls total pixel count
+    const STRIDE = 2;         // sample every Nth pixel
+    const PARTICLE_SIZE = 0.08;
+    const PLANE_SIZE = 8;    // world-space width/height
+    const DEPTH = 2.5;        // z-extrusion from brightness
+
+    const container = document.getElementById('canvas-container');
+    const loading = document.getElementById('loading');
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0f);
+    scene.fog = new THREE.FogExp2(0x0a0a0f, 0.04);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 14);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 4;
+    controls.maxDistance = 30;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.6;
+
+    // Double-click to reset
+    renderer.domElement.addEventListener('dblclick', () => {
+      controls.reset();
+      camera.position.set(0, 0, 14);
+    });
+
+    // Sample image pixels via canvas
+    async function samplePixels(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        // No crossOrigin needed 鈥?image lives right next to index.html
+        img.onload = () => {
+          const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0, w, h);
+          const { data } = ctx.getImageData(0, 0, w, h);
+
+          const points = [];
+          for (let y = 0; y < h; y += STRIDE) {
+            for (let x = 0; x < w; x += STRIDE) {
+              const i = (y * w + x) * 4;
+              const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+              if (a < 128) continue; // skip transparent
+
+              const brightness = (r + g + b) / 765; // 0..1
+              // slight z-extrusion based on brightness (gold highlights pop forward)
+              const z = (brightness - 0.5) * DEPTH;
+
+              points.push({
+                x: (x / w - 0.5) * PLANE_SIZE,
+                y: (0.5 - y / h) * PLANE_SIZE,
+                z: z,
+                r: r / 255,
+                g: g / 255,
+                b: b / 255,
+                brightness,
+                origX: x,
+                origY: y,
+              });
+            }
+          }
+          resolve({ points, w, h });
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    function buildGeometry(points) {
+      const positions = new Float32Array(points.length * 3);
+      const colors = new Float32Array(points.length * 3);
+      const sizes = new Float32Array(points.length);
+      const initialZ = new Float32Array(points.length);
+
+      points.forEach((p, i) => {
+        positions[i * 3] = p.x;
+        positions[i * 3 + 1] = p.y;
+        positions[i * 3 + 2] = p.z;
+        colors[i * 3] = p.r;
+        colors[i * 3 + 1] = p.g;
+        colors[i * 3 + 2] = p.b;
+        // brighter particles are slightly larger
+        sizes[i] = PARTICLE_SIZE * (0.6 + p.brightness * 0.8);
+        initialZ[i] = p.z;
+      });
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+      geo.setAttribute('initialZ', new THREE.BufferAttribute(initialZ, 1));
+      return geo;
+    }
+
+    // Ambient + directional light for depth perception even on particles
+    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffeebb, 1.5);
+    dirLight.position.set(5, 5, 10);
+    scene.add(dirLight);
+
+    const pointLight = new THREE.PointLight(0xd4af37, 2, 20);
+    pointLight.position.set(0, 0, 4);
+    scene.add(pointLight);
+
+    // Custom shader material for particles to support per-particle size
+    const particleMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uPixelRatio: { value: renderer.getPixelRatio() },
+      },
+      vertexShader: `
+        attribute float size;
+        attribute float initialZ;
+        attribute vec3 color;
+        varying vec3 vColor;
+        uniform float uTime;
+        uniform float uPixelRatio;
+
+        void main() {
+          vColor = color;
+          vec3 pos = position;
+          // gentle wave: particles breathe in z
+          pos.z += sin(uTime * 1.5 + position.x * 2.0 + position.y * 3.0) * 0.15;
+          // subtle rotation sway
+          pos.x += sin(uTime * 0.5 + position.y) * 0.03;
+          pos.y += cos(uTime * 0.4 + position.x) * 0.03;
+
+          vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+          gl_PointSize = size * uPixelRatio * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+
+        void main() {
+          // circular particle
+          vec2 coord = gl_PointCoord - vec2(0.5);
+          float dist = length(coord);
+          if (dist > 0.5) discard;
+          // soft edge
+          float alpha = 1.0 - smoothstep(0.35, 0.5, dist);
+          // lift dark tones so the tarot art remains visible
+          vec3 lifted = pow(vColor, vec3(0.45)) * 1.5;
+          // slight glow for very bright particles
+          float lum = dot(lifted, vec3(0.299, 0.587, 0.114));
+          lifted += vec3(0.08, 0.06, 0.03) * lum;
+          gl_FragColor = vec4(lifted, alpha * 0.95);
+        }
+      `,
+      transparent: true,
+      depthWrite: true,
+      blending: THREE.NormalBlending,
+    });
+
+    let pointsMesh;
+    window._scene = scene;
+    window._pointsMesh = null;
+
+    async function init() {
+      try {
+        const { points, w, h } = await samplePixels(IMAGE_URL);
+        console.log(`[The Fool] Sampled ${points.length} particles from ${w}x${h}`);
+        if (points.length === 0) {
+          console.error('[The Fool] ZERO particles sampled!');
+          loading.textContent = 'ZERO PARTICLES — check image alpha/brightness';
+          loading.style.color = '#c44';
+          return;
+        }
+
+        const geometry = buildGeometry(points);
+        pointsMesh = new THREE.Points(geometry, particleMaterial);
+        window._pointsMesh = pointsMesh;
+        scene.add(pointsMesh);
+        console.log('[The Fool] Points added to scene');
+
+        loading.style.opacity = '0';
+        setTimeout(() => loading.remove(), 700);
+      } catch (err) {
+        console.error(err);
+        loading.textContent = 'FAILED TO LOAD IMAGE. CHECK CONSOLE.';
+        loading.style.color = '#c44';
+      }
+    }
+
+    init();
+
+    // Animation loop
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      particleMaterial.uniforms.uTime.value = t;
+
+      // Slow point-light orbit for dynamic gold shimmer
+      pointLight.position.x = Math.sin(t * 0.3) * 3;
+      pointLight.position.y = Math.cos(t * 0.25) * 3;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      particleMaterial.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+    });
+  </script>
+</body>
+</html>
+
+

@@ -72,8 +72,10 @@ export default function CameraController() {
     if (p >= 1) {
       fly.active = false;
       inFlightRef.current = false;
-      // 飞行完成，释放 cameraTargetId，允许下次触发
-      setCameraTarget(null);
+      // 退出 useFrame 后再释放 cameraTargetId，避免渲染中更新状态
+      setTimeout(() => {
+        setCameraTarget(null);
+      }, 0);
     }
   });
 

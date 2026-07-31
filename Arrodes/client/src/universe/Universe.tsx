@@ -9,6 +9,9 @@ import SolarSystem from './SolarSystem';
 import CameraController from './CameraController';
 import ParticleSystem from './effects/ParticleSystem';
 import SessionSpawner from './SessionSpawner';
+import SpawnAnimation from './effects/SpawnAnimation';
+import OrbitSystem from './effects/OrbitSystem';
+import Bloom from './effects/Bloom';
 
 export default function Universe() {
   return (
@@ -24,7 +27,7 @@ export default function Universe() {
         alpha: false,
         powerPreference: 'high-performance',
       }}
-      dpr={[1, 1.5]}
+      dpr={[1, 2]}
       style={{ background: '#0a0e27' }}
       onCreated={({ gl }) => { gl.setClearColor('#0a0e27'); }}
     >
@@ -48,13 +51,17 @@ export default function Universe() {
       {/* 语音创建会话事件桥接 */}
       <SessionSpawner />
 
+      {/* 星球生成动画 */}
+      <SpawnAnimation />
+
+      {/* 引力轨道系统 */}
+      <OrbitSystem />
+
       {/* 相机控制 */}
       <CameraController />
 
-      {/* 后期特效：Bloom — 临时注释掉排查闪屏 */}
-      {/* <EffectComposer>
-        <Bloom />
-      </EffectComposer> */}
+      {/* 后期特效：Bloom — 部分GPU驱动会蓝屏，默认关闭；可手动启用 */}
+      {/* <Bloom /> */}
     </Canvas>
   );
 }

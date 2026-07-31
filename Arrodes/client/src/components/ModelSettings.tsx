@@ -1,0 +1,92 @@
+/**
+ * 模型选择面板
+ * 展示可用 LLM 模型列表，支持切换
+ */
+import { useState, useEffect } from 'react';
+import { api } from '../shared/utils/apiClient';
+
+interface ModelInfo {
+  id: string;
+  label: string;
+  provider: string;
+  isFree: boolean;
+}
+
+interface ModelListResponse {
+  models: ModelInfo[];
+  current: string;
+}
+
+export default function ModelSettings() {
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [current, setCurrent] = useState('');
+  const [switching, setSwitching] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get<ModelListResponse>('/models')
+      .then((d) => {
+        setModels(d.models);
+        setCurrent(d.current);
+      })
+      .catch(() => setError('无法加载模型列表'));
+  }, []);
+
+  const selectModel = async (id: string) => {
+    setSwitching(id);
+    setError('');
+    try {
+      const d = await api.post<{ success: boolean; current: string; error?: string }>(
+        '/models/select',
+        { modelId: id },
+      );
+      if (d.success) setCurrent(d.current);
+      else setError(d.error || '切换失败');
+    } catch {
+      setError('网络错误');
+    } finally {
+      setSwitching('');
+    }
+  };
+
+  return (
+    <div className="py-1">
+      {models.map((m) => (
+        <button
+          key={m.id}
+          onClick={() => selectModel(m.id)}
+          disabled={switching === m.id}
+          className={`w-full text-left px-3 py-2 flex items-center gap-2.5 text-sm transition-colors ${
+            current === m.id
+              ? 'bg-[var(--color-home-gold)]/10 text-[var(--color-home-gold)]'
+              : 'text-gray-300 hover:bg-white/5'
+          } disabled:opacity-50`}
+        >
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              current === m.id ? 'bg-[var(--color-home-gold)]' : 'bg-white/20'
+            }`}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate">{m.label}</span>
+              {m.isFree && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 shrink-0">
+                  免费
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-gray-500 mt-0.5">{m.provider}</div>
+          </div>
+          {switching === m.id && (
+            <svg className="w-3.5 h-3.5 animate-spin shrink-0" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" opacity="0.3" />
+              <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" />
+            </svg>
+          )}
+        </button>
+      ))}
+      {error && <div className="px-3 py-2 text-xs text-red-400">{error}</div>}
+    </div>
+  );
+}
