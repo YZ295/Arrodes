@@ -25,6 +25,8 @@ export interface ModelConfig {
   isFree: boolean;
   /** 中文描述 */
   description: string;
+  /** 是否需要 API Key（本地模型如 Ollama 不需要） */
+  requiresKey?: boolean;
 }
 
 // ===== 默认模型列表 =====
@@ -74,6 +76,29 @@ const DEFAULT_MODELS: ModelConfig[] = [
     isFree: false,
     description: '编程增强',
   },
+  {
+    id: 'glm-4-flash',
+    label: 'GLM-4 Flash',
+    provider: '智谱 AI (Zhipu)',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    modelName: 'glm-4-flash',
+    apiKeyEnv: 'GLM_API_KEY',
+    supportsStreaming: true,
+    isFree: true,
+    description: '智谱轻量模型，当前可用',
+  },
+  {
+    id: 'ollama-gemma3',
+    label: '本地模型 (Ollama gemma3:1b)',
+    provider: '本地 (Ollama)',
+    baseUrl: 'http://localhost:11434/v1',
+    modelName: 'gemma3:1b',
+    apiKeyEnv: 'OLLAMA_API_KEY',
+    supportsStreaming: true,
+    isFree: true,
+    requiresKey: false,
+    description: '本地运行，零成本（质量一般，建议后续换 qwen2.5:7b）',
+  },
 ];
 
 // ===== 运行时状态 =====
@@ -82,9 +107,12 @@ let _currentModelId: string;
 let _models: ModelConfig[];
 
 function loadHermesEnv(): void {
-  const hermesEnvPath = 'E:\\AI\\Hermes\\Hermes Agent CN Desktop\\data\\hermes-home\\.env';
-  if (existsSync(hermesEnvPath)) {
-    const content = readFileSync(hermesEnvPath, 'utf-8');
+  // 共享 .env 路径可配置：HERMES_ENV_PATH（或兼容 EXTRA_ENV_PATH）。
+  // 不设置时跳过，绝不硬编码机器路径。
+  const sharedEnvPath = process.env.HERMES_ENV_PATH || process.env.EXTRA_ENV_PATH;
+  if (!sharedEnvPath) return;
+  if (existsSync(sharedEnvPath)) {
+    const content = readFileSync(sharedEnvPath, 'utf-8');
     for (const line of content.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
@@ -103,10 +131,10 @@ function loadHermesEnv(): void {
 export function initModelRegistry(): void {
   loadHermesEnv();
   _models = [...DEFAULT_MODELS];
-  _currentModelId = process.env.ACTIVE_MODEL || 'deepseek-v4-flash';
+  _currentModelId = process.env.ACTIVE_MODEL || 'ollama-gemma3';
   // 验证当前模型存在
   if (!_models.find((m) => m.id === _currentModelId)) {
-    _currentModelId = 'deepseek-v4-flash';
+    _currentModelId = 'ollama-gemma3';
   }
 }
 
@@ -130,10 +158,12 @@ export function setCurrentModel(modelId: string): { success: boolean; error?: st
     return { success: false, error: `未知模型: ${modelId}` };
   }
 
-  // 验证 API Key 存在
-  const apiKey = process.env[model.apiKeyEnv];
-  if (!apiKey || apiKey.length < 10) {
-    return { success: false, error: `模型 ${model.label} 的 API Key 未配置（${model.apiKeyEnv}）` };
+  // 验证 API Key 存在（本地模型不需要）
+  if (model.requiresKey !== false) {
+    const apiKey = process.env[model.apiKeyEnv];
+    if (!apiKey || apiKey.length < 10) {
+      return { success: false, error: `模型 ${model.label} 的 API Key 未配置（${model.apiKeyEnv}）` };
+    }
   }
 
   _currentModelId = modelId;

@@ -1,6 +1,9 @@
 /**
  * 阿罗德斯 LLM 服务
  * 支持多供应商模型切换，流式返回
+ *
+ * 三个公共方法（chatStream / chatSimple / chatStreamSimple）共享同一个
+ * requestLlm 核心，仅系统提示词、消息截断、流式开关、max_tokens、temperature 不同。
  */
 import { getCurrentModel, getApiKeyForModel } from './modelRegistry.js';
 
@@ -13,6 +16,17 @@ interface LlmStreamCallbacks {
   onChunk: (text: string) => void;
   onComplete: (fullText: string) => void;
   onError: (error: string) => void;
+}
+
+interface LlmRequestOptions {
+  /** 注入的系统提示词（chatSimple 用轻量版，chatStream 用完整人设） */
+  systemPrompt?: string;
+  /** 用户消息只取最后 N 条（chatSimple 用 4 控制成本） */
+  sliceLast?: number;
+  /** 是否流式 */
+  stream: boolean;
+  maxTokens: number;
+  temperature: number;
 }
 
 // 阿罗德斯人设 —— 愚者的仆人
@@ -42,51 +56,110 @@ export class LlmService {
     userMessages: LlmMessage[],
     callbacks: LlmStreamCallbacks,
   ): Promise<void> {
+    await this.requestLlm(userMessages, {
+      systemPrompt: SYSTEM_PROMPT,
+      stream: true,
+      maxTokens: 2048,
+      temperature: 0.7,
+    }, callbacks);
+  }
+
+  /**
+   * 简单非流式聊天（用于记忆分析等非对话场景）
+   * 注意：非流式也会回调 onChunk（调用方依赖此通道收数据）
+   */
+  async chatSimple(
+    messages: LlmMessage[],
+    callbacks: LlmStreamCallbacks,
+  ): Promise<void> {
+    await this.requestLlm(messages, {
+      systemPrompt: '你是一个 AI 助手。请简洁回复，不要多余的话。',
+      sliceLast: 4,
+      stream: false,
+      maxTokens: 512,
+      temperature: 0.3,
+    }, callbacks);
+  }
+
+  /**
+   * 流式聊天（简化版，无系统提示词注入，消息原样透传）
+   */
+  async chatStreamSimple(
+    messages: LlmMessage[],
+    callbacks: LlmStreamCallbacks,
+  ): Promise<void> {
+    await this.requestLlm(messages, {
+      stream: true,
+      maxTokens: 1024,
+      temperature: 0.7,
+    }, callbacks);
+  }
+
+  // ============================================================
+  // 私有核心：统一鉴权、请求、SSE 解析
+  // ============================================================
+
+  private async requestLlm(
+    messages: LlmMessage[],
+    options: LlmRequestOptions,
+    callbacks: LlmStreamCallbacks,
+  ): Promise<void> {
     const model = getCurrentModel();
     const apiKey = getApiKeyForModel(model.id);
 
-    if (!apiKey) {
+    if ((model.requiresKey !== false) && !apiKey) {
       callbacks.onError(`API Key 未配置（${model.apiKeyEnv}）`);
       return;
     }
 
-    const messages: LlmMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...userMessages,
-    ];
+    const payload: LlmMessage[] = [];
+    if (options.systemPrompt) {
+      payload.push({ role: 'system', content: options.systemPrompt });
+    }
+    const userMessages = options.sliceLast ? messages.slice(-options.sliceLast) : messages;
+    payload.push(...userMessages);
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (model.requiresKey !== false && apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+
       const response = await fetch(`${model.baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
+        headers,
         body: JSON.stringify({
           model: model.modelName,
-          messages,
-          stream: model.supportsStreaming,
-          max_tokens: 2048,
-          temperature: 0.7,
+          messages: payload,
+          stream: options.stream,
+          max_tokens: options.maxTokens,
+          temperature: options.temperature,
         }),
       });
 
       if (!response.ok) {
         const errBody = await response.text().catch(() => '');
-        throw new Error(`${model.provider} ${response.status}: ${errBody.slice(0, 200)}`);
+        callbacks.onError(`${model.provider} ${response.status}: ${errBody.slice(0, 200)}`);
+        return;
       }
 
-      if (!model.supportsStreaming) {
-        // 非流式：一次返回
-        const json: any = await response.json();
+      if (!options.stream) {
+        // 非流式：一次返回（同时回调 onChunk，兼容依赖该通道的调用方）
+        const json = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
         const text = json.choices?.[0]?.message?.content || '';
+        callbacks.onChunk(text);
         callbacks.onComplete(text);
         return;
       }
 
-      // 流式解析
+      // 流式 SSE 解析
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('Response body is not readable');
+      if (!reader) {
+        callbacks.onError('Response body is not readable');
+        return;
+      }
 
       const decoder = new TextDecoder();
       let fullText = '';
@@ -122,112 +195,6 @@ export class LlmService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知 LLM 错误';
       callbacks.onError(msg);
-    }
-  }
-
-  /**
-   * 简单非流式聊天（用于记忆分析等非对话场景）
-   */
-  async chatSimple(
-    messages: LlmMessage[],
-    callbacks: LlmStreamCallbacks,
-  ): Promise<void> {
-    const model = getCurrentModel();
-    const apiKey = getApiKeyForModel(model.id);
-    if (!apiKey) { callbacks.onError('API Key 未配置'); return; }
-
-    try {
-      const response = await fetch(`${model.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: model.modelName,
-          messages: [
-            { role: 'system', content: '你是一个 AI 助手。请简洁回复，不要多余的话。' },
-            ...messages.slice(-4),
-          ],
-          max_tokens: 512,
-          temperature: 0.3,
-          stream: false,
-        }),
-      });
-
-      if (!response.ok) {
-        callbacks.onError(`LLM ${response.status}`);
-        return;
-      }
-
-      const json = await response.json() as any;
-      const text = json.choices?.[0]?.message?.content || '';
-      callbacks.onChunk(text);
-      callbacks.onComplete(text);
-    } catch (err) {
-      callbacks.onError(err instanceof Error ? err.message : 'LLM 错误');
-    }
-  }
-
-  /**
-   * 流式聊天（简化版，无系统提示词注入）
-   */
-  async chatStreamSimple(
-    messages: LlmMessage[],
-    callbacks: LlmStreamCallbacks,
-  ): Promise<void> {
-    const model = getCurrentModel();
-    const apiKey = getApiKeyForModel(model.id);
-    if (!apiKey) { callbacks.onError('API Key 未配置'); return; }
-
-    try {
-      const response = await fetch(`${model.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: model.modelName,
-          messages,
-          stream: true,
-          max_tokens: 1024,
-          temperature: 0.7,
-        }),
-      });
-
-      if (!response.ok) {
-        callbacks.onError(`LLM ${response.status}`);
-        return;
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) { callbacks.onError('No body'); return; }
-
-      const decoder = new TextDecoder();
-      let fullText = '';
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === 'data: [DONE]') continue;
-          if (!trimmed.startsWith('data: ')) continue;
-          try {
-            const json = JSON.parse(trimmed.slice(6));
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) { fullText += delta; callbacks.onChunk(delta); }
-          } catch { /* skip */ }
-        }
-      }
-      callbacks.onComplete(fullText);
-    } catch (err) {
-      callbacks.onError(err instanceof Error ? err.message : 'LLM 错误');
     }
   }
 }
