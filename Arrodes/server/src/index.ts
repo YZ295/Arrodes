@@ -5,6 +5,9 @@
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
+import { existsSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
 import { initSchema } from './db/schema.js';
@@ -107,6 +110,23 @@ app.delete('/api/v1/skills/:name', (req, res) => {
     res.status(404).json({ error: '未找到该技能' });
   }
 });
+
+// ---- 生产模式静态托管（desktop-shell）----
+// 仅 NODE_ENV=production 时托管 client 构建产物，并做 SPA fallback；
+// /api 与 /v1/chat 路径保持原样，绝不回退到 index.html。
+if (config.nodeEnv === 'production') {
+  const distDefault = resolve(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
+  const staticDir = process.env.CLIENT_DIST ? resolve(process.env.CLIENT_DIST) : distDefault;
+  if (existsSync(staticDir)) {
+    app.use(express.static(staticDir));
+    app.get(/^\/(?!api(?:$|\/)|v1\/chat(?:$|\/)).*/, (_req, res) => {
+      res.sendFile(resolve(staticDir, 'index.html'));
+    });
+    console.log(`[Arodes] 静态托管已启用 -> ${staticDir}`);
+  } else {
+    console.warn(`[Arodes] 静态目录不存在，跳过托管: ${staticDir}`);
+  }
+}
 
 // ---- WebSocket ----
 const wss = new WebSocketServer({ server, path: '/v1/chat' });
