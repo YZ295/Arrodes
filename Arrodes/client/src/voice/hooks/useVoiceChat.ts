@@ -240,27 +240,58 @@ export function useVoiceChat(): UseVoiceChatReturn {
   // ---- 录制 ----
   const startRecording = useCallback(() => {
     startAudioRecorder().catch(() => {});
-    sttPromiseRef.current = startStt().catch(() => '');
+    // Electron 壳内浏览器 SpeechRecognition 不可用（报 network 错误），
+    // 直接跳过实时 STT，靠 stopRecording 时的录音上传服务端识别。
+    const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+    sttPromiseRef.current = isElectron ? Promise.resolve('') : startStt().catch(() => '');
     eventBus.emit(EVENTS.VOICE_RECORDING_START);
   }, [startAudioRecorder, startStt]);
 
+  // ---- 服务端语音识别（录音 Blob 上传）----
+  const serverTranscribe = useCallback(async (blob: Blob): Promise<string> => {
+    const form = new FormData();
+    form.append('audio', blob, 'audio.webm');
+    const res = await fetch('/api/v1/stt/transcribe', { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`服务端语音识别失败 (${res.status})`);
+    const data = await res.json() as { text?: string };
+    return (data.text || '').trim();
+  }, []);
+
+  // 回退：浏览器实时 STT 结果（无则占位文本）
+  const fallbackToStt = useCallback((sttPromise: Promise<string> | null, fallback: (text: string) => void) => {
+    (sttPromise || Promise.resolve('')).then((sttText) => {
+      const text = sttText && sttText.length > 2 ? sttText : '[语音消息]';
+      fallback(text);
+    });
+  }, []);
+
   const stopRecording = useCallback(() => {
-    stopAudioRecorder();
-    stopStt();
     const sttPromise = sttPromiseRef.current;
     sttPromiseRef.current = null;
+    stopStt();
 
-    (sttPromise || Promise.resolve('')).then((sttText) => {
-      if (sttText && sttText.length > 2) {
-        sendMessage(sttText, true);
-        eventBus.emit(EVENTS.VOICE_RECORDING_END, { text: sttText, sessionId: currentSessionId });
-      } else {
-        const text = '[语音消息]';
+    // 结束录音并拿到 Blob（服务端 STT 用；浏览器实时 STT 结果作兜底）
+    stopAudioRecorder().then((audioBlob) => {
+      const fallback = (text: string) => {
         sendMessage(text, true);
         eventBus.emit(EVENTS.VOICE_RECORDING_END, { text, sessionId: currentSessionId });
+      };
+
+      if (audioBlob && audioBlob.size > 0) {
+        serverTranscribe(audioBlob)
+          .then((text) => {
+            if (text) { fallback(text); return; }
+            fallbackToStt(sttPromise, fallback);
+          })
+          .catch((err) => {
+            console.warn('[VoiceChat] 服务端识别失败，回退浏览器 STT:', err);
+            fallbackToStt(sttPromise, fallback);
+          });
+      } else {
+        fallbackToStt(sttPromise, fallback);
       }
     });
-  }, [stopAudioRecorder, stopStt, sendMessage, currentSessionId]);
+  }, [stopAudioRecorder, stopStt, sendMessage, currentSessionId, serverTranscribe]);
 
   useEffect(() => () => { ttsStop(); }, [ttsStop]);
 
