@@ -9,7 +9,7 @@
  *                             ↑                           ↓
  *                         记忆检索 ←──────────────── 记忆存储
  */
-import type { Message, MemoryNode, IntentResult } from './index';
+import type { MemoryNode, IntentResult } from './index';
 
 // ============================================================
 // 管道阶段
