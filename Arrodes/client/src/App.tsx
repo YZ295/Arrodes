@@ -21,6 +21,7 @@ import { initTtsRegistry } from './modules/voice/TtsEngineRegistry';
 import { initSttRegistry } from './modules/voice/SttEngineRegistry';
 import Sidebar, { type SidebarView } from './components/Sidebar';
 import ChatOverlay from './components/ChatOverlay';
+import SessionPanel from './components/SessionPanel';
 import PanelView from './components/PanelView';
 import Universe from './universe/Universe';
 import { useVoiceChat } from './voice/hooks/useVoiceChat';
@@ -55,7 +56,7 @@ const App = memo(function App() {
 
   return (
     <div className="w-full h-full flex overflow-hidden bg-[#050608]">
-      {/* 侧边栏 */}
+      {/* 侧边栏（图标导航） */}
       <Sidebar
         currentView={sidebarView}
         onViewChange={(v) => setSidebarView(v)}
@@ -63,7 +64,12 @@ const App = memo(function App() {
         onToggle={() => setSidebarCollapsed((p) => !p)}
       />
 
-      {/* 主区域：3D 宇宙 + 覆盖层 */}
+      {/* 左侧框：会话列表（仅对话视图显示） */}
+      {!showPanel && (
+        <SessionPanel currentSessionId={voice.currentSessionId} />
+      )}
+
+      {/* 主区域：3D 背景 + 覆盖层 */}
       <div className="relative flex-1 overflow-hidden">
         {/* 3D 宇宙背景 */}
         <Universe />
