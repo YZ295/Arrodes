@@ -4,6 +4,7 @@
  */
 import { Canvas } from '@react-three/fiber';
 import Starfield from './Starfield';
+import HomePlanet from './HomePlanet';
 import ParticleSystem from './effects/ParticleSystem';
 import CameraController from './CameraController';
 
@@ -35,6 +36,9 @@ export default function Universe() {
 
       {/* 粒子特效 */}
       <ParticleSystem />
+
+      {/* 主星球（初始大星球） */}
+      <HomePlanet />
 
       {/* 相机控制 */}
       <CameraController />
