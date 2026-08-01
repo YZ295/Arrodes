@@ -87,6 +87,65 @@ export default function ModelSettings() {
         </button>
       ))}
       {error && <div className="px-3 py-2 text-xs text-red-400">{error}</div>}
+
+      {/* Token 用量与额度（管控成本） */}
+      <UsageMeter />
+    </div>
+  );
+}
+
+/** Token 用量展示：今日/本月消耗 + 限额 + 超额状态 */
+function UsageMeter() {
+  const [stats, setStats] = useState<{
+    daily: { used: number; limit: number; remaining: number };
+    monthly: { used: number; limit: number; remaining: number };
+    allowed: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    api.get<{ stats: typeof stats }>('/usage')
+      .then((d) => setStats(d.stats))
+      .catch(() => { /* 静默：服务端未实现时不打扰用户 */ });
+  }, []);
+
+  if (!stats) return null;
+
+  const fmt = (n: number) => n >= 10000 ? `${(n / 10000).toFixed(1)}万` : n.toLocaleString();
+  const pct = (used: number, limit: number) => Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
+
+  return (
+    <div className="mt-3 px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] text-gray-400">Token 用量</span>
+        {!stats.allowed && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">已超额</span>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {([
+          { label: '今日', ...stats.daily },
+          { label: '本月', ...stats.monthly },
+        ]).map((row) => (
+          <div key={row.label}>
+            <div className="flex justify-between text-[11px] text-gray-500 mb-0.5">
+              <span>{row.label}</span>
+              <span>
+                {fmt(row.used)} / {fmt(row.limit)} Token
+              </span>
+            </div>
+            <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className={`h-full rounded-full ${pct(row.used, row.limit) >= 90 ? 'bg-red-400' : 'bg-[var(--color-home-gold)]'}`}
+                style={{ width: `${pct(row.used, row.limit)}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="text-[10px] text-gray-600 mt-1.5">
+        额度可在服务端 .env 配置（TOKEN_DAILY_LIMIT / TOKEN_MONTHLY_LIMIT）
+      </div>
     </div>
   );
 }
