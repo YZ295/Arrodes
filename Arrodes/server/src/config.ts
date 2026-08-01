@@ -47,4 +47,8 @@ export const config = {
   // Token 额度上限（管控运行成本）
   tokenDailyLimit: parseInt(process.env.TOKEN_DAILY_LIMIT || '500000', 10),
   tokenMonthlyLimit: parseInt(process.env.TOKEN_MONTHLY_LIMIT || '12000000', 10),
+
+  // 服务端语音识别（SiliconFlow SenseVoiceSmall，OpenAI 兼容）
+  siliconflowApiKey: process.env.SILICONFLOW_API_KEY || '',
+  siliconflowBaseUrl: process.env.SILICONFLOW_BASE_URL || 'https://api.siliconflow.cn',
 };

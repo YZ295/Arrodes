@@ -20,6 +20,7 @@ import { createVisionRouter } from './routes/vision.js';
 import { createMemoryRouter } from './routes/memories.js';
 import { createTtsRouter } from './routes/tts.js';
 import { createUsageRouter } from './routes/usage.js';
+import { createSttRouter } from './routes/stt.js';
 // 加载内置技能
 import './skills/builtin.js';
 import { getAllSkills, registerSkill, unregisterSkill } from './skills/registry.js';
@@ -48,6 +49,7 @@ app.use('/api/v1/vision', createVisionRouter());
 app.use('/api/v1/memories', createMemoryRouter());
 app.use('/api/v1/tts', createTtsRouter());
 app.use('/api/v1/usage', createUsageRouter());
+app.use('/api/v1/stt', createSttRouter());
 
 // ---- 技能管理 ----
 app.get('/api/v1/skills', (_req, res) => {
