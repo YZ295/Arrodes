@@ -205,7 +205,14 @@ export class TtsService {
 
     switch (engine) {
       case 'edge': {
-        const result = await synthesizeEdge(text, voice, rate, pitch);
+        let result;
+        try {
+          result = await synthesizeEdge(text, voice, rate, pitch);
+        } catch (err) {
+          // Edge TTS 偶发不稳定（连接关闭/超时），重试一次再失败
+          console.warn('[TTS] Edge 合成失败，重试一次:', err instanceof Error ? err.message : err);
+          result = await synthesizeEdge(text, voice, rate, pitch);
+        }
         const estimatedDuration = text.length / 4;
         return { ...result, engine: 'edge', voice, duration: estimatedDuration };
       }
