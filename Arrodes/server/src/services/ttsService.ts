@@ -11,15 +11,33 @@
  * 4. 接收二进制音频片段
  * 5. 拼接返回
  */
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { WebSocket } from 'ws';
 
 // ===== 配置 =====
 
 const EDGE_TTS_WS_URL = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1';
-const TRUSTED_CLIENT_TOKEN = '6A84B7B5-2D45-4F1E-9E1C-5E3B7C7D8E9F';
+// 2026-08 验证过的 TrustedClientToken（2025-12 微软换过令牌，旧值 401）
+const TRUSTED_CLIENT_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+const EDGE_ORIGIN = 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold';
+const EDGE_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0';
 const DEFAULT_VOICE = 'zh-CN-XiaoxiaoNeural';
 const OUTPUT_FORMAT = 'audio-24khz-48kbitrate-mono-mp3';
+
+// ===== Sec-MS-GEC 生成 =====
+// 微软规则：Windows 文件时间（1601-01-01 起，100ns 单位）按 300 秒对齐后，
+// 以十进制字符串拼接 TrustedClientToken，再 SHA256 大写。
+// 参考 edge-tts master 的 generate_sec_ms_gec（2026-08 实测十六进制版已被 403）。
+function generateSecMsGec(): string {
+  const WIN_EPOCH_SECONDS = BigInt(11644473600); // 1601-01-01 → 1970-01-01 秒差
+  const unixSeconds = BigInt(Math.floor(Date.now() / 1000));
+  let ticks = unixSeconds + WIN_EPOCH_SECONDS; // Windows 文件时间（秒）
+  ticks -= ticks % 300n; // 对齐 5 分钟
+  ticks *= 10000000n; // 秒 → 100ns 间隔
+  const str = `${ticks.toString()}${TRUSTED_CLIENT_TOKEN}`;
+  return createHash('sha256').update(str, 'ascii').digest('hex').toUpperCase();
+}
 
 // ===== 类型 =====
 
@@ -51,12 +69,16 @@ function synthesizeEdge(
 ): Promise<{ audioBase64: string; contentType: string }> {
   return new Promise((resolve, reject) => {
     const connectionId = randomUUID().replace(/-/g, '');
-    const wsUrl = `${EDGE_TTS_WS_URL}?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&ConnectionId=${connectionId}`;
+    // Sec-MS-GEC 必须放在 URL query 里，放 header 会被 403
+    const wsUrl = `${EDGE_TTS_WS_URL}?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${generateSecMsGec()}&Sec-MS-GEC-Version=1-143.0.3650.75&ConnectionId=${connectionId}`;
 
     const ws = new WebSocket(wsUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Origin': 'chrome-extension://jdiccldimpdaibmpdgdglndjomblegje',
+        'User-Agent': EDGE_UA,
+        'Origin': EDGE_ORIGIN,
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cookie': 'muid=',
       },
     });
 
@@ -99,7 +121,7 @@ function synthesizeEdge(
 
       const ssmlMsg = [
         `X-RequestId:${requestId}`,
-        'Content-Type:application/ssml+xml;charset=UTF-8',
+        'Content-Type:application/ssml+xml',
         `X-Timestamp:${new Date().toISOString()}`,
         'Path:ssml',
         '',

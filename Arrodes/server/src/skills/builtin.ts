@@ -3,12 +3,12 @@
  *
  * 第一性原理：每个技能必须有可执行的后端能力支撑，不做空壳。
  */
-import { registerSkill } from './registry';
-import { MemoryRepository } from '../db/memory-repo';
-import { SessionRepository } from '../db/session-repo';
-import { loadProfile } from '../services/MemoryGateway';
-import { config } from '../config';
-import { initModelRegistry } from '../services/modelRegistry';
+import { registerSkill } from './registry.js';
+import { MemoryRepository } from '../db/memory-repo.js';
+import { SessionRepository } from '../db/session-repo.js';
+import { loadProfile } from '../services/MemoryGateway.js';
+import { config } from '../config.js';
+import { initModelRegistry } from '../services/modelRegistry.js';
 
 /** 记忆搜索 */
 registerSkill({
@@ -266,4 +266,4 @@ registerSkill({
 });
 
 // ===== 导出 =====
-export { loadProfile } from '../services/MemoryGateway';
+export { loadProfile } from '../services/MemoryGateway.js';
