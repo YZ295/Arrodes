@@ -1,14 +1,14 @@
 {
   "workflow_version": 2,
   "project_kind": "legacy",
-  "phase": "ready-to-push",
+  "phase": "ready",
   "active_change": null,
   "approvals": {
     "baseline": {
-      "valid": false,
-      "digest": "user-confirmed-fix3-arch-plan",
-      "approved_at": "2026-07-24T12:00:00+08:00",
-      "invalidated_at": "2026-07-24T19:40:29+08:00"
+      "valid": true,
+      "digest": "b318a0bd103e43c529bc64a3e170d4fb6aac782e0e593747c0d7757e0cb68077",
+      "approved_at": "2026-08-01T10:56:11+08:00",
+      "head_before": "122f65e692f81c1da1df75ea973e84312d796815"
     },
     "spec": {
       "valid": false,

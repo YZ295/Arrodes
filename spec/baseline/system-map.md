@@ -85,4 +85,23 @@
 
 ## 模块关系与数据流
 
-<!-- AI 完整扫描后补充。 -->
+三层结构：`Arrodes/client`（React + Vite 前端）、`Arrodes/server`（Express + WebSocket 后端）、`Arrodes/shared`（共享类型与常量，两端直接引用）。
+
+### 后端（server/src/index.ts 为唯一入口）
+
+- `index.ts` 创建 Express app 与 HTTP server，挂载 CORS、JSON 中间件，初始化 DB schema 与模型注册表。
+- REST 路由（`/api/v1/*`）：`sessions`（会话 CRUD）、`messages`（按 sessionId 查消息）、`models`、`vision`、`memories`、`tts`、`skills`（GET 列出 / POST 注册自定义技能 / DELETE 删除）。
+- WebSocket：`/v1/chat` 路径，`ws/handler.ts` 处理消息，数据流为：收消息 → 校验会话 → 存用户消息 → `MemoryGateway.retrieveContext` 检索记忆与画像 → 拼 LLM 上下文（画像 + 记忆 + 技能提示 + 最近 10 条历史）→ DeepSeek 流式生成（25s 超时）→ 技能调用循环（`<tool_call>` 解析，最多 3 轮）→ 存 AI 回复 → `processConversation` 提取新记忆 → 推送 complete/memory 事件。
+- 配置（config.ts）：按 `$HOME/.arrodes/.env` → repo `.env` → `EXTRA_ENV_PATH` 顺序加载，密钥不进仓库。
+
+### 前端（client/src）
+
+- `main.tsx` / `App.tsx` 为入口；`shared/events/EventBus.ts` 提供全局事件总线（universe/voice/nav/app 命名空间事件）。
+- `shared/stores/useUniverseStore.ts` 管理星球宇宙状态；`core/MessageChannel.ts`、`core/Pipeline.ts`、`pipeline/` 承载语音管道与阶段处理（intent/llm/memory/tts）。
+- 组件层：`components/`（Avatar、ChatOverlay、SessionPanel、TTSControl 等）与 `modules/`（vision、voice）通过 EventBus 与 store 通信，WebSocket 收发在 MessageChannel 中完成。
+
+### 依赖方向
+
+- `shared/types` 被 client 与 server 共同 import，是唯一共享契约（会话/消息/记忆/意图/WS 协议类型）。
+- server 内部依赖：routes → repositories（`db/`）→ services（`llmService`、`MemoryGateway`、`modelRegistry`）；skills 注册表被 index 与 ws handler 共用。
+- 独立目录 `assistant-x-openclaw/*` 与 `Arrodes` 无代码级引用关系（仅同仓共存）。
