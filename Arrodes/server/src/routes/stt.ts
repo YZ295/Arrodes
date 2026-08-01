@@ -49,7 +49,7 @@ export function createSttRouter(): Router {
         req.file.buffer.byteOffset + req.file.buffer.byteLength,
       ) as ArrayBuffer;
       form.append('file', new Blob([audioBytes], { type: req.file.mimetype }), filename);
-      form.append('model', 'SenseVoiceSmall');
+      form.append('model', 'FunAudioLLM/SenseVoiceSmall');
 
       const resp = await fetch(`${config.siliconflowBaseUrl}/v1/audio/transcriptions`, {
         method: 'POST',
