@@ -39,6 +39,19 @@ CREATE TABLE IF NOT EXISTS memories (
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories(session_id);
+
+CREATE TABLE IF NOT EXISTS llm_usage (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  model_id      TEXT NOT NULL,
+  session_id    TEXT,
+  prompt_tokens INTEGER NOT NULL DEFAULT 0,
+  completion_tokens INTEGER NOT NULL DEFAULT 0,
+  total_tokens  INTEGER NOT NULL DEFAULT 0,
+  estimated     INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_usage_created_at ON llm_usage(created_at);
 `;
 
 export function initSchema(): void {

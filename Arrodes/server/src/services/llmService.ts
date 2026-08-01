@@ -4,8 +4,10 @@
  *
  * 三个公共方法（chatStream / chatSimple / chatStreamSimple）共享同一个
  * requestLlm 核心，仅系统提示词、消息截断、流式开关、max_tokens、temperature 不同。
+ * 每次调用前检查 Token 额度（超额拒绝），调用后记录用量（精确优先，缺失估算）。
  */
 import { getCurrentModel, getApiKeyForModel } from './modelRegistry.js';
+import { usageService } from './usageService.js';
 
 interface LlmMessage {
   role: 'system' | 'user' | 'assistant';
@@ -112,6 +114,13 @@ export class LlmService {
       return;
     }
 
+    // Token 额度检查：超额直接拒绝，不发请求
+    const limit = usageService.checkLimit();
+    if (!limit.allowed) {
+      callbacks.onError(limit.reason || 'Token 额度已用尽');
+      return;
+    }
+
     const payload: LlmMessage[] = [];
     if (options.systemPrompt) {
       payload.push({ role: 'system', content: options.systemPrompt });
@@ -127,16 +136,18 @@ export class LlmService {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
 
+      const requestBody = JSON.stringify({
+        model: model.modelName,
+        messages: payload,
+        stream: options.stream,
+        max_tokens: options.maxTokens,
+        temperature: options.temperature,
+      });
+
       const response = await fetch(`${model.baseUrl}/chat/completions`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model: model.modelName,
-          messages: payload,
-          stream: options.stream,
-          max_tokens: options.maxTokens,
-          temperature: options.temperature,
-        }),
+        body: requestBody,
       });
 
       if (!response.ok) {
@@ -147,8 +158,12 @@ export class LlmService {
 
       if (!options.stream) {
         // 非流式：一次返回（同时回调 onChunk，兼容依赖该通道的调用方）
-        const json = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+        const json = await response.json() as {
+          choices?: Array<{ message?: { content?: string } }>;
+          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+        };
         const text = json.choices?.[0]?.message?.content || '';
+        this.recordUsage(model.id, payload, text, json.usage);
         callbacks.onChunk(text);
         callbacks.onComplete(text);
         return;
@@ -164,6 +179,7 @@ export class LlmService {
       const decoder = new TextDecoder();
       let fullText = '';
       let buffer = '';
+      let streamUsage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -185,16 +201,56 @@ export class LlmService {
               fullText += delta;
               callbacks.onChunk(delta);
             }
+            if (json.usage) streamUsage = json.usage;
           } catch {
             // skip parse errors
           }
         }
       }
 
+      this.recordUsage(model.id, payload, fullText, streamUsage);
       callbacks.onComplete(fullText);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知 LLM 错误';
       callbacks.onError(msg);
     }
   }
+
+  /** 记录用量：优先精确 usage，缺失时按字符数估算 */
+  private recordUsage(
+    modelId: string,
+    payload: LlmMessage[],
+    completionText: string,
+    usage?: { prompt_tokens?: number; completion_tokens?: number },
+  ): void {
+    try {
+      if (usage && typeof usage.prompt_tokens === 'number') {
+        usageService.recordUsage({
+          modelId,
+          promptTokens: usage.prompt_tokens,
+          completionTokens: usage.completion_tokens ?? 0,
+          estimated: false,
+        });
+      } else {
+        const promptTokens = estimateTokens(JSON.stringify(payload));
+        const completionTokens = estimateTokens(completionText);
+        usageService.recordUsage({
+          modelId,
+          promptTokens,
+          completionTokens,
+          estimated: true,
+        });
+      }
+    } catch (err) {
+      console.warn('[LlmService] 记录用量失败:', err);
+    }
+  }
+}
+
+/** 粗略 token 估算：中文约 1 token/字符，英文约 4 字符/token，混合取 3 字符/token */
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  const cjk = (text.match(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/g) || []).length;
+  const other = text.length - cjk;
+  return Math.ceil(cjk + other / 4);
 }

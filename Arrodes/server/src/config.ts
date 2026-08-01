@@ -43,4 +43,8 @@ export const config = {
   deepseekApiKey: process.env.DEEPSEEK_API_KEY || '',
   deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
   deepseekModel: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
+
+  // Token 额度上限（管控运行成本）
+  tokenDailyLimit: parseInt(process.env.TOKEN_DAILY_LIMIT || '500000', 10),
+  tokenMonthlyLimit: parseInt(process.env.TOKEN_MONTHLY_LIMIT || '12000000', 10),
 };
