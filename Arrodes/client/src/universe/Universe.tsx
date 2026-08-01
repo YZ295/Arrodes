@@ -1,15 +1,11 @@
 /**
- * 阿罗德斯 3D 宇宙场景
- * 使用 React Three Fiber 渲染的沉浸式星系空间
+ * 阿罗德斯 3D 背景场景
+ * 纯星空氛围背景（会话不再以星球呈现，会话管理在左侧栏）
  */
 import { Canvas } from '@react-three/fiber';
 import Starfield from './Starfield';
-import HomePlanet from './HomePlanet';
-import SolarSystem from './SolarSystem';
-import CameraController from './CameraController';
 import ParticleSystem from './effects/ParticleSystem';
-import SpawnAnimation from './effects/SpawnAnimation';
-import OrbitSystem from './effects/OrbitSystem';
+import CameraController from './CameraController';
 
 export default function Universe() {
   return (
@@ -39,18 +35,6 @@ export default function Universe() {
 
       {/* 粒子特效 */}
       <ParticleSystem />
-
-      {/* 主星球 */}
-      <HomePlanet />
-
-      {/* 会话星球轨道系统 */}
-      <SolarSystem />
-
-      {/* 星球生成动画 */}
-      <SpawnAnimation />
-
-      {/* 引力轨道系统 */}
-      <OrbitSystem />
 
       {/* 相机控制 */}
       <CameraController />
