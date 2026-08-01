@@ -84,12 +84,12 @@ export const WebSpeechSttEngine: SttEngine = {
   priority: 0,
 
   checkAvailable: async () => {
-    return !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition);
+    return !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   },
 
   startRecognition: async (callbacks) => {
     const SpeechRecognitionCtor =
-      window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognitionCtor) {
       callbacks.onError?.('浏览器不支持语音识别');

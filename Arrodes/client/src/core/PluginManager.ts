@@ -14,8 +14,6 @@
 import type {
   ArodesPlugin,
   PluginRegistry,
-  PluginHooks,
-  PluginManifest,
 } from '@shared/types/plugin';
 import type { Message, MemoryNode } from '@shared/types';
 import type { PipelineContext, PipelineResult } from '@shared/types/pipeline';

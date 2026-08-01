@@ -20,13 +20,12 @@ import { PipelineRunner, createPipelineContext } from '../core/Pipeline';
 import { getPluginManager } from '../core/PluginManager';
 import type {
   PipelineResult,
-  PipelineContext,
   StageConfig,
 } from '@shared/types/pipeline';
 
 import { createIntentStage } from './stages/intentStage';
 import { createLlmStage } from './stages/llmStage';
-import { createTtsStage, type TtsStageDeps } from './stages/ttsStage';
+import { createTtsStage } from './stages/ttsStage';
 import { createMemoryStage } from './stages/memoryStage';
 
 // ============================================================
@@ -41,12 +40,12 @@ export interface VoicePipelineDeps {
  * 创建语音对话管道实例
  */
 export function createVoicePipeline(deps: VoicePipelineDeps): VoicePipelineRunner {
-  const stages: StageConfig[] = [
+  const stages = [
     createIntentStage(),
     createLlmStage(),
     createMemoryStage(),
     createTtsStage({ speak: deps.ttsSpeak }),
-  ];
+  ] as StageConfig[];
 
   const runner = new PipelineRunner({
     name: 'voice-chat',
@@ -65,7 +64,7 @@ export function createVoicePipeline(deps: VoicePipelineDeps): VoicePipelineRunne
         'color:#10b981', 'color:inherit', 'color:#888', 'color:#aaa',
       );
     },
-    onError: (ctx, err, stage) => {
+    onError: (_ctx, err, stage) => {
       console.error(
         `%c[Pipeline:voice-chat] %c失败 %c${stage}`,
         'color:#ef4444', 'color:inherit', 'color:#f59e0b',

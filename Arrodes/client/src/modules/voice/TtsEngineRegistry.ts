@@ -124,7 +124,7 @@ export const EdgeTtsEngine: TtsEngine = {
   checkAvailable: async () => {
     try {
       const res = await api.get('/tts/voices');
-      return res && (res as any).voices?.length > 0;
+      return Boolean((res as any)?.voices?.length);
     } catch {
       return false;
     }

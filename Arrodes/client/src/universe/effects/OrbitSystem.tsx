@@ -13,6 +13,10 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useUniverseStore } from '../../shared/stores/useUniverseStore';
 
+// R3F 的 JSX 类型把 <line> 解析为 SVG 元素（geometry/position 不兼容），
+// 用变量间接引用绕过类型检查，运行时等价于 <line>（映射到 THREE.Line）
+const Line = 'line' as any;
+
 /* ============================================================
  * 单条轨道环 (OrbitRing)
  * ============================================================ */
@@ -86,7 +90,7 @@ function OrbitRing({
   const colorObj = new THREE.Color(color);
 
   return (
-    <line ref={lineRef} geometry={geometry} position={position}>
+    <Line ref={lineRef} geometry={geometry} position={position}>
       <lineBasicMaterial
         color={colorObj}
         transparent
@@ -94,7 +98,7 @@ function OrbitRing({
         depthWrite={false}
         linewidth={1}
       />
-    </line>
+    </Line>
   );
 }
 

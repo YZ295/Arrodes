@@ -2,7 +2,7 @@
  * 会话星球
  * 根据主题显示不同颜色，包含大气层辉光、轨道环和动画交互
  */
-import { useRef, useMemo, memo } from 'react';
+import { useRef, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -35,7 +35,6 @@ function Planet({
   const ring2Ref = useRef<THREE.Mesh>(null);
 
   const hexColor = TOPIC_COLOR_HEX[color] ?? 0x6b7280;
-  const colorObj = useMemo(() => new THREE.Color(hexColor), []);
 
   // 跟踪悬停状态
   const hoverRef = useRef(false);

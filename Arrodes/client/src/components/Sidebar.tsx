@@ -11,7 +11,7 @@
  * 7. 移动端    — 待开发
  * 8. 高级      — API Key/调试/管道配置
  */
-import { useState, memo } from 'react';
+import { memo } from 'react';
 
 export type SidebarView =
   | 'conversation' | 'workflow' | 'profile' | 'memory'

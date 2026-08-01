@@ -65,43 +65,6 @@ const DEFAULTS: Required<Omit<VadConfig, 'onSpeechStart' | 'onSpeechEnd' | 'onLe
   fftSize: 256,
 };
 
-// ===== AudioWorklet 内联代码（免文件加载） =====
-// 浏览器需要 .js 文件的 worklet，这里用 Blob URL 内联
-
-function createVadProcessorCode(): string {
-  return `
-    class VadProcessor extends AudioWorkletProcessor {
-      process(inputs, outputs, parameters) {
-        const input = inputs[0];
-        if (!input || !input.length) return true;
-
-        const channel = input[0];
-        if (!channel) return true;
-
-        // 计算 RMS（均方根）音量
-        let sum = 0;
-        for (let i = 0; i < channel.length; i++) {
-          sum += channel[i] * channel[i];
-        }
-        const rms = Math.sqrt(sum / channel.length);
-
-        // 映射到 0~255
-        const level = Math.min(255, Math.floor(rms * 512));
-
-        this.port.postMessage({ level, rms });
-
-        return true; // keep alive
-      }
-
-      static get parameterDescriptors() {
-        return [];
-      }
-    }
-
-    registerProcessor('vad-processor', VadProcessor);
-  `;
-}
-
 // ===== Hook =====
 
 export function useVAD(config: VadConfig = {}): UseVadReturn {
@@ -122,7 +85,7 @@ export function useVAD(config: VadConfig = {}): UseVadReturn {
 
   const streamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataRef = useRef<Uint8Array | null>(null);
+  const dataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aboveCount = useRef(0);
   const belowCount = useRef(0);

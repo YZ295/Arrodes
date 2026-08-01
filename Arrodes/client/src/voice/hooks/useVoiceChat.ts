@@ -3,7 +3,7 @@
  * 多会话管理 + STT Promise 竞态修复 + 管道编排
  */
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { Message, WSClientMessage, SessionNode, WSChunkData, WSCompleteData, WSMemoryData } from '@shared/types';
+import type { Message, SessionNode, WSChunkData, WSCompleteData, WSMemoryData } from '@shared/types';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
 import { useUniverseStore } from '../../shared/stores/useUniverseStore';
 import { calcSpawnPosition } from '../../universe/utils/spawnPosition';
@@ -97,6 +97,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
     try {
       const data = await api.get<{ sessions: SessionNode[] }>('/sessions');
       const sessions = data.sessions || [];
+      useUniverseStore.getState().setPlanets(sessions);
       const valid = sessions.filter((s) => s.messageCount > 0);
 
       if (valid.length > 0) {
@@ -182,6 +183,10 @@ export function useVoiceChat(): UseVoiceChatReturn {
   const createNewSession = useCallback(async (title = '新会话'): Promise<string | null> => {
     try {
       const session = await api.post<SessionNode>('/sessions', { title, topic: 'other' });
+      const { planets, addPlanet } = useUniverseStore.getState();
+      const nonHomeCount = planets.filter((p) => !p.isHome).length;
+      const position = calcSpawnPosition(nonHomeCount);
+      addPlanet({ ...session, messageCount: session.messageCount || 1 }, position);
       switchSession(session.id);
       return session.id;
     } catch (err) {

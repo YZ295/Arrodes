@@ -28,6 +28,7 @@ import type {
   StageConfig,
   StageOutput,
 } from '@shared/types/pipeline';
+import type { MemoryNode } from '@shared/types';
 
 /** 默认阶段超时 (ms) */
 const DEFAULT_STAGE_TIMEOUT = 15000;
@@ -113,7 +114,7 @@ export class PipelineRunner {
         duration: Math.round(performance.now() - context.startTime),
         context,
         reply: (context.state.reply as string) || '',
-        newMemories: (context.state.newMemories as unknown[]) || [],
+        newMemories: (context.state.newMemories as MemoryNode[] | undefined) || [],
         stageDurations,
       };
     } catch (error) {

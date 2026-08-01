@@ -22,13 +22,14 @@ const DEFAULT_TIMEOUT = 15000;
 // ===== 自定义错误 =====
 
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code?: string,
-  ) {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
   }
 }
 

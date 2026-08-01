@@ -33,7 +33,7 @@ function PlaceholderPanel({ title, description, icon }: { title: string; descrip
 }
 
 export default memo(function PanelView(props: PanelViewProps) {
-  const { view, ttsConfig, ttsVoices, setTtsConfig, onBack } = props;
+  const { view, ttsConfig, setTtsConfig, onBack } = props;
 
   return (
     <div className="absolute inset-0 z-35 flex justify-end pointer-events-none">
@@ -58,7 +58,7 @@ export default memo(function PanelView(props: PanelViewProps) {
         <div className="flex-1 overflow-y-auto">
           {view === 'skills' && <SkillsPanel />}
           {view === 'profile' && <ProfilePanel />}
-          {view === 'memory' && <MemoryPanel />}
+          {view === 'memory' && <MemoryPanel onClose={onBack} />}
           {view === 'vision' && <VisionPanel />}
           {view === 'settings' && (
             <div className="p-5 space-y-6">
@@ -138,7 +138,7 @@ function AdvancedPanel() {
 
 function SkillsPanel() {
   const [skills, setSkills] = useState<Array<{
-    name: string; description: string; args: Array<{ name: string; type: string; description: string }>;
+    name: string; description: string; args: Array<{ name: string; type: string; description: string; required?: boolean }>;
   }>>([]);
   const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);

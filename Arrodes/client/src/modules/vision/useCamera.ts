@@ -29,7 +29,6 @@ export function useCamera(): UseCameraReturn {
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // 清理
   useEffect(() => {

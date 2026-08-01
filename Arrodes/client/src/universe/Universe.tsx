@@ -8,10 +8,8 @@ import HomePlanet from './HomePlanet';
 import SolarSystem from './SolarSystem';
 import CameraController from './CameraController';
 import ParticleSystem from './effects/ParticleSystem';
-import SessionSpawner from './SessionSpawner';
 import SpawnAnimation from './effects/SpawnAnimation';
 import OrbitSystem from './effects/OrbitSystem';
-import Bloom from './effects/Bloom';
 
 export default function Universe() {
   return (
@@ -47,9 +45,6 @@ export default function Universe() {
 
       {/* 会话星球轨道系统 */}
       <SolarSystem />
-
-      {/* 语音创建会话事件桥接 */}
-      <SessionSpawner />
 
       {/* 星球生成动画 */}
       <SpawnAnimation />

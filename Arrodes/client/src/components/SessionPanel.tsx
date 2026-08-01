@@ -13,7 +13,7 @@ interface SessionPanelProps {
 
 export default function SessionPanel({ onClose }: SessionPanelProps) {
   const [sessions, setSessions] = useState<SessionNode[]>([]);
-  const [currentId, setCurrentId] = useState('');
+  const [currentId] = useState('');
   const [editingId, setEditingId] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [deleting, setDeleting] = useState('');
@@ -34,16 +34,8 @@ export default function SessionPanel({ onClose }: SessionPanelProps) {
   };
 
   const createNew = async () => {
-    try {
-      const s = await api.post<SessionNode>('/sessions', {
-        title: '新对话',
-        topic: 'other',
-      });
-      eventBus.emit(EVENTS.VOICE_SESSION_CREATE, { title: s.title, topic: 'other' });
-      onClose();
-    } catch {
-      // 静默处理
-    }
+    eventBus.emit(EVENTS.VOICE_SESSION_CREATE, { title: '新对话', topic: 'other' });
+    onClose();
   };
 
   const remove = async (id: string, e: React.MouseEvent) => {

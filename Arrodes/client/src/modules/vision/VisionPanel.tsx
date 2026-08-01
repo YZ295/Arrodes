@@ -154,7 +154,6 @@ export default function VisionPanel() {
   const [error, setError] = useState<string | null>(null);
 
   const {
-    isActive,
     stream,
     snapshot,
     error: cameraError,

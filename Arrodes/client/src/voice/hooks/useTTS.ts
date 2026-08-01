@@ -61,7 +61,7 @@ export function useTTS(): UseTtsReturn {
   const [currentVoice, setCurrentVoice] = useState(DEFAULT_CONFIG.voiceId);
   const [config, setConfigState] = useState<TtsConfig>(DEFAULT_CONFIG);
   const [voices, setVoices] = useState<TtsVoice[]>([]);
-  const [available, setAvailable] = useState(true);
+  const [available] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -194,8 +194,8 @@ export function useTTS(): UseTtsReturn {
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<TtsConfig>;
         // Edge TTS 的 TRUSTED_CLIENT_TOKEN 经常被微软拒绝，强制改用 Web Speech
-        const engine = parsed.engine === 'server' ? 'web' : parsed.engine;
-        const migrated = { ...parsed, engine };
+        const engine: TtsEngine = parsed.engine === 'server' ? 'web' : (parsed.engine ?? 'web');
+        const migrated: TtsConfig = { ...DEFAULT_CONFIG, ...parsed, engine };
         setConfigState((prev) => ({ ...prev, ...migrated }));
         if (parsed.voiceId) setCurrentVoice(parsed.voiceId);
         setEngine(engine);

@@ -2,10 +2,10 @@
  * 星球生成动画特效
  * 新会话星球诞生时的光束 + 粒子凝聚 + 冲击波效果
  *
- * 触发条件：通过 EventBus 监听 VOICE_SESSION_CREATE 事件
+ * 触发条件：通过 EventBus 监听 UNIVERSE_PLANET_SPAWNED 事件
  * 流程：光束从天而降 → 冲击波扩散 → 粒子凝聚 → 星球浮现
  */
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
@@ -172,9 +172,7 @@ function ParticleAccretion({
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
-          count={particleCount.current}
-          array={initialPositions.current || new Float32Array(particleCount.current * 3)}
-          itemSize={3}
+          args={[initialPositions.current || new Float32Array(particleCount.current * 3), 3]}
         />
       </bufferGeometry>
       <pointsMaterial
@@ -210,10 +208,16 @@ export default function SpawnAnimation() {
     progress: 0,
   });
 
-  // 监听会话创建事件
+  // 监听星球真正写入宇宙后的事件，确保动画位置与实际星球一致。
   useEffect(() => {
-    const unsubscribe = eventBus.on(EVENTS.VOICE_SESSION_CREATE, (data: unknown) => {
-      const { title, topic } = (data as { title?: string; topic?: string }) || {};
+    const unsubscribe = eventBus.on(EVENTS.UNIVERSE_PLANET_SPAWNED, (data: unknown) => {
+      const { sessionId, position } = (data as {
+        sessionId?: string;
+        position?: { x: number; y: number; z: number };
+      }) || {};
+      if (!sessionId || !position) return;
+
+      const planet = useUniverseStore.getState().planets.find((p) => p.id === sessionId);
 
       // 从主题获取颜色
       const colorMap: Record<string, string> = {
@@ -225,15 +229,11 @@ export default function SpawnAnimation() {
         other: '#6B7280',
       };
 
-      // 获取新星球的 spawn 位置
-      const planets = useUniverseStore.getState().planets;
-      const spawnPos = calcSpawnPosition(planets.length);
-
       animRef.current = {
         active: true,
-        position: [spawnPos.x, spawnPos.y, spawnPos.z],
-        color: colorMap[topic || 'other'] || '#6B7280',
-        title: title || '新会话',
+        position: [position.x, position.y, position.z],
+        color: colorMap[planet?.topic || 'other'] || '#6B7280',
+        title: planet?.title || '新会话',
         progress: 0,
       };
     });
@@ -264,20 +264,4 @@ export default function SpawnAnimation() {
       <ParticleAccretion position={anim.position} progress={anim.progress} color={anim.color} />
     </group>
   );
-}
-
-/**
- * 计算星球的生成位置（与 spawnPosition.ts 保持一致的算法）
- */
-function calcSpawnPosition(index: number): { x: number; y: number; z: number } {
-  const ORBIT_RADIUS_MIN = 5;
-  const ORBIT_RADIUS_MAX = 11;
-  const angleStep = Math.PI * 2 / 7; // 7 个槽位
-  const radius = ORBIT_RADIUS_MIN + (index % 7) * (ORBIT_RADIUS_MAX - ORBIT_RADIUS_MIN) / 6;
-  const angle = index * angleStep + Math.PI / 2;
-  return {
-    x: Math.cos(angle) * radius,
-    y: (Math.random() - 0.5) * 2,
-    z: Math.sin(angle) * radius,
-  };
 }

@@ -16,7 +16,7 @@ export default memo(function MirrorShardText({
   text, charDelay = 40, color = '#e0f7fa', className = '',
 }: MirrorShardTextProps) {
   const [visibleChars, setVisibleChars] = useState(0);
-  const [complete, setComplete] = useState(false);
+  const [, setComplete] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevTextRef = useRef('');
 

@@ -6,7 +6,7 @@
  * - 当前会话记忆：从 chatStore 获取
  * - 全局记忆搜索：GET /api/v1/memories?q=xxx
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { MemoryNode, MemoryType } from '@shared/types';
 
 /* ============================================================

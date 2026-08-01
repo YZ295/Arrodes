@@ -31,7 +31,7 @@ export default memo(function DecryptedSubtitle({
   className = '',
 }: DecryptedSubtitleProps) {
   const [displayed, setDisplayed] = useState('');
-  const [doneLength, setDoneLength] = useState(0);
+  const [, setDoneLength] = useState(0);
   const targetRef = useRef(text);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const doneRef = useRef(0);
