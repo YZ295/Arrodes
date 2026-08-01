@@ -166,7 +166,7 @@ export class MessageChannel {
 
   private doConnect(): void {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:3001';
+    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:3002';
     const wsUrl = `${protocol}//${wsHost}${this.config.wsPath}`;
 
     const ws = new WebSocket(wsUrl);
