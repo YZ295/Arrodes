@@ -1,5 +1,10 @@
 {
+  "main": "electron/main.js",
+  "scripts": {
+    "desktop": "electron ."
+  },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "electron": "^43.2.0"
   }
 }
