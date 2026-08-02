@@ -14,7 +14,7 @@
 import { memo } from 'react';
 
 export type SidebarView =
-  | 'conversation' | 'workflow' | 'profile' | 'memory'
+  | 'conversation' | 'workspace' | 'workflow' | 'profile' | 'memory'
   | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced';
 
 interface NavItem {
@@ -27,6 +27,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'conversation', label: '对话', icon: 'M', available: true },
+  { id: 'workspace', label: '工作区', icon: 'K', available: true, hint: 'Agent 大宇宙' },
   { id: 'skills', label: '技能', icon: 'T', available: true },
   { id: 'workflow', label: '工作流', icon: 'W', available: false, hint: '即将支持 n8n / Coze' },
   { id: 'profile', label: '画像', icon: 'P', available: true },
