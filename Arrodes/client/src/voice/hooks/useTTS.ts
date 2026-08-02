@@ -327,7 +327,8 @@ export function useTTS(): UseTtsReturn {
           const msg = err instanceof Error ? err.message : 'unknown';
           console.warn('[TTS] 服务端失败 → 降级:', msg);
           setEngine('web');
-          setError(`服务端 TTS 失败 (${msg})，已降级到浏览器语音`);
+          // 柔和提示，不含技术细节
+          setError('语音引擎已自动切换');
         }
       }
       await speakWeb(text);

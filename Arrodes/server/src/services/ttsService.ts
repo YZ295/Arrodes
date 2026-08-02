@@ -92,7 +92,7 @@ function synthesizeEdge(
         try { ws.close(); } catch {}
         reject(new Error('Edge TTS 超时'));
       }
-    }, 15000);
+    }, 30000);
 
     ws.on('open', () => {
       // 1. 发送配置
@@ -202,18 +202,20 @@ export class TtsService {
 
     if (!text || !text.trim()) throw new Error('文本不能为空');
     if (text.length > 2000) throw new Error('文本过长（最大 2000 字）');
+    // 超长文本截断：Edge 合成 800+ 字需 10s+，过长易中断/超时，朗读前 1000 字
+    const speakText = text.length > 1000 ? text.slice(0, 1000) : text;
 
     switch (engine) {
       case 'edge': {
         let result;
         try {
-          result = await synthesizeEdge(text, voice, rate, pitch);
+          result = await synthesizeEdge(speakText, voice, rate, pitch);
         } catch (err) {
           // Edge TTS 偶发不稳定（连接关闭/超时），重试一次再失败
           console.warn('[TTS] Edge 合成失败，重试一次:', err instanceof Error ? err.message : err);
-          result = await synthesizeEdge(text, voice, rate, pitch);
+          result = await synthesizeEdge(speakText, voice, rate, pitch);
         }
-        const estimatedDuration = text.length / 4;
+        const estimatedDuration = speakText.length / 4;
         return { ...result, engine: 'edge', voice, duration: estimatedDuration };
       }
       default:
