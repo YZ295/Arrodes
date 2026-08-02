@@ -207,14 +207,22 @@ export class TtsService {
 
     switch (engine) {
       case 'edge': {
+        // 最多尝试 3 次（Edge TTS 国内网络间歇性失败，间隔 1s 重试）
         let result;
-        try {
-          result = await synthesizeEdge(speakText, voice, rate, pitch);
-        } catch (err) {
-          // Edge TTS 偶发不稳定（连接关闭/超时），重试一次再失败
-          console.warn('[TTS] Edge 合成失败，重试一次:', err instanceof Error ? err.message : err);
-          result = await synthesizeEdge(speakText, voice, rate, pitch);
+        let lastErr: unknown;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            result = await synthesizeEdge(speakText, voice, rate, pitch);
+            break;
+          } catch (err) {
+            lastErr = err;
+            if (attempt < 3) {
+              console.warn(`[TTS] Edge 合成失败（第 ${attempt} 次），1s 后重试:`, err instanceof Error ? err.message : err);
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+          }
         }
+        if (!result) throw lastErr;
         const estimatedDuration = speakText.length / 4;
         return { ...result, engine: 'edge', voice, duration: estimatedDuration };
       }
