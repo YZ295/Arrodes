@@ -194,6 +194,32 @@ function synthesizeEdge(
   });
 }
 
+// ===== 串行队列（防并发触发微软侧限流） =====
+
+let ttsChain: Promise<unknown> = Promise.resolve();
+
+/** 串行化执行：一次只处理一个 TTS 合成请求 */
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = ttsChain.then(() => task());
+  ttsChain = run.catch(() => undefined);
+  return run;
+}
+
+// ===== 失败统计（可观测，供诊断） =====
+
+export interface TtsStats {
+  totalAttempts: number;
+  totalFailures: number;
+  lastError?: string;
+  lastErrorAt?: string;
+}
+
+const ttsStats: TtsStats = { totalAttempts: 0, totalFailures: 0 };
+
+export function getTtsStats(): TtsStats {
+  return { ...ttsStats };
+}
+
 // ===== 服务类 =====
 
 export class TtsService {
@@ -205,30 +231,37 @@ export class TtsService {
     // 超长文本截断：Edge 合成 800+ 字需 10s+，过长易中断/超时，朗读前 1000 字
     const speakText = text.length > 1000 ? text.slice(0, 1000) : text;
 
-    switch (engine) {
-      case 'edge': {
-        // 最多尝试 3 次（Edge TTS 国内网络间歇性失败，间隔 1s 重试）
-        let result;
-        let lastErr: unknown;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            result = await synthesizeEdge(speakText, voice, rate, pitch);
-            break;
-          } catch (err) {
-            lastErr = err;
-            if (attempt < 3) {
-              console.warn(`[TTS] Edge 合成失败（第 ${attempt} 次），1s 后重试:`, err instanceof Error ? err.message : err);
-              await new Promise((r) => setTimeout(r, 1000));
+    // 串行队列：一次一个合成请求，避免并发触发微软侧限流导致间歇失败
+    return enqueue(async () => {
+      switch (engine) {
+        case 'edge': {
+          // 最多尝试 3 次（Edge TTS 间歇性失败，间隔 1s 重试）
+          let result;
+          let lastErr: unknown;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            ttsStats.totalAttempts++;
+            try {
+              result = await synthesizeEdge(speakText, voice, rate, pitch);
+              break;
+            } catch (err) {
+              lastErr = err;
+              ttsStats.totalFailures++;
+              ttsStats.lastError = err instanceof Error ? err.message : String(err);
+              ttsStats.lastErrorAt = new Date().toISOString();
+              if (attempt < 3) {
+                console.warn(`[TTS] Edge 合成失败（第 ${attempt} 次），1s 后重试:`, err instanceof Error ? err.message : err);
+                await new Promise((r) => setTimeout(r, 1000));
+              }
             }
           }
+          if (!result) throw lastErr;
+          const estimatedDuration = speakText.length / 4;
+          return { ...result, engine: 'edge', voice, duration: estimatedDuration };
         }
-        if (!result) throw lastErr;
-        const estimatedDuration = speakText.length / 4;
-        return { ...result, engine: 'edge', voice, duration: estimatedDuration };
+        default:
+          throw new Error(`不支持的 TTS 引擎: ${engine}`);
       }
-      default:
-        throw new Error(`不支持的 TTS 引擎: ${engine}`);
-    }
+    });
   }
 
   getVoices(): Array<{ id: string; name: string; gender: string; style: string }> {

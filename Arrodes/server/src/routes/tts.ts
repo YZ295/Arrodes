@@ -4,7 +4,7 @@
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { ttsService } from '../services/ttsService.js';
+import { ttsService, getTtsStats } from '../services/ttsService.js';
 
 export function createTtsRouter(): Router {
   const router = Router();
@@ -51,6 +51,11 @@ export function createTtsRouter(): Router {
   router.get('/voices', (_req: Request, res: Response) => {
     const voices = ttsService.getVoices();
     res.json({ voices });
+  });
+
+  // GET /api/v1/tts/status - 服务状态 + 失败统计（诊断用）
+  router.get('/status', (_req: Request, res: Response) => {
+    res.json({ status: 'ok', stats: getTtsStats() });
   });
 
   return router;
