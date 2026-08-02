@@ -24,6 +24,7 @@ import ChatOverlay from './components/ChatOverlay';
 import SessionPanel from './components/SessionPanel';
 import PanelView from './components/PanelView';
 import Universe from './universe/Universe';
+import Subtitle from './components/Subtitle';
 import { useVoiceChat } from './voice/hooks/useVoiceChat';
 
 const App = memo(function App() {
@@ -107,6 +108,9 @@ const App = memo(function App() {
             onBack={() => setSidebarView('conversation')}
           />
         )}
+
+        {/* 全局 AI 字幕（跟随 TTS 朗读，全屏居中） */}
+        <Subtitle />
       </div>
     </div>
   );

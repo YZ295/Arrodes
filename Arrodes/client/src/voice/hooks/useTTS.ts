@@ -10,6 +10,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { AudioContextManager } from '../../modules/voice/AudioContextManager';
 import { useAudioLevelStore } from '../../shared/stores/useAudioLevelStore';
+import { eventBus, EVENTS } from '../../shared/events/EventBus';
 
 // ===== 类型 =====
 
@@ -97,10 +98,10 @@ export function useTTS(): UseTtsReturn {
       useAudioLevelStore.getState().setMode('idle');
     };
 
-    audio.onplay = () => { setIsSpeaking(true); startLevelMonitor(); };
-    audio.onended = () => { setIsSpeaking(false); stopLevelMonitor(); };
-    audio.onpause = () => { setIsSpeaking(false); stopLevelMonitor(); };
-    audio.onerror = () => { setIsSpeaking(false); stopLevelMonitor(); };
+    audio.onplay = () => { setIsSpeaking(true); startLevelMonitor(); eventBus.emit(EVENTS.TTS_PLAY_START); };
+    audio.onended = () => { setIsSpeaking(false); stopLevelMonitor(); eventBus.emit(EVENTS.TTS_PLAY_END); };
+    audio.onpause = () => { setIsSpeaking(false); stopLevelMonitor(); eventBus.emit(EVENTS.TTS_PLAY_END); };
+    audio.onerror = () => { setIsSpeaking(false); stopLevelMonitor(); eventBus.emit(EVENTS.TTS_PLAY_END); };
 
     return () => {
       audio.pause();

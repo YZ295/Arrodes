@@ -31,6 +31,13 @@ export default function Subtitle() {
   const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUserSpeakingRef = useRef(false);
+  // status 的 ref 镜像（事件回调里读取最新状态）
+  const statusRef = useRef<'idle' | 'typing' | 'complete' | 'fading'>('idle');
+
+  // 同步 status → statusRef
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   // 清理定时器
   const clearTimers = useCallback(() => {
@@ -91,10 +98,35 @@ export default function Subtitle() {
 
   // 监听事件
   useEffect(() => {
+    // 最近一次 AI 回复文本（TTS 播放开始时显示）
+    let lastReplyContent = '';
+
     const unsubReply = eventBus.on(EVENTS.VOICE_REPLY_COMPLETE, (data: unknown) => {
       const { content } = (data as { content?: string; sessionId?: string }) || {};
       if (content && !isUserSpeakingRef.current) {
+        lastReplyContent = content;
         startTyping(content);
+      }
+    });
+
+    // TTS 朗读开始 → 显示字幕（跟随朗读）
+    const unsubPlayStart = eventBus.on(EVENTS.TTS_PLAY_START, () => {
+      if (lastReplyContent && !isUserSpeakingRef.current) {
+        startTyping(lastReplyContent);
+      }
+    });
+
+    // TTS 朗读结束 → 淡出（不固定 2s，朗读完即隐）
+    const unsubPlayEnd = eventBus.on(EVENTS.TTS_PLAY_END, () => {
+      if (statusRef.current === 'typing' || statusRef.current === 'complete') {
+        clearTimers();
+        setStatus('fading');
+        setOpacity(0);
+        setTimeout(() => {
+          setVisible(false);
+          setDisplayText('');
+          setStatus('idle');
+        }, FADE_OUT_DURATION);
       }
     });
 
@@ -115,6 +147,8 @@ export default function Subtitle() {
 
     return () => {
       unsubReply();
+      unsubPlayStart();
+      unsubPlayEnd();
       unsubRecord();
       unsubRecordEnd();
       unsubMsg();

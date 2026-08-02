@@ -115,6 +115,10 @@ export const EVENTS = {
   VOICE_SESSION_SWITCH: 'voice:session:switch',
   VOICE_INTENT_ACTION: 'voice:intent:action',
 
+  // TTS 播放（字幕跟随朗读）
+  TTS_PLAY_START: 'tts:play:start',
+  TTS_PLAY_END: 'tts:play:end',
+
   // 导航
   NAV_SEARCH_SELECT: 'nav:search:select',
   NAV_LIST_SELECT: 'nav:list:select',
