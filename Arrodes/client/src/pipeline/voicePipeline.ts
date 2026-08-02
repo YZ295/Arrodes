@@ -93,13 +93,14 @@ export class VoicePipelineRunner {
    * @param text 用户输入文本
    * @param sessionId 当前会话 ID
    * @param isVoice 是否为语音输入
+   * @param generation 消息代际（用于 TTS 中断检查，可空）
    * @returns 管道结果（含各阶段耗时）
    */
-  async run(text: string, sessionId: string, isVoice = false): Promise<PipelineResult> {
+  async run(text: string, sessionId: string, isVoice = false, generation?: number): Promise<PipelineResult> {
     const ctx = createPipelineContext({
       sessionId,
       rawInput: text,
-      state: { isVoice },
+      state: { isVoice, generation: generation ?? -1 },
     });
 
     // === PluginManager: beforePipeline 钩子 ===

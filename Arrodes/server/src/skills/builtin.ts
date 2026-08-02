@@ -83,6 +83,7 @@ registerSkill({
     return [
       '阿罗德斯当前能力：',
       '- 语音对话 (STT + LLM + TTS)',
+      '- 系统操控 (执行命令、读写文件)',
       '- 记忆系统 (自动提取 + 画像更新)',
       '- 会话管理 (多会话切换)',
       '- 视觉理解 (Qwen3-VL)',
@@ -261,6 +262,132 @@ registerSkill({
       return `MiniMax TTS 已合成。音频文件: /data/tts/${filename}\n音色: ${voice}\n文本: ${text.slice(0, 50)}...`;
     } catch (err) {
       return `MiniMax TTS 异常: ${err instanceof Error ? err.message : '未知错误'}`;
+    }
+  },
+});
+
+// ===== 系统操控技能 =====
+
+/** 执行命令（安全沙箱） */
+registerSkill({
+  name: 'exec_command',
+  description: '在本地电脑执行命令。当用户说"帮我跑""执行命令""打开XX""检查一下系统"时使用。仅允许非交互式命令，危险操作会被拦截。',
+  args: [
+    { name: 'command', type: 'string', required: true, description: '要执行的命令（如 dir, echo, git status 等非交互命令）' },
+  ],
+  execute: async (args) => {
+    const cmd = String(args.command || '').trim();
+    if (!cmd) return '错误: 命令不能为空';
+
+    // 安全沙箱：拦截危险操作
+    const blocked = [
+      'rm -rf', 'del /S', 'del /F', 'format', 'shutdown', 'restart',
+      'reg delete', 'sc delete', 'taskkill /F /IM', 'net stop', ':(){',
+      '/dev/null >', 'mkfs', 'dd if=', '> nul', '2>nul',
+    ];
+    const cmdLower = cmd.toLowerCase();
+    for (const b of blocked) {
+      if (cmdLower.includes(b.toLowerCase())) return `安全拦截: 禁止执行含「${b}」的命令`;
+    }
+
+    try {
+      const { execSync } = await import('node:child_process');
+      const output = execSync(cmd, {
+        cwd: process.cwd(),
+        timeout: 30000,
+        encoding: 'utf-8',
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+        windowsHide: true,
+      });
+      const clean = output.slice(0, 2000);
+      return clean.trim() || '命令执行成功（无输出）';
+    } catch (err: any) {
+      const msg = err.stderr || err.message || String(err);
+      return `命令执行失败: ${msg.slice(0, 500)}`;
+    }
+  },
+});
+
+/** 读取文件 */
+registerSkill({
+  name: 'read_file',
+  description: '读取本地文件内容。当用户说"看看这个文件""帮我读一下那个文件""打开xx文件"时使用。仅限文本文件。',
+  args: [
+    { name: 'path', type: 'string', required: true, description: '文件路径（绝对路径或相对于工作目录的路径）' },
+    { name: 'lines', type: 'number', required: false, description: '最多读取行数（默认 50）' },
+  ],
+  execute: async (args) => {
+    const filePath = String(args.path || '').trim();
+    const maxLines = Number(args.lines) || 50;
+    if (!filePath) return '错误: 路径不能为空';
+
+    // 拦截敏感文件
+    const sensitive = ['.env', '.gitconfig', 'id_rsa', 'NTUSER.DAT', '.pfx', '.p12'];
+    const fileName = filePath.split(/[/\\]/).pop()?.toLowerCase() || '';
+    if (sensitive.some((s) => fileName.includes(s.toLowerCase()))) {
+      return '安全拦截: 禁止读取敏感配置文件';
+    }
+
+    try {
+      const fs = await import('node:fs');
+      if (!fs.existsSync(filePath)) return `错误: 文件不存在 "${filePath}"`;
+
+      const stat = fs.statSync(filePath);
+      if (!stat.isFile()) return `错误: "${filePath}" 不是一个文件`;
+      if (stat.size > 500 * 1024) return `错误: 文件过大（${(stat.size / 1024).toFixed(1)}KB），最大 500KB`;
+
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n');
+      const preview = lines.slice(0, maxLines).join('\n');
+      const suffix = lines.length > maxLines ? `\n... (共 ${lines.length} 行，仅显示前 ${maxLines} 行)` : '';
+
+      return `文件: ${filePath} (${(stat.size / 1024).toFixed(1)}KB, ${lines.length} 行)\n\`\`\`\n${preview}\n\`\`\`${suffix}`;
+    } catch (err: any) {
+      return `读取失败: ${err.message?.slice(0, 200) || String(err)}`;
+    }
+  },
+});
+
+/** 写入文件 */
+registerSkill({
+  name: 'write_file',
+  description: '创建或写入本地文件。当用户说"帮我写一个文件""创建xx文件""保存到文件"时使用。会追加写入，不会覆盖已有内容。',
+  args: [
+    { name: 'path', type: 'string', required: true, description: '文件路径' },
+    { name: 'content', type: 'string', required: true, description: '要写入的内容' },
+    { name: 'overwrite', type: 'boolean', required: false, description: '是否覆盖已有文件（默认 false，追加写入）' },
+  ],
+  execute: async (args) => {
+    const filePath = String(args.path || '').trim();
+    const content = String(args.content || '');
+    const overwrite = args.overwrite === true;
+    if (!filePath) return '错误: 路径不能为空';
+    if (!content) return '错误: 内容不能为空';
+
+    // 拦截危险路径
+    const dangerous = ['/etc/', '/boot/', 'C:\\Windows\\', 'C:\\Program Files\\', 'System32', '.bashrc', '.zshrc', '.env'];
+    for (const d of dangerous) {
+      if (filePath.replace(/\\/g, '/').toLowerCase().includes(d.toLowerCase().replace(/\\/g, '/'))) {
+        return `安全拦截: 禁止写入系统路径 "${d}"`;
+      }
+    }
+
+    try {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      if (!overwrite && fs.existsSync(filePath)) {
+        // 追加模式
+        fs.appendFileSync(filePath, '\n' + content, 'utf-8');
+        return `已追加写入 ${filePath}`;
+      }
+
+      fs.writeFileSync(filePath, content, 'utf-8');
+      return `已写入 ${filePath} (${content.length} 字符)`;
+    } catch (err: any) {
+      return `写入失败: ${err.message?.slice(0, 200) || String(err)}`;
     }
   },
 });

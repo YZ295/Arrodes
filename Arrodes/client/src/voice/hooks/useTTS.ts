@@ -1,6 +1,8 @@
 /**
- * TTS Hook v4.4
- * - 服务端 Edge TTS 优先 + Web Speech 降级
+ * TTS Hook v5 — 纯云端模式
+ *
+ * - 只使用服务端 Edge TTS，无本地 Web Speech 降级
+ * - 云端不可用时：显示「无法连接云端语音服务」，不发声
  * - AudioContext 预热（用户首次交互后）
  * - 可见错误反馈 + 手动重播
  * - 预创建的 <audio> DOM 元素绕过 autoplay 限制
@@ -11,7 +13,7 @@ import { useAudioLevelStore } from '../../shared/stores/useAudioLevelStore';
 
 // ===== 类型 =====
 
-export type TtsEngine = 'server' | 'web';
+export type TtsEngine = 'server';
 
 export interface TtsVoice {
   id: string;
@@ -47,8 +49,8 @@ interface UseTtsReturn {
 // ===== 默认配置 =====
 
 const DEFAULT_CONFIG: TtsConfig = {
-  engine: 'web', // 默认用浏览器内置 Web Speech（Edge TTS 经常因 token 失效返回 401）
-  voiceId: 'zh-CN',
+  engine: 'server',
+  voiceId: 'zh-CN-XiaoxiaoNeural',
   rate: 1.0,
   pitch: 1.0,
 };
@@ -57,11 +59,9 @@ const DEFAULT_CONFIG: TtsConfig = {
 
 export function useTTS(): UseTtsReturn {
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [engine, setEngine] = useState<TtsEngine>('server');
   const [currentVoice, setCurrentVoice] = useState(DEFAULT_CONFIG.voiceId);
   const [config, setConfigState] = useState<TtsConfig>(DEFAULT_CONFIG);
   const [voices, setVoices] = useState<TtsVoice[]>([]);
-  const [available] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -117,7 +117,6 @@ export function useTTS(): UseTtsReturn {
       const acm = AudioContextManager.getInstance();
       await acm.ensureResumed();
 
-      // 首次解锁时同时建立音频分析图
       if (!analyserRef.current && audioRef.current) {
         const ctx = acm.getContext();
         const source = ctx.createMediaElementSource(audioRef.current);
@@ -128,92 +127,64 @@ export function useTTS(): UseTtsReturn {
         analyser.connect(ctx.destination);
         sourceNodeRef.current = source;
         analyserRef.current = analyser;
-        console.log('%c[TTS] %cAnalyserNode 已建立', 'color:#10b981', 'color:inherit');
       }
     } catch {
       /* ignore */
     }
   }, []);
 
-  // ---- 加载音色列表（Web Speech 从浏览器获取，Edge TTS 从服务端获取） ----
+  // ---- 加载服务端音色列表 ----
   useEffect(() => {
-    if (engine === 'server') {
-      fetch('/api/v1/tts/voices')
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.voices) {
-            setVoices(data.voices);
-            if (!data.voices.find((v: TtsVoice) => v.id === currentVoice)) {
-              setCurrentVoice(data.voices[0]?.id || 'zh-CN-YunyangNeural');
-            }
+    fetch('/api/v1/tts/voices')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.voices) {
+          setVoices(data.voices);
+          if (!data.voices.find((v: TtsVoice) => v.id === currentVoice)) {
+            setCurrentVoice(data.voices[0]?.id || 'zh-CN-YunyangNeural');
           }
-        })
-        .catch(() => {
-          setEngine('web');
-          setError('服务端 TTS 不可用，使用浏览器内置语音');
-        });
-    } else {
-      const loadWebVoices = () => {
-        const all = window.speechSynthesis.getVoices();
-        if (all.length === 0) { setTimeout(loadWebVoices, 200); return; }
-        const zhVoices = all
-          .filter((v) => v.lang.startsWith('zh'))
-          .map((v) => ({
-            id: v.voiceURI,
-            name: `${v.name}`,
-            gender: v.name.includes('Xiao') || v.name.includes('xiaoxiao') ? 'female' : 'male',
-            style: v.name,
-          }));
-        setVoices(zhVoices.length > 0 ? zhVoices : all.map((v) => ({
-          id: v.voiceURI, name: v.name, gender: 'other', style: v.name,
-        })));
-      };
-      loadWebVoices();
-      if ('onvoiceschanged' in window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = loadWebVoices;
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine]); // 只在 engine 切换时重新加载，不因 currentVoice 变化触发
+        }
+      })
+      .catch(() => {
+        setError('无法连接云端语音服务');
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- 更新配置 ----
   const setConfig = useCallback((partial: Partial<TtsConfig>) => {
     setConfigState((prev) => {
       const next = { ...prev, ...partial };
       if (partial.voiceId) setCurrentVoice(partial.voiceId);
-      if (partial.engine) setEngine(partial.engine);
       try { localStorage.setItem('arrodes_tts_config', JSON.stringify(next)); } catch {}
       return next;
     });
   }, []);
 
-  // ---- 恢复偏好（Edge TTS 当前 401，老用户强制升级到 web） ----
+  // ---- 恢复偏好 ----
   useEffect(() => {
     try {
       const saved = localStorage.getItem('arrodes_tts_config');
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<TtsConfig>;
-        // Edge TTS 的 TRUSTED_CLIENT_TOKEN 经常被微软拒绝，强制改用 Web Speech
-        const engine: TtsEngine = parsed.engine === 'server' ? 'web' : (parsed.engine ?? 'web');
-        const migrated: TtsConfig = { ...DEFAULT_CONFIG, ...parsed, engine };
-        setConfigState((prev) => ({ ...prev, ...migrated }));
+        setConfigState((prev) => ({ ...prev, ...parsed }));
         if (parsed.voiceId) setCurrentVoice(parsed.voiceId);
-        setEngine(engine);
-        // 写回 localStorage
-        try { localStorage.setItem('arrodes_tts_config', JSON.stringify(migrated)); } catch {}
       }
     } catch {}
   }, []);
 
-  // ---- 停止播放 ----
+  // ---- 停止播放（同时清 audio） ----
   const stop = useCallback(() => {
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
+      audio.src = '';
+      audio.load();
     }
-    window.speechSynthesis?.cancel();
     setIsSpeaking(false);
+    useAudioLevelStore.getState().setOutputLevel(0);
+    useAudioLevelStore.getState().setMode('idle');
+    if (levelTimerRef.current) { clearInterval(levelTimerRef.current); levelTimerRef.current = null; }
   }, []);
 
   // ---- 手动重播 ----
@@ -224,18 +195,10 @@ export function useTTS(): UseTtsReturn {
       audio.play().catch((err) => {
         console.warn('[TTS] replay 失败:', err);
       });
-    } else if (lastTextRef.current) {
-      // 重播 Web Speech
-      window.speechSynthesis?.cancel();
-      const utterance = new SpeechSynthesisUtterance(lastTextRef.current);
-      utterance.lang = 'zh-CN';
-      utterance.rate = config.rate;
-      utterance.pitch = config.pitch;
-      window.speechSynthesis.speak(utterance);
     }
-  }, [config.rate, config.pitch]);
+  }, []);
 
-  // ---- 服务端 TTS ----
+  // ---- 云端 TTS（Edge TTS 服务端合成） ----
   const speakServer = useCallback(async (text: string): Promise<void> => {
     const res = await fetch('/api/v1/tts/synthesize', {
       method: 'POST',
@@ -276,69 +239,29 @@ export function useTTS(): UseTtsReturn {
     });
   }, [currentVoice, config.rate, config.pitch]);
 
-  // ---- Web Speech ----
-  const speakWeb = useCallback((text: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!window.speechSynthesis) { resolve(); return; }
-      window.speechSynthesis.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = config.rate;
-      utterance.pitch = config.pitch;
-
-      // 多重匹配策略（按优先级）：
-      // 1. 精确匹配 voiceURI
-      // 2. 中文 + 名字包含关键词（如"云扬"/"Yunyang"=男声）
-      // 3. 任意中文语音
-      const voices = window.speechSynthesis.getVoices();
-      const exact = voices.find((v) => v.voiceURI === currentVoice);
-      const byKeyword = voices.find((v) =>
-        v.lang.startsWith('zh') && (
-          currentVoice.toLowerCase().includes('yunyang') || currentVoice.toLowerCase().includes('yunjian')
-            ? v.name.toLowerCase().includes('yun')
-            : currentVoice.toLowerCase().includes('xiaoxiao') || currentVoice.toLowerCase().includes('xiaoyi') || currentVoice.toLowerCase().includes('xiaorou')
-              ? v.name.toLowerCase().includes('xiao')
-              : false
-        )
-      );
-      const anyZh = voices.find((v) => v.lang.startsWith('zh'));
-      utterance.voice = exact || byKeyword || anyZh || voices[0] || null;
-
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => { setIsSpeaking(false); resolve(); };
-      utterance.onerror = () => { setIsSpeaking(false); resolve(); };
-      window.speechSynthesis.speak(utterance);
-    });
-  }, [currentVoice, config.rate, config.pitch]);
-
-  // ---- 主 speak 方法 ----
+  // ---- 主 speak 方法（代际计数器防旧音频残留） ----
+  const generationRef = useRef(0);
   const speak = useCallback(async (text: string) => {
     if (!text || !text.trim()) return;
     setError(null);
     lastTextRef.current = text;
 
+    // 中断前一代音频
+    stop();
+    generationRef.current++;
+    const gen = generationRef.current;
+
     try {
-      if (engine === 'server') {
-        try {
-          await speakServer(text);
-          return;
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'unknown';
-          console.warn('[TTS] 服务端失败 → 降级:', msg);
-          setEngine('web');
-          // 柔和提示，不含技术细节
-          setError('语音引擎已自动切换');
-        }
-      }
-      await speakWeb(text);
+      await speakServer(text);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'TTS 播放失败';
-      console.error('[TTS] 最终失败:', msg);
-      setError(msg);
-      setIsSpeaking(false);
+      const msg = err instanceof Error ? err.message : 'unknown';
+      console.warn('[TTS] 云端语音失败:', msg);
+      // 纯云端模式：不发声，只提示
+      if (gen === generationRef.current) {
+        setError('无法连接云端语音服务');
+      }
     }
-  }, [engine, speakServer, speakWeb]);
+  }, [speakServer, stop]);
 
   // ---- 卸载清理 ----
   useEffect(() => {
@@ -347,14 +270,14 @@ export function useTTS(): UseTtsReturn {
 
   return {
     isSpeaking,
-    engine,
+    engine: 'server',
     currentVoice,
     config,
     voices,
     speak,
     stop,
     setConfig,
-    available,
+    available: true,
     error,
     unlockAudio,
     replay,

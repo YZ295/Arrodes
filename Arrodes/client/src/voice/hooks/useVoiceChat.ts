@@ -6,6 +6,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { Message, SessionNode, WSChunkData, WSCompleteData, WSMemoryData } from '@shared/types';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
 import { uid } from '../../shared/utils/uid';
+import { bumpVoiceGeneration } from '../../shared/utils/voiceGeneration';
 import { api } from '../../shared/utils/apiClient';
 import { MessageChannel, useMessageChannel } from '../../core/MessageChannel';
 import { createVoicePipeline } from '../../pipeline/voicePipeline';
@@ -36,6 +37,8 @@ interface UseVoiceChatReturn {
   ttsError: string | null;
   /** 手动重播最近一段语音 */
   replayTTS: () => void;
+  /** 停止当前 TTS 播放 */
+  stopTTS: () => void;
   /** 解锁音频（首次交互后调用） */
   unlockAudio: () => Promise<void>;
   /** 当前 TTS 配置 */
@@ -43,7 +46,7 @@ interface UseVoiceChatReturn {
   /** 可用音色列表 */
   ttsVoices: Array<{ id: string; name: string; gender: string; style: string }>;
   /** 实时更新 TTS 配置（立即生效） */
-  setTtsConfig: (config: Partial<{ engine: 'server' | 'web'; voiceId: string; rate: number; pitch: number }>) => void;
+  setTtsConfig: (config: Partial<{ engine: 'server'; voiceId: string; rate: number; pitch: number }>) => void;
 }
 
 export function useVoiceChat(): UseVoiceChatReturn {
@@ -206,8 +209,11 @@ export function useVoiceChat(): UseVoiceChatReturn {
     return u2;
   }, [createNewSession]);
 
-  // ---- 发送消息 ----
+  // ---- 发送消息（自动中断正在播放的语音） ----
   const sendMessage = useCallback((content: string, isVoice: boolean) => {
+    // 递增代际 + 中断当前 TTS 播放（新消息取代旧消息）
+    const generation = bumpVoiceGeneration();
+    ttsStop();
     const sessionId = recordingSessionId.current;
     if (!sessionId || !channel.isConnected()) {
       setMessages((prev) => [
@@ -222,11 +228,11 @@ export function useVoiceChat(): UseVoiceChatReturn {
     setIsLoading(true);
 
     eventBus.emit(EVENTS.VOICE_MESSAGE_SEND, { content, sessionId, isVoice });
-    pipeline.run(content, sessionId, isVoice).catch((err) => {
+    pipeline.run(content, sessionId, isVoice, generation).catch((err) => {
       console.warn('[VoiceChat] 管道执行失败:', err);
       setIsLoading(false);
     });
-  }, [channel, pipeline]);
+  }, [channel, pipeline, ttsStop]);
 
   const sendTextMessage = useCallback((text: string) => sendMessage(text, false), [sendMessage]);
 
@@ -295,7 +301,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
     showMemoryToast, memoryToastText,
     startRecording, stopRecording, sendTextMessage,
     switchSession, createNewSession,
-    ttsError, replayTTS, unlockAudio,
+    ttsError, replayTTS, unlockAudio, stopTTS: ttsStop,
     ttsConfig: { engine: ttsConfig.engine, voiceId: ttsConfig.voiceId, rate: ttsConfig.rate, pitch: ttsConfig.pitch },
     ttsVoices, setTtsConfig: setTtsConfigRaw,
   };

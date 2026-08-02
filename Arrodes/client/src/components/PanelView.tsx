@@ -11,12 +11,13 @@ import ModelSettings from './ModelSettings';
 import TTSControl from './TTSControl';
 import MemoryPanel from './MemoryPanel';
 import VisionPanel from '../modules/vision/VisionPanel';
+import WorkspacePanel from './WorkspacePanel';
 
 interface PanelViewProps {
   view: SidebarView;
   ttsConfig: { engine: string; voiceId: string; rate: number; pitch: number };
   ttsVoices: Array<{ id: string; name: string; gender: string; style: string }>;
-  setTtsConfig: (config: Partial<{ engine: 'server' | 'web'; voiceId: string; rate: number; pitch: number }>) => void;
+  setTtsConfig: (config: Partial<{ engine: 'server'; voiceId: string; rate: number; pitch: number }>) => void;
   onBack: () => void;
 }
 
@@ -49,7 +50,8 @@ export default memo(function PanelView(props: PanelViewProps) {
           </button>
           <span className="text-sm font-medium text-white/60">
             {view === 'profile' ? '人物画像' : view === 'memory' ? '记忆库' : view === 'vision' ? '视觉理解'
-            : view === 'skills' ? '智能体技能' : view === 'settings' ? '配置' : view === 'workflow' ? '工作流' : view === 'mobile' ? '移动端' : '高级'}
+            : view === 'skills' ? '智能体技能' : view === 'settings' ? '配置' : view === 'workflow' ? '工作流'
+            : view === 'workspace' ? '工作区' : view === 'mobile' ? '移动端' : '高级'}
           </span>
           <div className="w-12" />
         </div>
@@ -57,6 +59,7 @@ export default memo(function PanelView(props: PanelViewProps) {
         {/* 内容 */}
         <div className="flex-1 overflow-y-auto">
           {view === 'skills' && <SkillsPanel />}
+          {view === 'workspace' && <WorkspacePanel />}
           {view === 'profile' && <ProfilePanel />}
           {view === 'memory' && <MemoryPanel onClose={onBack} />}
           {view === 'vision' && <VisionPanel />}
@@ -70,11 +73,9 @@ export default memo(function PanelView(props: PanelViewProps) {
                 <h3 className="text-xs text-white/30 mb-3 uppercase tracking-wider">语音合成</h3>
                 <TTSControl
                   currentVoice={ttsConfig.voiceId} rate={ttsConfig.rate} pitch={ttsConfig.pitch}
-                  engine={ttsConfig.engine as 'server' | 'web'}
                   onVoiceChange={(v) => setTtsConfig({ voiceId: v })}
                   onRateChange={(r) => setTtsConfig({ rate: r })}
                   onPitchChange={(p) => setTtsConfig({ pitch: p })}
-                  onEngineChange={(e) => setTtsConfig({ engine: e as 'server' | 'web' })}
                 />
               </div>
             </div>

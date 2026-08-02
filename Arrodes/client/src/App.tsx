@@ -93,6 +93,7 @@ const App = memo(function App() {
             stopRecording={voice.stopRecording}
             sendTextMessage={voice.sendTextMessage}
             replayTTS={voice.replayTTS}
+            stopTTS={voice.stopTTS}
           />
         )}
 

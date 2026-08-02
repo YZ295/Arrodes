@@ -1,8 +1,6 @@
 /**
  * TTS 控制面板
- * 音色切换 / 语速 / 音调 / 引擎选择
- *
- * 集成在 VoiceDialog 的设置下拉中
+ * 音色切换 / 语速 / 音调（纯云端 Edge TTS，无引擎选择）
  */
 import { useState, useEffect } from 'react';
 import type { TtsVoice } from '../voice/hooks/useTTS';
@@ -14,22 +12,18 @@ interface TTSControlProps {
   currentVoice: string;
   rate: number;
   pitch: number;
-  engine: 'server' | 'web';
   onVoiceChange: (voiceId: string) => void;
   onRateChange: (rate: number) => void;
   onPitchChange: (pitch: number) => void;
-  onEngineChange: (engine: 'server' | 'web') => void;
 }
 
 export default function TTSControl({
   currentVoice,
   rate,
   pitch,
-  engine,
   onVoiceChange,
   onRateChange,
   onPitchChange,
-  onEngineChange,
 }: TTSControlProps) {
   const [voices, setVoices] = useState<TtsVoice[]>([]);
 
@@ -44,29 +38,9 @@ export default function TTSControl({
 
   return (
     <div className="px-3 py-2 space-y-3">
-      {/* 引擎选择 */}
-      <div>
-        <label className="text-[10px] text-gray-500 block mb-1">TTS 引擎</label>
-        <div className="flex gap-1">
-          {(['server', 'web'] as const).map((e) => (
-            <button
-              key={e}
-              onClick={() => onEngineChange(e)}
-              className={`flex-1 text-[11px] py-1.5 rounded-lg transition-colors ${
-                engine === e
-                  ? 'bg-[var(--color-home-gold)]/20 text-[var(--color-home-gold)] border border-[var(--color-home-gold)]/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent'
-              }`}
-            >
-              {e === 'server' ? 'Edge TTS (云端)' : 'Web Speech (本地)'}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* 音色选择 */}
       <div>
-        <label className="text-[10px] text-gray-500 block mb-1.5">音色</label>
+        <label className="text-[10px] text-gray-500 block mb-1.5">音色 (Edge TTS 云端)</label>
         <div className="space-y-1 max-h-32 overflow-y-auto">
           {voices.map((v) => (
             <button

@@ -40,6 +40,7 @@ interface ChatOverlayProps {
   stopRecording: () => void;
   sendTextMessage: (text: string) => void;
   replayTTS: () => void;
+  stopTTS: () => void;
 }
 
 export default function ChatOverlay(props: ChatOverlayProps) {
@@ -47,7 +48,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     messages, isRecording, recordingDuration, recordingVolume,
     isLoading, isConnected, interimText, isSpeaking,
     ttsError, error, showMemoryToast, memoryToastText,
-    startRecording, stopRecording, sendTextMessage, replayTTS,
+    startRecording, stopRecording, sendTextMessage, replayTTS, stopTTS,
   } = props;
 
   const [text, setText] = useState('');
@@ -96,8 +97,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
               className="text-lg md:text-xl lg:text-2xl"
             />
             {isSpeaking && (
-              <div className="mt-4 flex items-center justify-center gap-2">
-                <AudioVisualizer mode="wave" level={128} isActive color="#00ffc8" width={180} height={14} />
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <AudioVisualizer mode="wave" level={128} isActive color="#00ffc8" width={140} height={14} />
+                <button
+                  onClick={stopTTS}
+                  className="text-[11px] px-3 py-1 rounded-full bg-red-500/20 text-red-300 hover:bg-red-500/30 
+                    border border-red-500/30 transition-colors pointer-events-auto"
+                >
+                  ■ 停止
+                </button>
               </div>
             )}
             {ttsError && (
@@ -198,6 +206,19 @@ export default function ChatOverlay(props: ChatOverlayProps) {
               transition-all max-h-32 disabled:opacity-30"
             style={{ minHeight: '44px' }}
           />
+
+          {/* 停止语音按钮（常驻，点击即中断） */}
+          <button
+            onClick={stopTTS}
+            disabled={!isSpeaking && !isLoading}
+            className="w-11 h-11 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0
+              hover:bg-red-500/30 transition-all disabled:opacity-20 disabled:hover:bg-red-500/15"
+            title="停止语音"
+          >
+            <svg className="w-4 h-4 text-red-300" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" rx="1.5" />
+            </svg>
+          </button>
 
           {/* 发送按钮 */}
           <button
