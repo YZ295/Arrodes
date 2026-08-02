@@ -131,10 +131,11 @@ function loadHermesEnv(): void {
 export function initModelRegistry(): void {
   loadHermesEnv();
   _models = [...DEFAULT_MODELS];
-  _currentModelId = process.env.ACTIVE_MODEL || 'ollama-gemma3';
+  // 默认 DeepSeek V4 Flash（用户要求：不使用本地/GLM 作为默认）
+  _currentModelId = process.env.ACTIVE_MODEL || 'deepseek-v4-flash';
   // 验证当前模型存在
   if (!_models.find((m) => m.id === _currentModelId)) {
-    _currentModelId = 'ollama-gemma3';
+    _currentModelId = 'deepseek-v4-flash';
   }
 }
 
