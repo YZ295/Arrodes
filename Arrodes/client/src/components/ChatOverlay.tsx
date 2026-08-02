@@ -1,19 +1,16 @@
 /**
  * 字幕对话覆盖层
  *
- * 替代旧的浮动对话框。AI 回复显示为星球上方的字幕，
- * 用户输入显示为星球下方的文字。底部是极简输入栏。
+ * AI 回复显示为星球上方的字幕，用户输入显示为星球下方的文字。
+ * 顶部为完整对话消息列表（可滚动），长回复不会被截断——可在对话中查看阿罗德斯全部回复。
  *
  * 布局：
  * ┌─────────────────────────────┐
- * │                             │
- * │      AI 字幕 (大字)          │  ← 最新 AI 回复
- * │   "愚者大人，晚上好..."       │
- * │                             │
- * │      🌍 主星球               │
- * │                             │
- * │    用户输入 (小字)           │  ← 最新用户消息
- * │                             │
+ * │ 消息列表 (可滚动, 完整内容)   │  ← 用户/AI 气泡
+ * │  [AI] 完整的回复...          │
+ * │  [用户] 你好                │
+ * ├─────────────────────────────┤
+ * │ 记忆提示 / 录音指示          │
  * ├─────────────────────────────┤
  * │ [🎤] [输入框........] [→]   │  ← 底部输入栏
  * └─────────────────────────────┘
@@ -53,17 +50,19 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  // 获取最新的 AI 消息和用户消息
+  // 最新的 AI 消息和用户消息
   const lastAiMsg = [...messages].reverse().find((m) => m.role === 'assistant');
   const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
 
-  // 自动滚动
+  // 自动滚动到底部（新消息或内容增长时）
   useEffect(() => {
-    if (lastAiMsg) {
-      // 字幕出现时可以加一些动画效果
+    const el = listRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }
-  }, [lastAiMsg?.id]);
+  }, [messages.length, messages[messages.length - 1]?.content?.length, isLoading]);
 
   const handleSend = () => {
     const t = text.trim();
@@ -80,52 +79,61 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     }
   };
 
-  // 截断显示
-  const aiSubtitle = lastAiMsg?.content || '';
-  const displayAiText = aiSubtitle.length > 200 ? aiSubtitle.slice(0, 200) + '…' : aiSubtitle;
-
   return (
     <div className="absolute inset-0 z-30 flex flex-col pointer-events-none">
-      {/* 顶部：AI 字幕（星球上方居中） */}
-      <div className="flex-1 flex items-center justify-center px-8 pb-[5vh]">
-        {displayAiText ? (
-          <div className="max-w-2xl w-full text-center animate-fade-in pointer-events-auto">
-            <MirrorShardText
-              text={displayAiText}
-              charDelay={35}
-              color="#e0f7fa"
-              className="text-lg md:text-xl lg:text-2xl"
-            />
-            {isSpeaking && (
-              <div className="mt-4 flex items-center justify-center gap-3">
-                <AudioVisualizer mode="wave" level={128} isActive color="#00ffc8" width={140} height={14} />
-                <button
-                  onClick={stopTTS}
-                  className="text-[11px] px-3 py-1 rounded-full bg-red-500/20 text-red-300 hover:bg-red-500/30 
-                    border border-red-500/30 transition-colors pointer-events-auto"
-                >
-                  ■ 停止
-                </button>
+      {/* 顶部：完整对话消息列表（可滚动） */}
+      <div
+        ref={listRef}
+        className="flex-1 overflow-y-auto pointer-events-auto px-6 pt-4 pb-2
+          [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"
+      >
+        <div className="max-w-2xl mx-auto flex flex-col justify-end gap-2 min-h-full">
+          {messages.length === 0 && !isLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm text-white/20 tracking-wider">向阿罗德斯问点什么吧</p>
+            </div>
+          ) : (
+            messages.map((m) => {
+              const isUser = m.role === 'user';
+              const isLastAi = m.id === lastAiMsg?.id;
+              return (
+                <div key={m.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                      isUser
+                        ? 'bg-cyan-500/20 border border-cyan-400/20 text-cyan-100/90'
+                        : 'bg-white/5 border border-white/10 text-white/85'
+                    }`}
+                  >
+                    {!isUser && isLastAi ? (
+                      <MirrorShardText
+                        text={m.content}
+                        charDelay={12}
+                        color="#e0f7fa"
+                        className="text-sm md:text-base"
+                      />
+                    ) : (
+                      m.content
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="flex gap-2 px-4 py-3">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="w-2 h-2 bg-cyan-400/60 rounded-full animate-bounce"
+                    style={{ animationDelay: `${i * 150}ms` }}
+                  />
+                ))}
               </div>
-            )}
-            {ttsError && (
-              <button onClick={replayTTS} className="mt-3 text-xs text-red-400/60 hover:text-red-300 pointer-events-auto">
-                {ttsError} · ▶ 重播
-              </button>
-            )}
-          </div>
-        ) : isLoading ? (
-          <div className="flex gap-2">
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="w-2.5 h-2.5 bg-cyan-400/60 rounded-full animate-bounce"
-                style={{ animationDelay: `${i * 150}ms` }} />
-            ))}
-          </div>
-        ) : !isRecording ? (
-          <div className="text-center text-white/15">
-            <p className="text-sm tracking-wider">按住麦克风开始</p>
-          </div>
-        ) : null}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 中部：用户输入预览（星球下方） */}
@@ -152,6 +160,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
       {error && (
         <div className="px-8 pb-1 text-center">
           <span className="text-xs text-red-400/60">{error}</span>
+        </div>
+      )}
+
+      {/* TTS 错误（含重播） */}
+      {ttsError && !error && (
+        <div className="px-8 pb-1 text-center">
+          <button onClick={replayTTS} className="text-xs text-red-400/60 hover:text-red-300 pointer-events-auto">
+            {ttsError} · ▶ 重播
+          </button>
         </div>
       )}
 
