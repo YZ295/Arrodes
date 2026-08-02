@@ -21,6 +21,7 @@ import { createMemoryRouter } from './routes/memories.js';
 import { createTtsRouter } from './routes/tts.js';
 import { createUsageRouter } from './routes/usage.js';
 import { createSttRouter } from './routes/stt.js';
+import { harness } from './harness/harness.js';
 // 加载内置技能
 import './skills/builtin.js';
 import { getAllSkills, registerSkill, unregisterSkill } from './skills/registry.js';
@@ -50,6 +51,15 @@ app.use('/api/v1/memories', createMemoryRouter());
 app.use('/api/v1/tts', createTtsRouter());
 app.use('/api/v1/usage', createUsageRouter());
 app.use('/api/v1/stt', createSttRouter());
+
+// ---- 多 Agent 展示（Harness）----
+app.get('/api/v1/agents', (_req, res) => {
+  res.json({ agents: harness.listAgents() });
+});
+
+app.get('/api/v1/agents/tasks', (_req, res) => {
+  res.json({ tasks: harness.getRecentTasks() });
+});
 
 // ---- 技能管理 ----
 app.get('/api/v1/skills', (_req, res) => {
