@@ -24,6 +24,8 @@ import { createSttRouter } from './routes/stt.js';
 import { harness } from './harness/harness.js';
 // 加载内置技能
 import './skills/builtin.js';
+// 电脑操作技能（正式版，后注册覆盖同名试探版）
+import './skills/computer.js';
 import { getAllSkills, registerSkill, unregisterSkill } from './skills/registry.js';
 
 const app = express();
