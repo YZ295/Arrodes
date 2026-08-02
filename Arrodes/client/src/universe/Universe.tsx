@@ -1,16 +1,12 @@
 /**
- * 阿罗德斯 3D 宇宙场景
- * 使用 React Three Fiber 渲染的沉浸式星系空间
+ * 阿罗德斯 3D 背景场景
+ * 纯星空氛围背景（会话不再以星球呈现，会话管理在左侧栏）
  */
 import { Canvas } from '@react-three/fiber';
-import { EffectComposer } from '@react-three/postprocessing';
 import Starfield from './Starfield';
 import HomePlanet from './HomePlanet';
-import SolarSystem from './SolarSystem';
-import CameraController from './CameraController';
 import ParticleSystem from './effects/ParticleSystem';
-import Bloom from './effects/Bloom';
-import SessionSpawner from './SessionSpawner';
+import CameraController from './CameraController';
 
 export default function Universe() {
   return (
@@ -26,7 +22,9 @@ export default function Universe() {
         alpha: false,
         powerPreference: 'high-performance',
       }}
-      dpr={[1, 1.5]}
+      dpr={[1, 2]}
+      style={{ background: '#0a0e27' }}
+      onCreated={({ gl }) => { gl.setClearColor('#0a0e27'); }}
     >
       {/* 环境光 + 点光源 */}
       <ambientLight intensity={0.4} />
@@ -39,22 +37,14 @@ export default function Universe() {
       {/* 粒子特效 */}
       <ParticleSystem />
 
-      {/* 主星球 */}
+      {/* 主星球（初始大星球） */}
       <HomePlanet />
-
-      {/* 会话星球轨道系统 */}
-      <SolarSystem />
-
-      {/* 语音创建会话事件桥接 */}
-      <SessionSpawner />
 
       {/* 相机控制 */}
       <CameraController />
 
-      {/* 后期特效：Bloom */}
-      <EffectComposer>
-        <Bloom />
-      </EffectComposer>
+      {/* 后期特效：Bloom — 部分GPU驱动会蓝屏，默认关闭；可手动启用 */}
+      {/* <Bloom /> */}
     </Canvas>
   );
 }

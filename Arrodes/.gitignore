@@ -21,3 +21,15 @@ Thumbs.db
 
 # Windows reserved device name (prevents fatal: invalid path)
 nul
+
+# 环境变量 & 密钥
+*.env
+!.env.example
+*.env.txt
+
+# TypeScript 编译缓存
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc

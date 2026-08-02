@@ -133,4 +133,12 @@ export class SessionRepository {
   updateSummary(id: string, summary: string): void {
     this.db.prepare('UPDATE sessions SET summary = ? WHERE id = ?').run(summary, id);
   }
+
+  updateTitle(id: string, title: string): SessionNode | null {
+    const now = new Date().toISOString();
+    this.db
+      .prepare('UPDATE sessions SET title = ?, last_active_at = ? WHERE id = ?')
+      .run(title, now, id);
+    return this.findAll().find((s) => s.id === id) || null;
+  }
 }

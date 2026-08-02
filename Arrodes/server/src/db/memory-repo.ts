@@ -7,6 +7,10 @@ import { getDb } from './connection.js';
 import type { MemoryNode, MemoryType } from '../../../shared/types/index.js';
 import crypto from 'node:crypto';
 
+export interface MemoryRowWithSession extends MemoryNode {
+  sessionId: string;
+}
+
 interface MemoryRow {
   id: string;
   session_id: string;
@@ -56,6 +60,23 @@ export class MemoryRepository {
     this.db.prepare('DELETE FROM memories WHERE session_id = ?').run(sessionId);
   }
 
+  /** 查询所有记忆 */
+  findAll(): MemoryRowWithSession[] {
+    const rows = this.db
+      .prepare('SELECT * FROM memories ORDER BY created_at DESC')
+      .all() as MemoryRow[];
+    return rows.map((row) => ({
+      ...rowToMemory(row),
+      sessionId: row.session_id,
+    }));
+  }
+
+  /** 清空所有记忆 */
+  clearAll(): number {
+    const result = this.db.prepare('DELETE FROM memories').run();
+    return result.changes;
+  }
+
   delete(id: string): boolean {
     const result = this.db.prepare('DELETE FROM memories WHERE id = ?').run(id);
     return result.changes > 0;
@@ -63,12 +84,27 @@ export class MemoryRepository {
 
   search(query: string): MemoryNode[] {
     // 简单的 LIKE 搜索
-    const pattern = `%${query.replace(/[%_]/g, '\\$&')}%`;
+    const pattern = `%${query.replace(/[%_]/g, '\\\\$&')}%`;
     const rows = this.db
       .prepare(
-        `SELECT * FROM memories WHERE content LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT 20`,
+        `SELECT * FROM memories WHERE content LIKE ? ESCAPE '\\\\' ORDER BY created_at DESC LIMIT 20`,
       )
       .all(pattern) as MemoryRow[];
     return rows.map(rowToMemory);
+  }
+
+  /**
+   * 多关键词跨会话搜索
+   */
+  searchAll(keywords: string[]): Array<MemoryRowWithSession & { sessionId: string }> {
+    if (keywords.length === 0) return [];
+
+    const conditions = keywords.map(() => 'content LIKE ?');
+    const sql = `SELECT id, session_id AS sessionId, content, type, created_at AS createdAt
+                 FROM memories WHERE ${conditions.join(' OR ')}
+                 ORDER BY created_at DESC LIMIT 20`;
+    const params = keywords.map((k) => `%${k.replace(/[%_]/g, '\\\\$&')}%`);
+    const rows = this.db.prepare(sql).all(...params) as Array<MemoryRowWithSession & { sessionId: string }>;
+    return rows;
   }
 }

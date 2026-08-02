@@ -50,6 +50,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
   const resolveRef = useRef<((value: string) => void) | null>(null);
   const rejectRef = useRef<((reason: Error) => void) | null>(null);
   const retryCountRef = useRef(0);
+  const finalTextRef = useRef(''); // 避免闭包陷阱：存最终文本
 
   const cleanup = useCallback(() => {
     if (recognitionRef.current) {
@@ -85,18 +86,13 @@ export function useSpeechToText(): UseSpeechToTextReturn {
         return;
       }
 
-      // 清理之前的实例
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {
-          // ignore
-        }
+        try { recognitionRef.current.abort(); } catch { /* ignore */ }
       }
 
       const recognition = new SpeechRecognitionAPI();
       recognition.lang = 'zh-CN';
-      recognition.continuous = false;
+      recognition.continuous = true; // 持续监听，不自动停止
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
@@ -104,6 +100,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       resolveRef.current = resolve;
       rejectRef.current = reject;
       retryCountRef.current = 0;
+      finalTextRef.current = ''; // 重置
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         let finalText = '';
@@ -111,48 +108,31 @@ export function useSpeechToText(): UseSpeechToTextReturn {
           const result = event.results[i];
           if (result.isFinal) {
             finalText += result[0].transcript;
+            finalTextRef.current += result[0].transcript; // 累积到 ref
           } else {
-            setInterimText(result[0].transcript);
+            setInterimText((prev) => prev + result[0].transcript);
           }
         }
         if (finalText) {
-          setInterimText('');
-          resolve(finalText);
-          cleanup();
+          setInterimText(''); // 清空临时文本，显示确认文本
+          // 不在此 resolve，等 onend 统一处理
         }
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech' && retryCountRef.current < 1) {
-          // 静默重试一次
           retryCountRef.current++;
-          try {
-            recognition.start();
-          } catch {
-            // ignore
-          }
+          try { recognition.start(); } catch { /* ignore */ }
           return;
         }
-
         let errorMsg: string;
         switch (event.error) {
-          case 'not-allowed':
-            errorMsg = '麦克风权限被拒绝';
-            break;
-          case 'no-speech':
-            errorMsg = '未检测到语音';
-            break;
-          case 'audio-capture':
-            errorMsg = '未找到麦克风';
-            break;
-          case 'network':
-            errorMsg = '网络错误';
-            break;
-          case 'aborted':
-            errorMsg = '识别已取消';
-            break;
-          default:
-            errorMsg = '语音识别失败';
+          case 'not-allowed': errorMsg = '麦克风权限被拒绝'; break;
+          case 'no-speech': errorMsg = '未检测到语音'; break;
+          case 'audio-capture': errorMsg = '未找到麦克风'; break;
+          case 'network': errorMsg = '网络错误'; break;
+          case 'aborted': errorMsg = '识别已取消'; break;
+          default: errorMsg = '语音识别失败';
         }
         setError(errorMsg);
         reject(new Error(errorMsg));
@@ -160,13 +140,12 @@ export function useSpeechToText(): UseSpeechToTextReturn {
       };
 
       recognition.onend = () => {
-        // 如果 resolve 还没被调用（没有 final result），用 interim text 兜底
-        if (resolveRef.current) {
-          const finalText = interimText || '';
-          setInterimText('');
-          resolve(finalText);
-          cleanup();
-        }
+        // 用 ref 中累积的最终文本（避免闭包陷阱）
+        const finalText = finalTextRef.current || '';
+        setInterimText('');
+        finalTextRef.current = '';
+        resolve(finalText);
+        cleanup();
       };
 
       try {
@@ -179,7 +158,7 @@ export function useSpeechToText(): UseSpeechToTextReturn {
         cleanup();
       }
     });
-  }, [cleanup, interimText]);
+  }, [cleanup]);
 
   // 组件卸载时清理
   useEffect(() => {

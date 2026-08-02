@@ -1,33 +1,45 @@
 {
   "workflow_version": 2,
   "project_kind": "legacy",
-  "phase": "ready-to-push",
-  "active_change": null,
+  "phase": "implementing",
+  "active_change": {
+    "slug": "desktop-shell",
+    "type": "feature",
+    "mode": "full",
+    "branch": "feature/desktop-shell",
+    "created_at": "2026-08-01T11:05:42+08:00"
+  },
   "approvals": {
     "baseline": {
-      "valid": false,
-      "digest": "user-confirmed-fix3-arch-plan",
-      "approved_at": "2026-07-24T12:00:00+08:00",
-      "invalidated_at": "2026-07-24T19:40:29+08:00"
+      "valid": true,
+      "digest": "b318a0bd103e43c529bc64a3e170d4fb6aac782e0e593747c0d7757e0cb68077",
+      "approved_at": "2026-08-01T10:56:11+08:00",
+      "head_before": "122f65e692f81c1da1df75ea973e84312d796815"
     },
     "spec": {
-      "valid": false,
-      "digest": null,
-      "approved_at": null
+      "valid": true,
+      "digest": "a2fa1e13546a4609b0e7d1522e33f350e145ce35672740b470efc10c2b908078",
+      "approved_at": "2026-08-01T13:03:08+08:00",
+      "head_before": "1db6f4896562f67f8b3fa9aa4d99ef26ffdfb806"
     },
     "plan": {
-      "valid": false,
-      "digest": null,
-      "approved_at": null
+      "valid": true,
+      "digest": "5a73c4bee3268b2545d9becb0cde6fad84a75dfc0daccbaba01b9bb089c03a69",
+      "approved_at": "2026-08-01T13:03:08+08:00",
+      "head_before": "1db6f4896562f67f8b3fa9aa4d99ef26ffdfb806"
     },
     "hotfix": {
       "valid": false,
-      "digest": "hotfix_20260724_01",
-      "approved_at": "2026-07-24T23:00:00+08:00",
-      "invalidated_at": "2026-07-24T22:00:58+08:00"
+      "digest": null,
+      "approved_at": null
     }
   },
-  "dependency_approvals": [],
+  "dependency_approvals": [
+    {
+      "name": "desktop-shell",
+      "approved_at": "2026-08-01T12:40:16+08:00"
+    }
+  ],
   "verification": null,
   "task_progress": [],
   "last_completed": {

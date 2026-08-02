@@ -81,6 +81,8 @@ export const useUniverseStore = create<UniverseState>((set, get) => ({
         messageCount: s.messageCount,
         lastActiveAt: s.lastActiveAt,
         createdAt: s.createdAt,
+        position: { x: 0, y: 0, z: 0 },
+        velocity: { x: 0, y: 0, z: 0 },
         isHome: false,
       })),
     ];

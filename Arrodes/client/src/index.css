@@ -23,9 +23,55 @@ html, body, #root {
   overflow: hidden;
   background: var(--color-bg-deep);
   color: var(--color-text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 镜片碎片弹出动画 — 字幕从虚空裂隙中逐字浮现 */
+@keyframes mirror-shard-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.3) rotateX(60deg);
+    filter: blur(8px);
+    text-shadow: 0 0 20px rgba(0, 255, 200, 0.8), 0 0 60px rgba(0, 255, 200, 0.4);
+  }
+  40% {
+    opacity: 0.6;
+    transform: translateY(4px) scale(1.05) rotateX(-5deg);
+    filter: blur(2px);
+    text-shadow: 0 0 12px rgba(0, 255, 200, 0.5), 0 0 30px rgba(0, 255, 200, 0.2);
+  }
+  70% {
+    opacity: 0.9;
+    transform: translateY(-1px) scale(0.98) rotateX(2deg);
+    filter: blur(0);
+    text-shadow: 0 0 6px rgba(0, 255, 200, 0.3), 0 0 15px rgba(0, 255, 200, 0.1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0);
+    filter: blur(0);
+    text-shadow: none;
+  }
+}
+
+@keyframes mirror-glitch {
+  0%, 100% { clip-path: inset(0 0 0 0); }
+  10% { clip-path: inset(20% 0 60% 0); }
+  20% { clip-path: inset(0 0 80% 0); }
+  30% { clip-path: inset(60% 0 0 0); }
+  40% { clip-path: inset(0 0 0 0); }
+}
+
+.char-shard {
+  display: inline-block;
+  animation: mirror-shard-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity, filter;
+}
+
+.char-glitch {
+  animation: mirror-glitch 0.3s ease-out 0.6s both;
 }
 
 /* 消息气泡淡入动画 */

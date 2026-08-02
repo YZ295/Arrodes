@@ -3,3 +3,10 @@ dist/
 .env
 *.log
 Arrodes/Plan/
+
+# 运行时数据（用户画像）
+data/
+# 一次性 TTS 实验脚本
+Arrodes/server/ab-test.mts
+Arrodes/server/verify-tts.mts
+Arrodes/server/test-tts-fix.mjs

@@ -173,3 +173,25 @@ export const TOPIC_COLOR_HEX: Record<SessionTopic, number> = {
 
 export const HOME_PLANET_COLOR = '#FFD700';
 export const HOME_PLANET_COLOR_HEX = 0xffd700;
+
+// ---- 管道架构 & 插件系统（v4.0） ----
+export type {
+  PipelineContext,
+  PipelineResult,
+  PipelineDefinition,
+  StageConfig,
+  StageOutput,
+  SttOutput,
+  MemoryRetrievalOutput,
+  IntentDetectionOutput,
+  LlmInferenceOutput,
+  TtsOutput,
+  VoicePipelineStage,
+} from './pipeline';
+export { VOICE_PIPELINE_STAGES } from './pipeline';
+export type {
+  ArodesPlugin,
+  PluginManifest,
+  PluginHooks,
+  PluginRegistry,
+} from './plugin';
