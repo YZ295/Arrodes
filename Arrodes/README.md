@@ -125,5 +125,7 @@ cd TheFool && python -m PyInstaller --onefile --windowed --name "桌宠-愚者" 
 
 尚未指定 License，保留所有权利。如需开源协议（如 MIT/Apache-2.0），请作者在发布前添加。
 
+> 本文件为子目录文档；仓库根 [LICENSE](../../LICENSE) 已采用 MIT 协议。
+
 ---
 *项目知识库见 `Knowledge/`（Obsidian 格式，含架构/语音/记忆/技能/Agent/工程文档）*

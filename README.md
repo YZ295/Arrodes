@@ -53,4 +53,4 @@ cd Arrodes/server && NODE_ENV=production PORT=3002 node dist/index.js
 
 ## 📄 License
 
-尚未指定 License，保留所有权利。如需开源协议（如 MIT/Apache-2.0），请在发布前添加。
+本项目采用 [MIT License](LICENSE) 开源。
