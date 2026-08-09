@@ -16,3 +16,5 @@ Arrodes/server/test-tts-fix.mjs
 uploads/
 tts-sidecar/
 Arrodes/server/v_bk.json
+TheFool/dist*/
+TheFool/build*/
