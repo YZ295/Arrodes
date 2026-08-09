@@ -15,6 +15,7 @@ interface SessionRow {
   summary: string;
   created_at: string;
   last_active_at: string;
+  archived: number;
 }
 
 function rowToNode(row: SessionRow, messageCount: number): SessionNode {
@@ -26,6 +27,7 @@ function rowToNode(row: SessionRow, messageCount: number): SessionNode {
     messageCount,
     lastActiveAt: row.last_active_at,
     createdAt: row.created_at,
+    archived: !!row.archived,
   };
 }
 
@@ -36,13 +38,29 @@ export class SessionRepository {
     this.db = getDb();
   }
 
-  findAll(): SessionNode[] {
-    const rows = this.db
+  findAll(workspaceId?: string, opts: { archived?: boolean } = {}): SessionNode[] {
+    const where: string[] = [];
+    const params: string[] = [];
+
+    if (workspaceId) {
+      where.push('s.workspace_id = ?');
+      params.push(workspaceId);
+    }
+    if (typeof opts.archived === 'boolean') {
+      where.push('s.archived = ?');
+      params.push(opts.archived ? '1' : '0');
+    } else {
+      // 默认行为：只返回未归档会话（归档是隐藏语义）
+      where.push('s.archived = 0');
+    }
+    const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+    const rows = (this.db
       .prepare(
         `SELECT s.*, (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS msg_count
-         FROM sessions s ORDER BY s.last_active_at DESC`,
+         FROM sessions s ${whereSql} ORDER BY s.last_active_at DESC`,
       )
-      .all() as (SessionRow & { msg_count: number })[];
+      .all(...params) as (SessionRow & { msg_count: number })[]);
 
     return rows.map((r) => rowToNode(r, r.msg_count));
   }
@@ -86,16 +104,17 @@ export class SessionRepository {
     };
   }
 
-  create(data: { title: string; topic: SessionTopic; parentId?: string; initialMessage?: string }): SessionNode {
+  create(data: { title: string; topic: SessionTopic; parentId?: string; initialMessage?: string; workspaceId?: string }): SessionNode {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
+    const workspaceId = data.workspaceId || 'default';
 
     this.db
       .prepare(
-        `INSERT INTO sessions (id, title, topic, parent_id, created_at, last_active_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO sessions (id, title, topic, parent_id, workspace_id, created_at, last_active_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(id, data.title, data.topic, data.parentId || null, now, now);
+      .run(id, data.title, data.topic, data.parentId || null, workspaceId, now, now);
 
     // 如果有 initialMessage，写入第一条消息
     if (data.initialMessage) {
@@ -122,6 +141,37 @@ export class SessionRepository {
   delete(id: string): boolean {
     const result = this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
     return result.changes > 0;
+  }
+
+  /** 归档会话（软删除：列表隐藏，数据保留） */
+  archive(id: string): boolean {
+    const result = this.db
+      .prepare('UPDATE sessions SET archived = 1 WHERE id = ?')
+      .run(id);
+    return result.changes > 0;
+  }
+
+  /** 取消归档 */
+  unarchive(id: string): boolean {
+    const result = this.db
+      .prepare('UPDATE sessions SET archived = 0 WHERE id = ?')
+      .run(id);
+    return result.changes > 0;
+  }
+
+  /**
+   * 回收过期会话（自动归档超过 N 天未活跃的会话）
+   * @returns 被回收的会话数
+   */
+  autoArchiveStale(days: number = 30): number {
+    const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
+    const result = this.db
+      .prepare(
+        `UPDATE sessions SET archived = 1
+         WHERE archived = 0 AND last_active_at < ?`,
+      )
+      .run(cutoff);
+    return result.changes;
   }
 
   updateLastActive(id: string): void {

@@ -8,7 +8,7 @@
  *
  * 每个连接器记录能力（capabilities），供工作区 UI 展示与后续协同路由。
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { execCommand } from '../services/computerService.js';
 
 export interface AgentConnector {
@@ -28,6 +28,34 @@ const BASE_PATHS = {
   crow5: 'E:/project/Crow5',
 };
 
+/** 桌面版 Hermes runtime 根目录（versions 下按时间取最新） */
+const HERMES_VERSIONS_DIR = 'E:/AI/Hermes/Hermes Agent CN Desktop/data/versions';
+const HERMES_RUNTIME_EXE = 'hermes-agent-cn-runtime-win32-x64.exe';
+
+/** 探测桌面版 Hermes runtime：扫描 versions 目录取最新可用版本（避免硬编码版本号） */
+export function findHermesDesktopRuntime(): { exe: string; version: string } | null {
+  try {
+    if (!existsSync(HERMES_VERSIONS_DIR)) return null;
+    const dirs = readdirSync(HERMES_VERSIONS_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .filter((name) => name.startsWith('0.'))
+      .sort((a, b) => {
+        // 按目录修改时间倒序（最新安装的版本优先）
+        const ta = statSync(`${HERMES_VERSIONS_DIR}/${a}`).mtimeMs;
+        const tb = statSync(`${HERMES_VERSIONS_DIR}/${b}`).mtimeMs;
+        return tb - ta;
+      });
+    for (const dir of dirs) {
+      const exe = `${HERMES_VERSIONS_DIR}/${dir}/${HERMES_RUNTIME_EXE}`;
+      if (existsSync(exe)) return { exe, version: dir };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** 快速检测 CLI 是否可用（2s 超时） */
 async function checkCli(command: string): Promise<boolean> {
   try {
@@ -38,13 +66,46 @@ async function checkCli(command: string): Promise<boolean> {
   }
 }
 
+/** 探测 Hermes：优先桌面版 runtime（新版），兜底 PATH 中的 hermes 命令 */
+async function probeHermes(): Promise<{ available: boolean; version: string; source: 'desktop' | 'cli' | '' }> {
+  // 1. 桌面版 runtime（CN Desktop 独立版本体系，优先）
+  // 注意：① PyInstaller 启动器 --version 输出正常但 exitCode=-1，以 stdout 解析为准
+  //       ② PowerShell 中带引号路径须用 & 调用运算符（路径含空格，否则报"意外的标记"）
+  const rt = findHermesDesktopRuntime();
+  if (rt) {
+    try {
+      const r = await execCommand(`& "${rt.exe}" --version`, { timeoutMs: 5000 });
+      const v = (r.stdout || '').match(/Hermes Agent v?([\d.]+)/)?.[1] || '';
+      if (v) return { available: true, version: rt.version, source: 'desktop' };
+    } catch {
+      /* 桌面版不可用则继续 */
+    }
+  }
+  // 2. 兜底：PATH 中的 hermes 命令（pip 版）
+  try {
+    const r = await execCommand('hermes --version', { timeoutMs: 3000 });
+    const v = (r.stdout || '').match(/Hermes Agent v?([\d.]+)/)?.[1] || '';
+    if (r.exitCode === 0 && v) {
+      return { available: true, version: v, source: 'cli' };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { available: false, version: '', source: '' };
+}
+
 /** 探测所有可接入 agent */
 export async function detectConnectors(): Promise<AgentConnector[]> {
-  const [hermes, codex, vscode] = await Promise.all([
-    checkCli('hermes'),
+  const [hermesInfo, codex, vscode] = await Promise.all([
+    probeHermes(),
     checkCli('codex'),
     checkCli('code'),
   ]);
+  const hermesDetail = hermesInfo.available
+    ? (hermesInfo.source === 'desktop'
+      ? `Hermes 桌面版 ${hermesInfo.version} 可用（可对话/派任务）`
+      : `Hermes CLI v${hermesInfo.version} 可用（可对话/派任务）`)
+    : '未检测到 Hermes（桌面版 runtime 或 hermes 命令均不可用）';
 
   return [
     {
@@ -59,9 +120,9 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
       id: 'hermes',
       name: 'Hermes',
       type: 'cli',
-      available: hermes,
-      detail: hermes ? 'Hermes CLI 可用（可对话/派任务）' : '未检测到 hermes 命令',
-      capabilities: hermes ? ['chat', 'skills', 'exec_command'] : [],
+      available: hermesInfo.available,
+      detail: hermesDetail,
+      capabilities: hermesInfo.available ? ['chat', 'skills', 'exec_command'] : [],
     },
     {
       id: 'codex',

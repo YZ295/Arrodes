@@ -66,10 +66,36 @@ export class Harness {
   // ============================================================
 
   /**
-   * 意图路由。v1 用关键词/规则匹配；后续可升级为 LLM 路由（orchestrator Agent）。
-   * 所有对话默认进主对话 Agent；本地指令意图（帮助/静音等）由前端拦截，不走到这里。
+   * 意图路由（Agent 路由 v1，借鉴技能触发机制）
+   *
+   * 用关键词/规则匹配把消息分发到专门 Agent：
+   * - 开发意图（grill-me/to-spec/to-tickets/implement/code-review/improve-architecture）→ dev
+   * - 记忆管理意图（查看/列出记忆）→ memory
+   * - 其余 → main（默认兜底）
+   *
+   * 可回滚：环境变量 HARNESS_ROUTING=off 时关闭路由，全部走 main。
    */
-  route(_content: string): string {
+  route(content: string): string {
+    // 开关：默认开，可关（回滚点）
+    if (process.env.HARNESS_ROUTING === 'off') return 'main';
+
+    const text = content.toLowerCase();
+    const devKeywords = [
+      'grill-me', 'grill me', 'to-spec', 'to spec', '转成 spec', '转成spec',
+      'to-tickets', 'to tickets', '拆任务', '拆 ticket',
+      'implement', '实现 t', '开始实现', '按 ticket',
+      'code-review', 'code review', '审查代码', 'code review 一下',
+      'improve-architecture', 'improve architecture', '优化架构',
+    ];
+    for (const k of devKeywords) {
+      if (text.includes(k)) return 'dev';
+    }
+
+    const memoryKeywords = ['查看我的记忆', '列出记忆', '我的记忆', '记忆列表', '查记忆'];
+    for (const k of memoryKeywords) {
+      if (text.includes(k)) return 'memory';
+    }
+
     return 'main';
   }
 

@@ -13,7 +13,7 @@
  *       ├─ 存储到 SQLite (MemoryRepository)
  *       └─ 更新用户画像 JSON
  */
-import { MemoryRepository } from '../db/memory-repo.js';
+import { MemoryRepository, type MemoryRowWithSession } from '../db/memory-repo.js';
 import { MessageRepository } from '../db/message-repo.js';
 import { LlmService } from './llmService.js';
 import type { MemoryNode } from '../../../shared/types/index.js';
@@ -78,6 +78,71 @@ const llmService = new LlmService();
 /**
  * 根据用户消息检索需要注入的上下文
  */
+/** 常见中文姓氏（人物识别用） */
+const CN_SURNAMES = new Set(['王', '李', '张', '刘', '陈', '杨', '赵', '黄', '周', '吴', '徐', '孙', '胡', '朱', '高', '林', '何', '郭', '马', '罗', '梁', '宋', '郑', '谢', '韩', '唐', '冯', '于', '董', '萧', '程', '曹', '袁', '邓', '许', '傅', '沈', '曾', '彭', '吕', '苏', '卢', '蒋', '蔡', '贾', '丁', '魏', '薛', '叶', '阎', '余', '潘', '杜', '戴', '夏', '钟', '汪', '田', '任', '姜', '范', '方', '石', '姚', '谭', '廖', '邹', '熊', '金', '陆', '郝', '孔', '白', '崔', '康', '毛', '邱', '秦', '江', '史', '顾', '侯', '邵', '孟', '龙', '万', '段', '雷', '钱', '汤', '尹', '黎', '易', '常', '武', '乔', '贺', '赖', '龚', '文']);
+
+/** 从记忆中识别人物实体（中文人名 + 英文人名），去重返回 */
+export function extractPersonEntities(memories: Array<{ content: string }>): string[] {
+  const persons = new Set<string>();
+  // 排除"姓氏+常用词"误报（非人名）
+  const STOP_WORDS = new Set(['高兴', '高级', '高大', '马上', '大家', '安全', '认真', '重要', '容易', '方便', '简单', '清楚', '熟悉', '了解', '支持', '喜欢', '可以', '应该', '能够']);
+
+  for (const m of memories) {
+    // 1. 英文人名：单词首字母大写、长度≥2、非句首常见词
+    const engMatches = m.content.match(/\b[A-Z][a-z]{1,10}\b/g) || [];
+    for (const w of engMatches) {
+      if (/^(The|This|That|What|How|When|Where|Why|I|You|He|She|It|We|They|Hello|Hi|Yes|No|OK|Please)$/i.test(w)) continue;
+      persons.add(w);
+    }
+
+    // 2. 中文人名：常见姓氏 + 恰好 1 个名字（2 字人名；3 字易误报故不收）
+    //    不设前后边界——中文人名在句中天然被中文字包围（如"和张三一起"）
+    for (const surname of CN_SURNAMES) {
+      const re = new RegExp(`${surname}[\\u4e00-\\u9fa5]`, 'g');
+      const matches = m.content.match(re) || [];
+      for (const name of matches) {
+        if (!STOP_WORDS.has(name)) {
+          persons.add(name);
+        }
+      }
+    }
+  }
+  return Array.from(persons);
+}
+
+/**
+ * 记忆召回排序（阶段2）：相关性 = 关键词命中数（主导）× 时间衰减（辅助）
+ * 命中数不同 → 命中多的优先；命中数相同 → 更新的优先
+ */
+export function rankMemories<T extends { id: string; content: string; createdAt: string }>(
+  memories: T[],
+  keywords: string[],
+  now = Date.now(),
+): T[] {
+  if (keywords.length === 0) return [...memories];
+
+  const scored = memories.map((m) => {
+    const hits = keywords.filter((k) => m.content.includes(k)).length;
+    // 时间衰减：7 天内线性衰减，超过按 0.2 最低权重
+    const ageMs = Math.max(0, now - Date.parse(m.createdAt));
+    const ageDays = ageMs / 86_400_000;
+    const timeWeight = ageDays <= 7 ? 1 - (ageDays / 7) * 0.8 : 0.2;
+    return { m, hits, timeWeight };
+  });
+
+  return scored
+    .sort((a, b) => {
+      // 命中词数主导
+      if (b.hits !== a.hits) return b.hits - a.hits;
+      // 命中相同 → 时间权重
+      return b.timeWeight - a.timeWeight;
+    })
+    .map((s) => s.m);
+}
+
+/**
+ * 根据用户消息检索需要注入的上下文
+ */
 export async function retrieveContext(
   query: string,
   sessionId: string,
@@ -86,11 +151,12 @@ export async function retrieveContext(
   profile: string;
   summary: string;
 }> {
-  // 1. 关键词检索往期记忆
+  // 1. 关键词检索往期记忆 + 召回排序（阶段2：相关性优先，时间辅助）
   const keywords = extractKeywords(query);
-  const memories = keywords.length > 0
-    ? memoryRepo.searchAll(keywords).filter((m) => m.sessionId !== sessionId).slice(0, 5)
+  const raw = keywords.length > 0
+    ? memoryRepo.searchAll(keywords).filter((m) => m.sessionId !== sessionId)
     : [];
+  const memories = rankMemories(raw, keywords).slice(0, 5);
 
   // 2. 加载用户画像
   const profile = loadProfile();
@@ -153,6 +219,105 @@ export async function processConversation(
 }
 
 /**
+ * 从 LLM 输出文本中解析记忆分析 JSON（纯函数，可单测）
+ * LLM 可能夹带解释文字，提取第一个 {...} JSON 块解析
+ */
+export function parseAnalysisJson(text: string): {
+  memories?: Array<{ content: string; type: 'fact' | 'preference' | 'event' | 'task' }>;
+  profile?: Partial<UserProfile>;
+} | null {
+  if (!text) return null;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return null;
+  }
+}
+
+// ===== 记忆整理（consolidate，借鉴 BaiLongma 主动记忆维护）=====
+
+/** 计算两个文本的相似度：字符 bigram 的 Dice 系数（中文鲁棒；对短文本比 Jaccard 宽容） */
+function diceSimilarity(a: string, b: string): number {
+  const bigrams = (s: string): Set<string> => {
+    const clean = s.replace(/[\s，。！？、,.!?；;：:""''（）()【】\[\]]/g, '');
+    const set = new Set<string>();
+    if (clean.length === 1) {
+      set.add(clean);
+      return set;
+    }
+    for (let i = 0; i < clean.length - 1; i++) {
+      set.add(clean.slice(i, i + 2));
+    }
+    return set;
+  };
+  const sa = bigrams(a);
+  const sb = bigrams(b);
+  if (sa.size === 0 && sb.size === 0) return 1;
+  let inter = 0;
+  for (const t of sa) if (sb.has(t)) inter++;
+  if (inter === 0) return 0;
+  return (2 * inter) / (sa.size + sb.size);
+}
+
+export interface DuplicateGroup {
+  /** 保留的记忆（较早创建） */
+  keep: MemoryRowWithSession;
+  /** 应删除的重复记忆 */
+  remove: MemoryRowWithSession[];
+}
+
+/**
+ * 找出相似记忆分组（纯函数，可单测）
+ * 规则：同会话 + 同类型 + 文本相似度 ≥ 阈值 → 视为重复，保留较早创建的
+ */
+export function computeDuplicateGroups(
+  memories: MemoryRowWithSession[],
+  threshold = 0.75,
+): DuplicateGroup[] {
+  const groups: DuplicateGroup[] = [];
+
+  for (let i = 0; i < memories.length; i++) {
+    const mi = memories[i];
+    // 跳过已被归入删除集的记忆
+    if (groups.some((g) => g.remove.some((r) => r.id === mi.id))) continue;
+
+    const removals: MemoryRowWithSession[] = [];
+    for (let j = i + 1; j < memories.length; j++) {
+      const mj = memories[j];
+      if (mj.sessionId !== mi.sessionId || mj.type !== mi.type) continue;
+      if (diceSimilarity(mi.content, mj.content) >= threshold) {
+        removals.push(mj);
+      }
+    }
+    if (removals.length > 0) {
+      groups.push({ keep: mi, remove: removals });
+    }
+  }
+  return groups;
+}
+
+/**
+ * 执行记忆去重合并：删除重复记忆
+ * @param repo 可注入（默认全局 memoryRepo）；测试可传 mock
+ */
+export async function consolidateMemories(
+  repo: Pick<MemoryRepository, 'findAll' | 'delete'> = memoryRepo,
+): Promise<{ scanned: number; removed: number }> {
+  const all = repo.findAll();
+  const groups = computeDuplicateGroups(all);
+
+  let removed = 0;
+  for (const g of groups) {
+    for (const r of g.remove) {
+      if (repo.delete(r.id)) removed++;
+    }
+  }
+  return { scanned: all.length, removed };
+}
+
+/**
  * 用 LLM 分析单轮对话，提取记忆 + 画像更新
  */
 async function analyzeConversation(
@@ -190,25 +355,26 @@ async function analyzeConversation(
   ].join('\n');
 
   try {
-    let result = '';
-    await llmService.chatSimple([
-      { role: 'system', content: '你是一个记忆分析器，只输出 JSON。' },
-      { role: 'user', content: prompt },
-    ], {
-      onChunk: (text) => { result += text; },
-      onComplete: () => {},
-      onError: () => {},
+    // 用 onComplete 信号等待真实完成（替代原 setTimeout(500) 伪等待）
+    const result = await new Promise<string>((resolve, reject) => {
+      let full = '';
+      llmService.chatSimple([
+        { role: 'system', content: '你是一个记忆分析器，只输出 JSON。' },
+        { role: 'user', content: prompt },
+      ], {
+        onChunk: (text) => { full += text; },
+        onComplete: (text) => { resolve(text || full); },
+        onError: (err) => { reject(new Error(err)); },
+      }).catch(reject);
     });
 
-    // 等待非流式完成
-    await new Promise((r) => setTimeout(r, 500));
-    if (!result) return null;
-
-    // 尝试从结果中提取 JSON
-    const jsonMatch = result.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    return JSON.parse(jsonMatch[0]);
+    const parsed = parseAnalysisJson(result);
+    if (!parsed) return null;
+    // 规范化：memories 缺失时给空数组（保持下游类型契约）
+    return {
+      memories: parsed.memories || [],
+      profile: parsed.profile || {},
+    };
   } catch (err) {
     console.warn('[MemoryGateway] LLM 分析失败:', err);
     return null;

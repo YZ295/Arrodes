@@ -71,12 +71,12 @@ export default function ModelSettings() {
             <div className="flex items-center gap-1.5">
               <span className="truncate">{m.label}</span>
               {m.isFree && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 shrink-0">
+                <span className="text-[16px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 shrink-0">
                   免费
                 </span>
               )}
             </div>
-            <div className="text-[11px] text-gray-500 mt-0.5">{m.provider}</div>
+            <div className="text-[16px] text-gray-500 mt-0.5">{m.provider}</div>
           </div>
           {switching === m.id && (
             <svg className="w-3.5 h-3.5 animate-spin shrink-0" viewBox="0 0 24 24">
@@ -86,10 +86,88 @@ export default function ModelSettings() {
           )}
         </button>
       ))}
-      {error && <div className="px-3 py-2 text-xs text-red-400">{error}</div>}
+      {error && <div className="px-3 py-2 text-[16px] text-red-400">{error}</div>}
+
+      {/* 添加自定义 Provider（4.2 多 Provider 配置） */}
+      <CustomModelForm onAdded={() => {
+        api.get<ModelListResponse>('/models')
+          .then((d) => { setModels(d.models); setCurrent(d.current); })
+          .catch(() => {});
+      }} />
 
       {/* Token 用量与额度（管控成本） */}
       <UsageMeter />
+    </div>
+  );
+}
+
+/** 自定义 Provider 添加表单（baseUrl/key/modelName） */
+function CustomModelForm({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [modelName, setModelName] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const submit = async () => {
+    setBusy(true);
+    setMsg('');
+    try {
+      const d = await api.post<{ success: boolean; id?: string; error?: string }>('/models/custom', {
+        label, baseUrl, modelName, apiKey,
+      });
+      if (d.success) {
+        setMsg('✅ 已添加，可在上方选择');
+        setLabel(''); setBaseUrl(''); setModelName(''); setApiKey('');
+        setOpen(false);
+        onAdded();
+      } else {
+        setMsg(`❌ ${d.error || '添加失败'}`);
+      }
+    } catch {
+      setMsg('❌ 网络错误');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full text-left px-3 py-2 text-[16px] text-[var(--color-home-gold)] hover:bg-[var(--color-home-gold)]/10 transition-colors"
+      >
+        ＋ 添加自定义 Provider（中转站/自建）
+      </button>
+    );
+  }
+
+  const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white placeholder-gray-500 outline-none focus:border-[var(--color-home-gold)]/40';
+  return (
+    <div className="mx-3 my-2 p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
+      <div className="text-[16px] text-gray-300 font-medium">自定义 Provider</div>
+      <input className={inputCls} placeholder="显示名称（如：我的中转站）" value={label} onChange={(e) => setLabel(e.target.value)} />
+      <input className={inputCls} placeholder="Base URL（如 https://proxy.example.com/v1）" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+      <input className={inputCls} placeholder="模型名（如 gpt-4o / deepseek-chat）" value={modelName} onChange={(e) => setModelName(e.target.value)} />
+      <input className={inputCls} type="password" placeholder="API Key（仅存本机）" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+      {msg && <div className="text-[16px] text-gray-300">{msg}</div>}
+      <div className="flex gap-2">
+        <button
+          onClick={submit}
+          disabled={busy || !label || !baseUrl || !modelName || !apiKey}
+          className="flex-1 py-1.5 rounded-lg bg-[var(--color-home-gold)]/20 text-[var(--color-home-gold)] hover:bg-[var(--color-home-gold)]/30 disabled:opacity-40 text-sm"
+        >
+          {busy ? '添加中…' : '保存'}
+        </button>
+        <button
+          onClick={() => { setOpen(false); setMsg(''); }}
+          className="px-3 py-1.5 rounded-lg text-gray-400 hover:bg-white/10 text-sm"
+        >
+          取消
+        </button>
+      </div>
     </div>
   );
 }
@@ -116,9 +194,9 @@ function UsageMeter() {
   return (
     <div className="mt-3 px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] text-gray-400">Token 用量</span>
+        <span className="text-[16px] text-gray-400">Token 用量</span>
         {!stats.allowed && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">已超额</span>
+          <span className="text-[16px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400">已超额</span>
         )}
       </div>
 
@@ -128,7 +206,7 @@ function UsageMeter() {
           { label: '本月', ...stats.monthly },
         ]).map((row) => (
           <div key={row.label}>
-            <div className="flex justify-between text-[11px] text-gray-500 mb-0.5">
+            <div className="flex justify-between text-[16px] text-gray-500 mb-0.5">
               <span>{row.label}</span>
               <span>
                 {fmt(row.used)} / {fmt(row.limit)} Token
@@ -143,7 +221,7 @@ function UsageMeter() {
           </div>
         ))}
       </div>
-      <div className="text-[10px] text-gray-600 mt-1.5">
+      <div className="text-[16px] text-gray-600 mt-1.5">
         额度可在服务端 .env 配置（TOKEN_DAILY_LIMIT / TOKEN_MONTHLY_LIMIT）
       </div>
     </div>

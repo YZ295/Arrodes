@@ -4,7 +4,7 @@ echo 正在打包桌面宠物程序...
 echo.
 
 D:\python3.14.3\python.exe -m PyInstaller --noconfirm --onefile --windowed --name "桌宠-愚者" ^
-    --add-data "character_no_bg.png;." ^
+    --add-data "character_transparent.png;." ^
     desktop_pet.py
 
 echo.

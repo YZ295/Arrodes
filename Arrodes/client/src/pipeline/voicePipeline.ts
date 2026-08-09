@@ -96,11 +96,18 @@ export class VoicePipelineRunner {
    * @param generation 消息代际（用于 TTS 中断检查，可空）
    * @returns 管道结果（含各阶段耗时）
    */
-  async run(text: string, sessionId: string, isVoice = false, generation?: number): Promise<PipelineResult> {
+  async run(
+    text: string,
+    sessionId: string,
+    isVoice = false,
+    generation?: number,
+    signal?: AbortSignal,
+  ): Promise<PipelineResult> {
     const ctx = createPipelineContext({
       sessionId,
       rawInput: text,
       state: { isVoice, generation: generation ?? -1 },
+      signal,
     });
 
     // === PluginManager: beforePipeline 钩子 ===

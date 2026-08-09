@@ -131,6 +131,8 @@ function loadHermesEnv(): void {
 export function initModelRegistry(): void {
   loadHermesEnv();
   _models = [...DEFAULT_MODELS];
+  // 4.2 自定义 Provider：并入自定义模型（存在时前置）
+  loadCustomModelsIntoRegistry();
   // 默认 DeepSeek V4 Flash（用户要求：不使用本地/GLM 作为默认）
   _currentModelId = process.env.ACTIVE_MODEL || 'deepseek-v4-flash';
   // 验证当前模型存在
@@ -174,5 +176,98 @@ export function setCurrentModel(modelId: string): { success: boolean; error?: st
 export function getApiKeyForModel(modelId: string): string | null {
   const model = _models.find((m) => m.id === modelId);
   if (!model) return null;
+  // 自定义模型（4.2）：key 存在 custom 存储，非 env
+  if (model.id.startsWith('custom:')) {
+    return getCustomKey(model.id);
+  }
   return process.env[model.apiKeyEnv] || null;
+}
+
+// ===== 自定义模型（4.2 多 Provider 配置） =====
+
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const CUSTOM_MODELS_FILE = process.env.CUSTOM_MODELS_FILE
+  ? resolve(process.env.CUSTOM_MODELS_FILE)
+  : join(resolve(__dirname, '../data'), 'custom-models.json');
+
+interface CustomModelRecord {
+  id: string;
+  label: string;
+  baseUrl: string;
+  modelName: string;
+  apiKey: string;
+}
+
+function loadCustomModels(): CustomModelRecord[] {
+  try {
+    if (!existsSync(CUSTOM_MODELS_FILE)) return [];
+    return JSON.parse(readFileSync(CUSTOM_MODELS_FILE, 'utf-8')) as CustomModelRecord[];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomModels(list: CustomModelRecord[]): void {
+  mkdirSync(dirname(CUSTOM_MODELS_FILE), { recursive: true });
+  writeFileSync(CUSTOM_MODELS_FILE, JSON.stringify(list, null, 2), 'utf-8');
+}
+
+function getCustomKey(modelId: string): string | null {
+  return loadCustomModels().find((m) => m.id === modelId)?.apiKey ?? null;
+}
+
+/** 加载自定义模型并入 _models（init 时调用） */
+export function loadCustomModelsIntoRegistry(): void {
+  const customs = loadCustomModels().map((c): ModelConfig => ({
+    id: c.id,
+    label: c.label,
+    provider: '自定义',
+    baseUrl: c.baseUrl,
+    modelName: c.modelName,
+    apiKeyEnv: '', // 自定义模型 key 存文件，不走 env
+    supportsStreaming: true,
+    isFree: false,
+    description: '自定义 Provider（设置面板添加）',
+  }));
+  if (customs.length > 0) {
+    _models = [...customs, ...DEFAULT_MODELS];
+  }
+}
+
+/** 添加自定义模型（返回新模型 id） */
+export function addCustomModel(data: {
+  label: string; baseUrl: string; modelName: string; apiKey: string;
+}): { success: boolean; id?: string; error?: string } {
+  const label = String(data.label || '').trim();
+  const baseUrl = String(data.baseUrl || '').trim().replace(/\/+$/, '');
+  const modelName = String(data.modelName || '').trim();
+  const apiKey = String(data.apiKey || '').trim();
+
+  if (!label || !baseUrl || !modelName || !apiKey) {
+    return { success: false, error: 'label/baseUrl/modelName/apiKey 均为必填' };
+  }
+  if (apiKey.length < 10) {
+    return { success: false, error: 'API Key 长度过短（疑似无效）' };
+  }
+
+  const id = `custom:${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
+  const list = loadCustomModels();
+  list.push({ id, label, baseUrl, modelName, apiKey });
+  saveCustomModels(list);
+  loadCustomModelsIntoRegistry();
+  return { success: true, id };
+}
+
+/** 删除自定义模型 */
+export function removeCustomModel(id: string): { success: boolean; error?: string } {
+  const list = loadCustomModels();
+  const next = list.filter((m) => m.id !== id);
+  if (next.length === list.length) return { success: false, error: '未找到自定义模型' };
+  saveCustomModels(next);
+  loadCustomModelsIntoRegistry();
+  return { success: true };
 }

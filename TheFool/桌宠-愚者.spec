@@ -5,7 +5,7 @@ a = Analysis(
     ['desktop_pet.py'],
     pathex=[],
     binaries=[],
-    datas=[('character_no_bg.png', '.')],
+    datas=[('character_transparent.png', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

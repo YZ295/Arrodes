@@ -168,32 +168,58 @@ export default function Subtitle() {
       className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] pointer-events-none select-none"
       style={{
         opacity,
-        transition: `opacity ${FADE_OUT_DURATION}ms ease-out`,
+        transition: `opacity ${FADE_OUT_DURATION}ms ease-out, transform ${FADE_OUT_DURATION}ms ease-out`,
+        transform: `translateX(-50%) ${status === 'fading' ? 'translateY(8px)' : 'translateY(0)'}`,
       }}
     >
-      <p
-        className="text-center whitespace-pre-wrap"
-        style={{
-          color: '#ffffff',
-          fontSize: 'clamp(18px, 3.5vw, 32px)',
-          lineHeight: 1.6,
-          fontFamily: '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
-          fontWeight: 500,
-          letterSpacing: '0.05em',
-          textShadow:
-            '0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7), 0 1px 3px rgba(0,0,0,0.8)',
-          maxWidth: 'min(800px, 85vw)',
-          // 打字光标
-          borderRight: status === 'typing' ? '2px solid rgba(255,255,255,0.7)' : 'none',
-          animation: status === 'typing' ? 'cursor-blink 0.8s step-end infinite' : 'none',
-        }}
-      >
-        {displayText}
-      </p>
+      {/* 玻璃拟态浮现卡片（参考 border-beam 光束语言，与输入栏风格统一） */}
+      <div className="relative rounded-2xl" style={{ padding: 1, borderRadius: 18 }}>
+        {/* 边框光束层 */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            padding: 1,
+            borderRadius: 18,
+            background: 'linear-gradient(135deg, rgba(120,200,255,0.55), rgba(255,180,120,0.35), rgba(120,200,255,0.55))',
+            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            WebkitMaskComposite: 'xor',
+            mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            maskComposite: 'exclude',
+          }}
+        />
+        {/* 玻璃内容层 */}
+        <div
+          className="rounded-[17px] px-6 py-4"
+          style={{
+            backgroundColor: 'rgba(10, 12, 20, 0.75)',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)',
+          }}
+        >
+          <p
+            className="text-center whitespace-pre-wrap"
+            style={{
+              color: '#f2f7ff',
+              fontSize: 'clamp(16px, 2.6vw, 24px)',
+              lineHeight: 1.7,
+              fontFamily: '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+              fontWeight: 400,
+              letterSpacing: '0.04em',
+              maxWidth: 'min(640px, 80vw)',
+              // 打字光标
+              borderRight: status === 'typing' ? '2px solid rgba(120,200,255,0.8)' : 'none',
+              animation: status === 'typing' ? 'cursor-blink 0.8s step-end infinite' : 'none',
+            }}
+          >
+            {displayText}
+          </p>
+        </div>
+      </div>
 
       <style>{`
         @keyframes cursor-blink {
-          0%, 100% { border-color: rgba(255,255,255,0.7); }
+          0%, 100% { border-color: rgba(120,200,255,0.8); }
           50% { border-color: transparent; }
         }
       `}</style>

@@ -27,6 +27,8 @@ export interface PipelineContext {
   rawInput?: string;
   /** 语音 blob（如果有） */
   audioBlob?: Blob;
+  /** 取消信号（用户停止 → 中断 LLM 等待与后续阶段） */
+  signal?: AbortSignal;
 }
 
 /** 单个阶段的输入 */

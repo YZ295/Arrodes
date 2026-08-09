@@ -33,3 +33,19 @@ nul
 # Python
 __pycache__/
 *.pyc
+
+# ---- 打包产物（体积大/含环境，不入库） ----
+desktop/release*/
+TheFool/dist*/
+TheFool/dist2*/
+TheFool/build*/
+TheFool/build2*/
+
+# ---- 模型权重（5.3GB）与个人数据 ----
+tts-sidecar/CosyVoice-unzip/
+tts-sidecar/CosyVoice-src/
+tts-sidecar/CosyVoice/
+tts-sidecar/custom-voices/
+
+# 编译临时
+*.spec

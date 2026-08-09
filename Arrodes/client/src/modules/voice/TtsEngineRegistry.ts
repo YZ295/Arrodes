@@ -115,10 +115,10 @@ export class TtsEngineRegistry {
 
 // ===== 内置引擎实现 =====
 
-/** Edge TTS 引擎（服务端合成） */
+/** 本地 CosyVoice 引擎（服务端合成） */
 export const EdgeTtsEngine: TtsEngine = {
-  id: 'server-edge',
-  name: 'Edge TTS (云端)',
+  id: 'server-local',
+  name: '本地 CosyVoice',
   priority: 0,
 
   checkAvailable: async () => {

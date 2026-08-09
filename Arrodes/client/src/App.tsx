@@ -21,7 +21,6 @@ import { initTtsRegistry } from './modules/voice/TtsEngineRegistry';
 import { initSttRegistry } from './modules/voice/SttEngineRegistry';
 import Sidebar, { type SidebarView } from './components/Sidebar';
 import ChatOverlay from './components/ChatOverlay';
-import SessionPanel from './components/SessionPanel';
 import PanelView from './components/PanelView';
 import Universe from './universe/Universe';
 import Subtitle from './components/Subtitle';
@@ -57,18 +56,14 @@ const App = memo(function App() {
 
   return (
     <div className="w-full h-full flex overflow-hidden bg-[#050608]">
-      {/* 侧边栏（图标导航） */}
+      {/* 左侧栏：功能导航 + 会话列表（一体） */}
       <Sidebar
         currentView={sidebarView}
         onViewChange={(v) => setSidebarView(v)}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((p) => !p)}
+        currentSessionId={voice.currentSessionId}
       />
-
-      {/* 左侧框：会话列表（仅对话视图显示） */}
-      {!showPanel && (
-        <SessionPanel currentSessionId={voice.currentSessionId} />
-      )}
 
       {/* 主区域：3D 背景 + 覆盖层 */}
       <div className="relative flex-1 overflow-hidden">
@@ -95,6 +90,9 @@ const App = memo(function App() {
             sendTextMessage={voice.sendTextMessage}
             replayTTS={voice.replayTTS}
             stopTTS={voice.stopTTS}
+            stopAll={voice.stopAll}
+            isMuted={voice.isMuted}
+            toggleMuted={voice.toggleMuted}
           />
         )}
 

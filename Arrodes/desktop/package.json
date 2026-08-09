@@ -1,0 +1,78 @@
+{
+  "name": "arrodes-desktop",
+  "version": "1.0.0",
+  "description": "阿罗德斯 - 桌面版",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.9.3"
+  },
+  "build": {
+    "appId": "com.arrodes.desktop",
+    "productName": "阿罗德斯",
+    "directories": {
+      "output": "release3"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../server",
+        "to": "server",
+        "filter": [
+          "dist/**",
+          "node_modules/**",
+          "package.json",
+          ".env"
+        ]
+      },
+      {
+        "from": "../client/dist",
+        "to": "client/dist",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../tts-sidecar",
+        "to": "tts-sidecar",
+        "filter": [
+          "tts_sidecar.py",
+          "custom-voices/**",
+          "requirements.txt"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/@vscode/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Arrodes-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "阿罗德斯"
+    }
+  }
+}

@@ -10,3 +10,9 @@ data/
 Arrodes/server/ab-test.mts
 Arrodes/server/verify-tts.mts
 Arrodes/server/test-tts-fix.mjs
+
+# 工具内部数据 / 个人文件 / 实验目录
+.workbuddy/
+uploads/
+tts-sidecar/
+Arrodes/server/v_bk.json

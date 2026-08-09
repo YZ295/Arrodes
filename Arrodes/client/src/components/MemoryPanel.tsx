@@ -33,13 +33,13 @@ function MemoryCard({
     <div className="group px-3 py-2.5 mx-1 rounded-lg hover:bg-white/5 transition-colors">
       <div className="flex items-start gap-2">
         {/* 类型标签 */}
-        <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full mt-0.5 ${typeInfo.color}`}>
+        <span className={`shrink-0 text-[16px] px-1.5 py-0.5 rounded-full mt-0.5 ${typeInfo.color}`}>
           {typeInfo.label}
         </span>
         {/* 内容 */}
         <div className="flex-1 min-w-0">
           <p className="text-sm text-gray-200 leading-relaxed">{memory.content}</p>
-          <span className="text-[10px] text-gray-500 mt-1 block">{timeAgo}</span>
+          <span className="text-[16px] text-gray-500 mt-1 block">{timeAgo}</span>
         </div>
         {/* 删除按钮 */}
         {onDelete && (
@@ -68,6 +68,7 @@ interface MemoryPanelProps {
 
 export default function MemoryPanel({ onClose }: MemoryPanelProps) {
   const [memories, setMemories] = useState<MemoryNode[]>([]);
+  const [persons, setPersons] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,6 +94,7 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
       if (!res.ok) throw new Error(`加载记忆失败: ${res.status}`);
       const data = await res.json();
       setMemories(data.memories || []);
+      setPersons(data.persons || []);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '加载记忆失败';
       setError(msg);
@@ -132,7 +134,7 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
           </svg>
           <span className="text-sm font-medium">记忆管理</span>
-          <span className="text-[10px] text-gray-500">({memories.length}条)</span>
+          <span className="text-[16px] text-gray-500">({memories.length}条)</span>
         </div>
         <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
       </div>
@@ -160,7 +162,7 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${
+              className={`text-[16px] px-2 py-0.5 rounded-full transition-colors ${
                 typeFilter === t
                   ? 'bg-[var(--color-home-gold)]/20 text-[var(--color-home-gold)]'
                   : 'bg-white/5 text-gray-400 hover:bg-white/10'
@@ -186,12 +188,34 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
               currentSessionOnly ? 'left-4' : 'left-0.5'
             }`} />
           </div>
-          <span className="text-[11px] text-gray-400">仅当前会话</span>
+          <span className="text-[16px] text-gray-400">仅当前会话</span>
         </label>
       </div>
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto">
+        {/* 人物卡区块（阶段2：记忆中出现的人物实体） */}
+        {!loading && !error && persons.length > 0 && (
+          <div className="px-3 pt-2 pb-1">
+            <div className="text-[16px] text-gray-500 mb-1.5">👤 人物（{persons.length}）</div>
+            <div className="flex flex-wrap gap-1.5">
+              {persons.map((name) => (
+                <div
+                  key={name}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--color-home-gold)]/10
+                    border border-[var(--color-home-gold)]/20 text-[16px] text-[var(--color-home-gold)]"
+                  title={`${name} 出现在记忆中`}
+                >
+                  <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-400/60 to-amber-700/60
+                    flex items-center justify-center text-[16px] font-bold text-white shrink-0">
+                    {name[0]}
+                  </span>
+                  {name}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <svg className="w-5 h-5 animate-spin text-gray-400" viewBox="0 0 24 24">
@@ -200,14 +224,14 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
             </svg>
           </div>
         ) : error ? (
-          <div className="px-4 py-3 text-xs text-red-300">{error}</div>
+          <div className="px-4 py-3 text-[16px] text-red-300">{error}</div>
         ) : memories.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <svg className="w-8 h-8 mx-auto mb-2 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
             </svg>
             <p className="text-sm">暂无记忆</p>
-            <p className="text-xs mt-1">和阿罗德斯对话，记忆会自动保存</p>
+            <p className="text-[16px] mt-1">和阿罗德斯对话，记忆会自动保存</p>
           </div>
         ) : (
           <div className="py-1">

@@ -21,6 +21,8 @@ export interface SessionNode {
   messageCount: number;
   lastActiveAt: string;
   createdAt: string;
+  /** 是否已归档（软删除，数据保留） */
+  archived?: boolean;
   children?: SessionNode[];
 }
 
@@ -102,22 +104,58 @@ export interface SynthesizeResponse {
 
 // ---- WebSocket 协议 ----
 
-export type WSClientMessageType = 'message';
-export type WSServerMessageType = 'chunk' | 'complete' | 'memory' | 'intent' | 'error';
+export type WSClientMessageType = 'message' | 'cancel';
+export type WSServerMessageType = 'chunk' | 'complete' | 'memory' | 'intent' | 'error' | 'stopped';
 
 export interface WSClientMessage {
   type: WSClientMessageType;
   sessionId: string;
   content: string;
   isVoice: boolean;
+  /** 请求唯一标识：服务端所有相关事件（chunk/complete/stopped/error）回带同一 id，供客户端按 id 认领 */
+  requestId?: string;
   /** 客户端检测到的意图（Phase 1 透传服务端处理） */
   intent?: IntentResult;
 }
 
-export interface WSServerMessage {
-  type: WSServerMessageType;
-  data: Record<string, unknown>;
+export interface WSServerMessageBase {
+  /** 请求标识：由客户端发出消息时携带，服务端原样回带（无则 undefined） */
+  requestId?: string;
 }
+
+/** 服务端消息判别联合：按 type 精确定型 data（阶段3 强类型） */
+export interface WSServerChunkMessage extends WSServerMessageBase {
+  type: 'chunk';
+  data: WSChunkData;
+}
+export interface WSServerCompleteMessage extends WSServerMessageBase {
+  type: 'complete';
+  data: WSCompleteData;
+}
+export interface WSServerMemoryMessage extends WSServerMessageBase {
+  type: 'memory';
+  data: WSMemoryData;
+}
+export interface WSServerIntentMessage extends WSServerMessageBase {
+  type: 'intent';
+  data: WSIntentData;
+}
+export interface WSServerErrorMessage extends WSServerMessageBase {
+  type: 'error';
+  data: { error: string; code?: string };
+}
+export interface WSServerStoppedMessage extends WSServerMessageBase {
+  type: 'stopped';
+  data?: Record<string, unknown>;
+}
+
+export type WSServerMessage =
+  | WSServerChunkMessage
+  | WSServerCompleteMessage
+  | WSServerMemoryMessage
+  | WSServerIntentMessage
+  | WSServerErrorMessage
+  | WSServerStoppedMessage;
 
 export interface WSChunkData {
   content: string;

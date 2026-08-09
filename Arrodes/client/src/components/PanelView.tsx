@@ -66,11 +66,11 @@ export default memo(function PanelView(props: PanelViewProps) {
           {view === 'settings' && (
             <div className="p-5 space-y-6">
               <div>
-                <h3 className="text-xs text-white/30 mb-3 uppercase tracking-wider">AI 模型</h3>
+                <h3 className="text-[16px] text-white/30 mb-3 uppercase tracking-wider">AI 模型</h3>
                 <ModelSettings />
               </div>
               <div className="border-t border-white/5 pt-5">
-                <h3 className="text-xs text-white/30 mb-3 uppercase tracking-wider">语音合成</h3>
+                <h3 className="text-[16px] text-white/30 mb-3 uppercase tracking-wider">语音合成</h3>
                 <TTSControl
                   currentVoice={ttsConfig.voiceId} rate={ttsConfig.rate} pitch={ttsConfig.pitch}
                   onVoiceChange={(v) => setTtsConfig({ voiceId: v })}
@@ -115,7 +115,7 @@ function ProfilePanel() {
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-white/3 rounded-lg px-4 py-2.5 border border-white/5">
-      <div className="text-[10px] text-white/25 uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="text-[16px] text-white/25 uppercase tracking-wider mb-0.5">{label}</div>
       <div className="text-sm text-white/60">{value}</div>
     </div>
   );
@@ -125,7 +125,7 @@ function AdvancedPanel() {
   return (
     <div className="p-5 space-y-4">
       <div>
-        <h3 className="text-xs text-white/30 mb-3 uppercase tracking-wider">系统状态</h3>
+        <h3 className="text-[16px] text-white/30 mb-3 uppercase tracking-wider">系统状态</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between"><span className="text-white/40">WebSocket</span><span className="text-green-400/60">已连接</span></div>
           <div className="flex justify-between"><span className="text-white/40">Edge TTS</span><span className="text-cyan-400/60">可用</span></div>
@@ -191,19 +191,19 @@ function SkillsPanel() {
   return (
     <div className="p-5 space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-white/30 uppercase tracking-wider">已注册技能</span>
+        <span className="text-[16px] text-white/30 uppercase tracking-wider">已注册技能</span>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-amber-400/60">{skills.length} 个</span>
+          <span className="text-[16px] text-amber-400/60">{skills.length} 个</span>
           <button
             onClick={() => setShowAdd((p) => !p)}
-            className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+            className="text-[16px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
           >
             {showAdd ? '取消' : '+ 添加'}
           </button>
         </div>
       </div>
 
-      {error && <div className="text-xs text-red-400 bg-red-500/10 px-3 py-1.5 rounded">{error}</div>}
+      {error && <div className="text-[16px] text-red-400 bg-red-500/10 px-3 py-1.5 rounded">{error}</div>}
 
       {/* 添加表单 */}
       {showAdd && (
@@ -211,26 +211,26 @@ function SkillsPanel() {
           <input
             value={newName} onChange={(e) => setNewName(e.target.value)}
             placeholder="技能名称 (英文, 如 my_weather)"
-            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 outline-none focus:border-cyan-400/30"
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[16px] text-white/80 outline-none focus:border-cyan-400/30"
           />
           <input
             value={newDesc} onChange={(e) => setNewDesc(e.target.value)}
             placeholder="技能描述 (LLM 靠这个判断何时调用)"
-            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 outline-none focus:border-cyan-400/30"
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[16px] text-white/80 outline-none focus:border-cyan-400/30"
           />
           <input
             value={newUrl} onChange={(e) => setNewUrl(e.target.value)}
             placeholder="Webhook URL (可选, 调用 GET 此地址获取回复)"
-            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 outline-none focus:border-cyan-400/30"
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[16px] text-white/80 outline-none focus:border-cyan-400/30"
           />
           <input
             value={newText} onChange={(e) => setNewText(e.target.value)}
             placeholder="固定回复文本 (可选, 不填 URL 时生效)"
-            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 outline-none focus:border-cyan-400/30"
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[16px] text-white/80 outline-none focus:border-cyan-400/30"
           />
           <button
             onClick={addSkill} disabled={adding}
-            className="w-full py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-xs hover:bg-cyan-500/30 disabled:opacity-40 transition-colors"
+            className="w-full py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-[16px] hover:bg-cyan-500/30 disabled:opacity-40 transition-colors"
           >
             {adding ? '添加中…' : '确认添加'}
           </button>
@@ -241,7 +241,7 @@ function SkillsPanel() {
       {skills.map((skill) => (
         <div key={skill.name} className="bg-white/3 rounded-xl p-4 border border-white/5 hover:border-white/10 transition-all group">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-mono">{skill.name}</span>
+            <span className="text-[16px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-mono">{skill.name}</span>
             <button
               onClick={() => removeSkill(skill.name)}
               className="ml-auto w-4 h-4 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-500/20 text-red-400/60 hover:text-red-400"
@@ -256,7 +256,7 @@ function SkillsPanel() {
           {skill.args.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {skill.args.map((arg) => (
-                <span key={arg.name} className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/30">
+                <span key={arg.name} className="text-[16px] px-2 py-0.5 rounded-full bg-white/5 text-white/30">
                   {arg.name}{arg.required ? <span className="text-red-400/60 ml-0.5">*</span> : ''}
                   <span className="text-white/15 ml-1">: {arg.type}</span>
                 </span>
@@ -269,7 +269,7 @@ function SkillsPanel() {
       {skills.length === 0 && !error && <div className="text-center text-white/20 py-8 text-sm">正在加载…</div>}
 
       <div className="border-t border-white/5 pt-3 mt-4">
-        <div className="text-[10px] text-white/20">
+        <div className="text-[16px] text-white/20">
           内置技能删除后重启会恢复。自定义技能（custom: 前缀）可增删。<br />
           自定义技能支持 Webhook URL（GET 调用）或固定文本回复。
         </div>

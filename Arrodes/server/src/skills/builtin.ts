@@ -251,13 +251,13 @@ registerSkill({
       const audioBase64 = data.data?.audio || data.audio;
       if (!audioBase64) return 'MiniMax TTS 返回的音频为空';
 
-      // 保存到临时文件供前端访问
+      // 保存到临时文件供前端访问（MiniMax 返回 base64 编码，用 'base64' 解码）
       const fs = await import('node:fs');
       const path = await import('node:path');
       const tmpDir = path.resolve('./data/tts');
       fs.mkdirSync(tmpDir, { recursive: true });
       const filename = `minimax_${Date.now()}.mp3`;
-      fs.writeFileSync(path.join(tmpDir, filename), Buffer.from(audioBase64, 'hex'));
+      fs.writeFileSync(path.join(tmpDir, filename), Buffer.from(audioBase64, 'base64'));
 
       return `MiniMax TTS 已合成。音频文件: /data/tts/${filename}\n音色: ${voice}\n文本: ${text.slice(0, 50)}...`;
     } catch (err) {

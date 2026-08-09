@@ -1,7 +1,8 @@
 {
-  "main": "electron/main.js",
+  "main": "desktop/dist/main.js",
   "scripts": {
-    "desktop": "electron ."
+    "desktop": "electron .",
+    "desktop:build": "cd desktop && npm run build"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

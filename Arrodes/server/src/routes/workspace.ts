@@ -1,9 +1,11 @@
 /**
- * 工作区路由（Agent 工作区）
+ * 工作区路由（Agent 工作区 · 兼容层）
  *
- * GET  /api/v1/workspace            → 连接器列表 + 共享记忆概览
- * GET  /api/v1/workspace/memories   → 查询共享记忆（?q= 关键词）
- * POST /api/v1/workspace/memories   → 写入共享记忆
+ * GET  /api/v1/workspace            → 连接器列表 + 共享记忆概览（?ws= 指定工作区）
+ * GET  /api/v1/workspace/memories   → 查询共享记忆（?ws= 指定工作区）
+ * POST /api/v1/workspace/memories   → 写入共享记忆（body.workspaceId 可选）
+ *
+ * workspace-v2：新 CRUD 走 /api/v1/workspaces（复数），本路由保留向后兼容。
  */
 import { Router } from 'express';
 import { detectConnectors } from '../workspace/connectors.js';
@@ -12,12 +14,13 @@ import { workspaceMemoryHub } from '../workspace/memory-hub.js';
 export function createWorkspaceRouter(): Router {
   const router = Router();
 
-  // 工作区总览
-  router.get('/', async (_req, res) => {
+  // 工作区总览（?ws= 指定工作区，默认 default）
+  router.get('/', async (req, res) => {
     try {
+      const ws = typeof req.query.ws === 'string' && req.query.ws ? String(req.query.ws) : 'default';
       const agents = await detectConnectors();
-      const stats = workspaceMemoryHub.stats();
-      const recent = workspaceMemoryHub.search(undefined, 10);
+      const stats = workspaceMemoryHub.stats(ws);
+      const recent = workspaceMemoryHub.search(undefined, 10, ws);
       res.json({ agents, memories: { stats, recent } });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : '工作区查询失败' });

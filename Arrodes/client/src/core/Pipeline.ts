@@ -54,6 +54,20 @@ export class PipelineRunner {
 
     try {
       for (const stage of this.definition.stages) {
+        // 已取消 → 立即终止（不再执行任何阶段）
+        if (context.signal?.aborted) {
+          return {
+            success: false,
+            duration: Math.round(performance.now() - context.startTime),
+            context,
+            reply: '',
+            newMemories: [],
+            stageDurations,
+            failedStage: stage.name,
+            error: 'cancelled',
+          };
+        }
+
         const stageStart = performance.now();
 
         try {
@@ -173,5 +187,6 @@ export function createPipelineContext(overrides?: Partial<PipelineContext>): Pip
     state: overrides?.state || {},
     rawInput: overrides?.rawInput,
     audioBlob: overrides?.audioBlob,
+    signal: overrides?.signal,
   };
 }

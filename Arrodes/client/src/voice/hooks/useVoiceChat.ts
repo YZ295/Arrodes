@@ -1,21 +1,25 @@
 /**
- * 语音聊天 Hook v4.4
- * 多会话管理 + STT Promise 竞态修复 + 管道编排
+ * 语音聊天 Hook v5（T10 重构：组合式）
+ *
+ * 拆分自 v4.4 巨型 hook：
+ * - useSessionManager：会话/消息/切换/新建
+ * - useVoiceRecorder：录音/STT/转录回退
+ * - useTTS：语音合成/静音
+ * 本文件只保留：TTS 编排、WS 事件订阅、管道触发、停止机制。
  */
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type { Message, SessionNode, WSChunkData, WSCompleteData, WSMemoryData } from '@shared/types';
+import type { WSChunkData, WSCompleteData, WSMemoryData } from '@shared/types';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
 import { uid } from '../../shared/utils/uid';
 import { bumpVoiceGeneration } from '../../shared/utils/voiceGeneration';
-import { api } from '../../shared/utils/apiClient';
 import { MessageChannel, useMessageChannel } from '../../core/MessageChannel';
 import { createVoicePipeline } from '../../pipeline/voicePipeline';
-import { useAudioRecorder } from './useAudioRecorder';
-import { useSpeechToText } from './useSpeechToText';
 import { useTTS } from './useTTS';
+import { useSessionManager } from './useSessionManager';
+import { useVoiceRecorder } from './useVoiceRecorder';
 
 interface UseVoiceChatReturn {
-  messages: Message[];
+  messages: import('@shared/types').Message[];
   isRecording: boolean;
   recordingDuration: number;
   recordingVolume: number;
@@ -39,6 +43,10 @@ interface UseVoiceChatReturn {
   replayTTS: () => void;
   /** 停止当前 TTS 播放 */
   stopTTS: () => void;
+  /** 完整停止：停语音 + 停 LLM 思考 + 停任务执行（用户真实意图：不想再听） */
+  stopAll: () => void;
+  /** 静音开关：关闭语音输出（不合成不播放） */
+  toggleMuted: () => void;
   /** 解锁音频（首次交互后调用） */
   unlockAudio: () => Promise<void>;
   /** 当前 TTS 配置 */
@@ -50,81 +58,71 @@ interface UseVoiceChatReturn {
 }
 
 export function useVoiceChat(): UseVoiceChatReturn {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showMemoryToast, setShowMemoryToast] = useState(false);
   const [memoryToastText, setMemoryToastText] = useState('');
 
   const channel = useMemo(() => MessageChannel.getInstance(), []);
   const { state: channelState } = useMessageChannel();
-  const { speak: ttsSpeak, stop: ttsStop, isSpeaking: ttsSpeaking, error: ttsError, replay: replayTTS, unlockAudio, config: ttsConfig, voices: ttsVoices, setConfig: setTtsConfigRaw } = useTTS();
+  const { speak: ttsSpeak, stop: ttsStop, isSpeaking: ttsSpeaking, error: ttsError, replay: replayTTS, unlockAudio, config: ttsConfig, voices: ttsVoices, setConfig: setTtsConfigRaw, isMuted: ttsMuted, toggleMuted: ttsToggleMuted } = useTTS();
   const pipeline = useMemo(() => createVoicePipeline({ ttsSpeak }), [ttsSpeak]);
 
-  const recordingSessionId = useRef<string | null>(null);
-  const hasInitialized = useRef(false);
-  const sttPromiseRef = useRef<Promise<string> | null>(null);
-
+  // 会话管理（T10 拆分）
   const {
-    isRecording, duration: recordingDuration, volume: recordingVolume,
-    startRecording: startAudioRecorder, stopRecording: stopAudioRecorder,
-    error: recorderError,
-  } = useAudioRecorder();
+    messages, currentSessionId, setMessages, initSession, switchSession, createNewSession,
+  } = useSessionManager();
 
-  const {
-    interimText, startListening: startStt, stopListening: stopStt, error: sttError,
-  } = useSpeechToText();
+  // 当前对话任务的取消控制器（停止机制核心：abort → 停 LLM 等待 + 发 cancel 给服务端）
+  const abortRef = useRef<AbortController | null>(null);
+  // 当前会话 id 的 ref 同步（供 recorder/发送归属）
+  const sessionIdRef = useRef<string | null>(null);
+  useEffect(() => { sessionIdRef.current = currentSessionId; }, [currentSessionId]);
 
-  useEffect(() => { if (recorderError) console.warn('[VoiceChat] 录音器异常:', recorderError); }, [recorderError]);
-  useEffect(() => { if (sttError) console.warn('[VoiceChat] 语音识别异常:', sttError); }, [sttError]);
+  // ---- 发送消息（自动中断正在播放的语音 + 取消上一个任务） ----
+  const sendMessage = useCallback((content: string, isVoice: boolean) => {
+    // 递增代际 + 中断当前 TTS 播放（新消息取代旧消息）
+    const generation = bumpVoiceGeneration();
+    ttsStop();
+    // 新消息 = 全新的开始：取消上一个还在跑的 LLM 任务
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-  // ---- 消息加载 ----
-  const loadMessages = useCallback(async (sessionId: string) => {
-    try {
-      const data = await api.get<{ messages?: Message[] }>(`/messages/${sessionId}`);
-      if (data.messages) setMessages(data.messages);
-    } catch {
-      /* 静默降级 */
+    const activeSessionId = sessionIdRef.current;
+    if (!activeSessionId || !channel.isConnected()) {
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), role: 'user', content, timestamp: new Date().toISOString(), isVoice },
+        { id: uid(), role: 'assistant', content: '⚠️ 无法连接到服务器', timestamp: new Date().toISOString(), isVoice: false },
+      ]);
+      return;
     }
-  }, []);
 
-  // ---- 会话初始化：加载/创建第一个有效会话 ----
-  const initSession = useCallback(async () => {
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
+    setMessages((prev) => [...prev, { id: uid(), role: 'user', content, timestamp: new Date().toISOString(), isVoice }]);
+    setIsLoading(true);
 
-    try {
-      const data = await api.get<{ sessions: SessionNode[] }>('/sessions');
-      const sessions = data.sessions || [];
-      const valid = sessions.filter((s) => s.messageCount > 0);
-
-      if (valid.length > 0) {
-        // 加载第一个有效会话
-        const first = valid[0];
-        setCurrentSessionId(first.id);
-        recordingSessionId.current = first.id;
-        loadMessages(first.id);
+    eventBus.emit(EVENTS.VOICE_MESSAGE_SEND, { content, sessionId: activeSessionId, isVoice });
+    pipeline.run(content, activeSessionId, isVoice, generation, controller.signal).catch((err) => {
+      // 用户主动停止不算错误
+      if (err instanceof Error && err.message === 'cancelled') {
+        console.log('[VoiceChat] 已按用户指令停止');
       } else {
-        // 无历史 → 创建默认会话
-        const session = await api.post<SessionNode>('/sessions', { title: '新对话', topic: 'other' });
-        setCurrentSessionId(session.id);
-        recordingSessionId.current = session.id;
+        console.warn('[VoiceChat] 管道执行失败:', err);
       }
-    } catch {
-      const tmpId = uid();
-      setCurrentSessionId(tmpId);
-      recordingSessionId.current = tmpId;
-    }
-  }, [loadMessages]);
+      setIsLoading(false);
+      if (abortRef.current === controller) abortRef.current = null;
+    });
+  }, [channel, pipeline, ttsStop, setMessages]);
 
-  useEffect(() => {
-    setIsConnected(channelState === 'connected');
-    if (channelState === 'connected') initSession();
-  }, [channelState, initSession]);
+  // 录音（T10 拆分；sendMessage 回调注入）
+  const recorder = useVoiceRecorder({
+    sendMessage,
+    getSessionId: () => sessionIdRef.current,
+  });
 
-  // ---- MessageChannel 回调 ----
+  // ---- WS 事件回调 ----
   const handleChunk = useCallback((data: WSChunkData) => {
     if (!data.content) return;
     setMessages((prev) => {
@@ -136,7 +134,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
       }
       return [...prev, { id: uid(), role: 'assistant', content: data.content, timestamp: new Date().toISOString(), isVoice: false }];
     });
-  }, []);
+  }, [setMessages]);
 
   const handleComplete = useCallback((data: WSCompleteData) => {
     setIsLoading(false);
@@ -148,8 +146,8 @@ export function useVoiceChat(): UseVoiceChatReturn {
       updated[updated.length - 1] = { ...last, id: last.id + '-done', content: data.content };
       return updated;
     });
-    eventBus.emit(EVENTS.VOICE_REPLY_COMPLETE, { content: data.content, sessionId: recordingSessionId.current });
-  }, []);
+    eventBus.emit(EVENTS.VOICE_REPLY_COMPLETE, { content: data.content, sessionId: sessionIdRef.current });
+  }, [setMessages]);
 
   const handleMemory = useCallback((data: WSMemoryData) => {
     if (data.memories?.length) {
@@ -162,147 +160,64 @@ export function useVoiceChat(): UseVoiceChatReturn {
   const handleError = useCallback((error: string) => {
     setIsLoading(false);
     setMessages((prev) => [...prev, { id: uid(), role: 'assistant', content: `⚠️ ${error || '发生未知错误'}`, timestamp: new Date().toISOString(), isVoice: false }]);
-  }, []);
+  }, [setMessages]);
 
+  // 订阅 MessageChannel 全局回调 + 连接状态
   useEffect(() => {
     channel.setCallbacks({ onChunk: handleChunk, onComplete: handleComplete, onMemory: handleMemory, onError: handleError });
   }, [channel, handleChunk, handleComplete, handleMemory, handleError]);
 
+  useEffect(() => {
+    setIsConnected(channelState === 'connected');
+    if (channelState === 'connected') initSession();
+  }, [channelState, initSession]);
+
   useEffect(() => { setIsSpeaking(ttsSpeaking); }, [ttsSpeaking]);
 
-  // ---- 切换会话 ----
-  const switchSession = useCallback((sessionId: string) => {
-    if (sessionId === currentSessionId) return;
-    setCurrentSessionId(sessionId);
-    recordingSessionId.current = sessionId;
-    setMessages([]);
-    loadMessages(sessionId);
-  }, [currentSessionId, loadMessages]);
-
-  // ---- 创建新会话 ----
-  const createNewSession = useCallback(async (title = '新会话'): Promise<string | null> => {
-    try {
-      const session = await api.post<SessionNode>('/sessions', { title, topic: 'other' });
-      switchSession(session.id);
-      return session.id;
-    } catch (err) {
-      console.error('[VoiceChat] 创建会话失败:', err);
-      return null;
-    }
-  }, [switchSession]);
-
-  // ---- 事件驱动：会话切换 ----
-  useEffect(() => {
-    const u1 = eventBus.on(EVENTS.VOICE_SESSION_SWITCH, (data: unknown) => {
-      const { sessionId } = (data as { sessionId: string }) || {};
-      if (sessionId) switchSession(sessionId);
-    });
-    return u1;
-  }, [switchSession]);
-
-  // ---- 事件驱动：新建会话 ----
-  useEffect(() => {
-    const u2 = eventBus.on(EVENTS.VOICE_SESSION_CREATE, (data: unknown) => {
-      const { title } = (data as { title?: string }) || {};
-      createNewSession(title);
-    });
-    return u2;
-  }, [createNewSession]);
-
-  // ---- 发送消息（自动中断正在播放的语音） ----
-  const sendMessage = useCallback((content: string, isVoice: boolean) => {
-    // 递增代际 + 中断当前 TTS 播放（新消息取代旧消息）
-    const generation = bumpVoiceGeneration();
+  // ---- 完整停止：停语音 + 停 LLM 思考 + 停任务执行 ----
+  const stopAll = useCallback(() => {
+    // 1. 立即停语音播放
     ttsStop();
-    const sessionId = recordingSessionId.current;
-    if (!sessionId || !channel.isConnected()) {
-      setMessages((prev) => [
-        ...prev,
-        { id: uid(), role: 'user', content, timestamp: new Date().toISOString(), isVoice },
-        { id: uid(), role: 'assistant', content: '⚠️ 无法连接到服务器', timestamp: new Date().toISOString(), isVoice: false },
-      ]);
-      return;
-    }
-
-    setMessages((prev) => [...prev, { id: uid(), role: 'user', content, timestamp: new Date().toISOString(), isVoice }]);
-    setIsLoading(true);
-
-    eventBus.emit(EVENTS.VOICE_MESSAGE_SEND, { content, sessionId, isVoice });
-    pipeline.run(content, sessionId, isVoice, generation).catch((err) => {
-      console.warn('[VoiceChat] 管道执行失败:', err);
-      setIsLoading(false);
-    });
-  }, [channel, pipeline, ttsStop]);
+    // 2. 取消 LLM 推理（前端 Promise reject + WS 发 cancel 给服务端中断流）
+    abortRef.current?.abort();
+    abortRef.current = null;
+    // 3. 清理 loading 态（AI 不再继续输出）
+    setIsLoading(false);
+    console.log('[VoiceChat] 已完整停止：语音已停、推理已中断');
+  }, [ttsStop]);
 
   const sendTextMessage = useCallback((text: string) => sendMessage(text, false), [sendMessage]);
 
-  // ---- 录制 ----
-  const startRecording = useCallback(() => {
-    startAudioRecorder().catch(() => {});
-    // Electron 壳内浏览器 SpeechRecognition 不可用（报 network 错误），
-    // 直接跳过实时 STT，靠 stopRecording 时的录音上传服务端识别。
-    const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
-    sttPromiseRef.current = isElectron ? Promise.resolve('') : startStt().catch(() => '');
-    eventBus.emit(EVENTS.VOICE_RECORDING_START);
-  }, [startAudioRecorder, startStt]);
-
-  // ---- 服务端语音识别（录音 Blob 上传）----
-  const serverTranscribe = useCallback(async (blob: Blob): Promise<string> => {
-    const form = new FormData();
-    form.append('audio', blob, 'audio.webm');
-    const res = await fetch('/api/v1/stt/transcribe', { method: 'POST', body: form });
-    if (!res.ok) throw new Error(`服务端语音识别失败 (${res.status})`);
-    const data = await res.json() as { text?: string };
-    return (data.text || '').trim();
-  }, []);
-
-  // 回退：浏览器实时 STT 结果（无则占位文本）
-  const fallbackToStt = useCallback((sttPromise: Promise<string> | null, fallback: (text: string) => void) => {
-    (sttPromise || Promise.resolve('')).then((sttText) => {
-      const text = sttText && sttText.length > 2 ? sttText : '[语音消息]';
-      fallback(text);
-    });
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    const sttPromise = sttPromiseRef.current;
-    sttPromiseRef.current = null;
-    stopStt();
-
-    // 结束录音并拿到 Blob（服务端 STT 用；浏览器实时 STT 结果作兜底）
-    stopAudioRecorder().then((audioBlob) => {
-      const fallback = (text: string) => {
-        sendMessage(text, true);
-        eventBus.emit(EVENTS.VOICE_RECORDING_END, { text, sessionId: currentSessionId });
-      };
-
-      if (audioBlob && audioBlob.size > 0) {
-        serverTranscribe(audioBlob)
-          .then((text) => {
-            if (text) { fallback(text); return; }
-            fallbackToStt(sttPromise, fallback);
-          })
-          .catch((err) => {
-            console.warn('[VoiceChat] 服务端识别失败，回退浏览器 STT:', err);
-            fallbackToStt(sttPromise, fallback);
-          });
-      } else {
-        fallbackToStt(sttPromise, fallback);
-      }
-    });
-  }, [stopAudioRecorder, stopStt, sendMessage, currentSessionId, serverTranscribe]);
-
+  // 卸载清理
   useEffect(() => () => { ttsStop(); }, [ttsStop]);
 
   return {
-    messages, isRecording, recordingDuration, recordingVolume,
-    isLoading, isConnected, currentSessionId, interimText,
-    isSpeaking, isMuted: false, error: recorderError || sttError || null,
-    showMemoryToast, memoryToastText,
-    startRecording, stopRecording, sendTextMessage,
-    switchSession, createNewSession,
-    ttsError, replayTTS, unlockAudio, stopTTS: ttsStop,
+    messages,
+    isRecording: recorder.isRecording,
+    recordingDuration: recorder.recordingDuration,
+    recordingVolume: recorder.recordingVolume,
+    isLoading,
+    isConnected,
+    currentSessionId,
+    interimText: recorder.interimText,
+    isSpeaking,
+    isMuted: ttsMuted,
+    error: recorder.error,
+    showMemoryToast,
+    memoryToastText,
+    startRecording: recorder.startRecording,
+    stopRecording: recorder.stopRecording,
+    sendTextMessage,
+    switchSession,
+    createNewSession,
+    ttsError,
+    replayTTS,
+    unlockAudio,
+    stopTTS: ttsStop,
+    stopAll,
+    toggleMuted: ttsToggleMuted,
     ttsConfig: { engine: ttsConfig.engine, voiceId: ttsConfig.voiceId, rate: ttsConfig.rate, pitch: ttsConfig.pitch },
-    ttsVoices, setTtsConfig: setTtsConfigRaw,
+    ttsVoices,
+    setTtsConfig: setTtsConfigRaw,
   };
 }

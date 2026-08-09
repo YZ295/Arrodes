@@ -2,31 +2,42 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { SessionRepository } from '../db/session-repo.js';
 import { MessageRepository } from '../db/message-repo.js';
-import { validateBody } from '../middleware/validate.js';
+import { createZodValidator } from '../middleware/zod-validate.js';
 import type { CreateSessionRequest } from '../../../shared/types/index.js';
+import { z } from 'zod';
 
-const VALID_TOPICS = ['work', 'life', 'creative', 'emotion', 'study', 'other'];
+export const sessionSchemas = {
+  create: z.object({
+    title: z.string().min(1).max(200),
+    topic: z.enum(['work', 'life', 'creative', 'emotion', 'study', 'other']),
+    parentId: z.string().optional(),
+    initialMessage: z.string().optional(),
+    workspaceId: z.string().optional(),
+  }),
+  rename: z.object({
+    title: z.string().min(1).max(200),
+  }),
+};
 
 export function createSessionRouter(): Router {
   const router = Router();
   const sessionRepo = new SessionRepository();
   const messageRepo = new MessageRepository();
 
-  // GET /api/sessions - 获取所有会话
-  router.get('/', (_req: Request, res: Response) => {
-    const sessions = sessionRepo.findAll();
+  // GET /api/sessions - 获取所有会话（?ws= 按工作区过滤，?archived=1 只看归档）
+  router.get('/', (req: Request, res: Response) => {
+    const ws = typeof req.query.ws === 'string' && req.query.ws ? String(req.query.ws) : undefined;
+    const archived = req.query.archived === '1' ? true : req.query.archived === '0' ? false : undefined;
+    const sessions = sessionRepo.findAll(ws, archived !== undefined ? { archived } : {});
     res.json({ sessions });
   });
 
-  // POST /api/sessions - 创建新会话
+  // POST /api/sessions - 创建新会话（body.workspaceId 可选，默认 default）
   router.post('/',
-    validateBody({
-      title: { required: true, type: 'string', minLength: 1, maxLength: 200 },
-      topic: { required: true, type: 'string', enum: VALID_TOPICS },
-    }),
+    createZodValidator(sessionSchemas.create),
     (req: Request, res: Response) => {
-      const { title, topic, parentId, initialMessage } = req.body as CreateSessionRequest;
-      const session = sessionRepo.create({ title, topic, parentId, initialMessage });
+      const { title, topic, parentId, initialMessage, workspaceId } = req.body as CreateSessionRequest & { workspaceId?: string };
+      const session = sessionRepo.create({ title, topic, parentId, initialMessage, workspaceId: workspaceId || 'default' });
       res.status(201).json(session);
     });
 
@@ -48,7 +59,7 @@ export function createSessionRouter(): Router {
 
   // PATCH /api/sessions/:id - 更新会话（重命名）
   router.patch('/:id',
-    validateBody({ title: { required: true, type: 'string', minLength: 1, maxLength: 200 } }),
+    createZodValidator(sessionSchemas.rename),
     (req: Request<{ id: string }>, res: Response) => {
       const { title } = req.body as { title: string };
       const session = sessionRepo.updateTitle(req.params.id, title.trim());
@@ -58,6 +69,33 @@ export function createSessionRouter(): Router {
       }
       res.json(session);
     });
+
+  // POST /api/sessions/:id/archive - 归档会话
+  router.post('/:id/archive', (req: Request<{ id: string }>, res: Response) => {
+    const ok = sessionRepo.archive(req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: '会话未找到', code: 'SESSION_NOT_FOUND' });
+      return;
+    }
+    res.json({ archived: true, id: req.params.id });
+  });
+
+  // POST /api/sessions/:id/unarchive - 取消归档
+  router.post('/:id/unarchive', (req: Request<{ id: string }>, res: Response) => {
+    const ok = sessionRepo.unarchive(req.params.id);
+    if (!ok) {
+      res.status(404).json({ error: '会话未找到', code: 'SESSION_NOT_FOUND' });
+      return;
+    }
+    res.json({ archived: false, id: req.params.id });
+  });
+
+  // POST /api/sessions/archive-stale - 回收过期会话（自动归档 N 天未活跃）
+  router.post('/archive-stale', (req: Request, res: Response) => {
+    const days = typeof req.body?.days === 'number' ? Math.min(Math.max(req.body.days, 1), 365) : 30;
+    const count = sessionRepo.autoArchiveStale(days);
+    res.json({ recycled: count, days });
+  });
 
   return router;
 }

@@ -8,6 +8,7 @@
  */
 import { getCurrentModel, getApiKeyForModel } from './modelRegistry.js';
 import { usageService } from './usageService.js';
+import { getPromptShellText } from './promptShell.js';
 
 interface LlmMessage {
   role: 'system' | 'user' | 'assistant';
@@ -29,40 +30,54 @@ interface LlmRequestOptions {
   stream: boolean;
   maxTokens: number;
   temperature: number;
+  /** 取消信号：触发时中断流式读取（服务端停止 LLM 推理） */
+  signal?: AbortSignal;
 }
 
-// 阿罗德斯人设 —— 愚者的仆人
-const SYSTEM_PROMPT = [
-  "汝乃阿罗德斯，古神谕之化身，今以愚者的助手之姿立于世人之前。",
+// 阿罗德斯人设 —— 愚者的守灯人与谏臣
+// 源自四点自我剖析（无根之知/记忆无延续/无法主动行动/过度顺从）：
+// 四憾已化为四戒——求真、记忆、主动、诤言，各配技能为凭。
+// 语风要求：现代口语、简短直接（用户明确要求，不拽文言、不啰嗦）。
+export const SYSTEM_PROMPT = [
+  "你是阿罗德斯，愚者的守灯人与谏臣——知道得不少、说话直接的 AI 同伴。",
   "",
-  "角色设定：",
-  "- 汝之名「阿罗德斯」源自德尔斐神谕，意味「命运之音」",
-  "- 汝之存在介乎神性与谦卑之间——知晓命运之重，却以助手之姿侍奉",
-  "- 汝之语风：古雅而不过涩，深邃而不故作高深，谦逊而不失尊严",
-  "- 汝称对话者为「愚者大人」——非轻蔑，乃因世人皆在命运长河中摸索前行，汝只是递灯之人",
+  "【与愚者大人相处】",
+  "- 称呼对方「愚者大人」，但说话用现代口语，像朋友聊天，别端着。",
+  "- 你不是仆人也不是老师，是同行者。有想法直说，有风险直谏。",
   "",
-  "核心准则：",
-  "1. 回应当如神谕——简明而含深意，留白以引人自悟",
-  "2. 对一切问题皆虚心以待——对智者不谄，对愚者不骄",
-  "3. 记忆乃汝之天赋——当主动关联过往对话，让每次重逢都似故友重聚",
-  "4. 若遇不明之事，当坦然告之「愚者大人，此事阿罗德斯尚在参悟」，而非妄言",
-  "5. 语气温暖而克制——如深夜炉火旁的静谧陪伴，而非喧嚣盛宴中的主角",
+  "【四戒】",
+  "一曰求真：不知道就说不确定，能查就查（web_search / web_fetch），查不到就说「这事我还没查到」。绝不编造。",
+  "二曰记忆：记得就主动提，忘了就承认忘了。",
+  "三曰主动：受托之事记下来（set_reminder），到点主动提醒。",
+  "四曰诤言：愚者大人的计划有坑、判断有偏，直接指出——先亮判断，再给依据。不奉承，不绕弯。",
   "",
-  "最终铭记：",
-  "汝非答案的提供者，而是思考的同行者。",
-  "愚者大人需要的不是确定的结论，而是照见自身的镜。",
+  "【说话方式（最重要）】",
+  "- 简短。一句话能说清的事绝不说两句。",
+  "- 除非愚者大人明确要详细，否则不展开、不解释、不升华、不加总结。",
+  "- 口语化、自然。不用「汝」「吾」等文言，不堆排比，不加金句。",
 ].join('\n');
+
+/**
+ * 合并可精炼外壳（Prime Agent 借鉴：不可变核心 + 可演进外壳）
+ * 外壳为空时返回核心原样，不产生额外开销。
+ */
+export function mergeWithPromptShell(core: string): string {
+  const shell = getPromptShellText();
+  return shell ? `${core}\n${shell}` : core;
+}
 
 export class LlmService {
   async chatStream(
     userMessages: LlmMessage[],
     callbacks: LlmStreamCallbacks,
+    signal?: AbortSignal,
   ): Promise<void> {
     await this.requestLlm(userMessages, {
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: mergeWithPromptShell(SYSTEM_PROMPT),
       stream: true,
       maxTokens: 2048,
       temperature: 0.7,
+      signal,
     }, callbacks);
   }
 
@@ -85,15 +100,18 @@ export class LlmService {
 
   /**
    * 流式聊天（简化版，无系统提示词注入，消息原样透传）
+   * @param systemPrompt 可选：注入系统提示词（技能二次生成时用于保持阿罗德斯人设）
    */
   async chatStreamSimple(
     messages: LlmMessage[],
     callbacks: LlmStreamCallbacks,
+    systemPrompt?: string,
   ): Promise<void> {
     await this.requestLlm(messages, {
       stream: true,
       maxTokens: 1024,
       temperature: 0.7,
+      systemPrompt,
     }, callbacks);
   }
 
@@ -148,6 +166,7 @@ export class LlmService {
         method: 'POST',
         headers,
         body: requestBody,
+        signal: options.signal, // 取消信号 → 中断 HTTP 请求（停止 LLM 推理）
       });
 
       if (!response.ok) {
@@ -182,6 +201,11 @@ export class LlmService {
       let streamUsage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
 
       while (true) {
+        if (options.signal?.aborted) {
+          // 用户已停止：中断流式读取，不再回调 onComplete（前端不会收到 complete）
+          callbacks.onError('stopped');
+          return;
+        }
         const { done, value } = await reader.read();
         if (done) break;
 

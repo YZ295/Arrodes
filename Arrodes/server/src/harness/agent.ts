@@ -34,6 +34,8 @@ export interface AgentInput {
   aiReply?: string;
   /** 流式回调（主对话 Agent 推送 chunk 给前端） */
   onChunk?: (text: string) => void;
+  /** 取消信号（用户停止 → 中断 LLM 流式推理） */
+  signal?: AbortSignal;
 }
 
 /** Agent 输出 */

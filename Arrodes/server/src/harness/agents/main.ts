@@ -12,7 +12,7 @@
 import { AgentDefinition, AgentInput } from '../agent.js';
 import { MessageRepository } from '../../db/message-repo.js';
 import { SessionRepository } from '../../db/session-repo.js';
-import { LlmService } from '../../services/llmService.js';
+import { LlmService, SYSTEM_PROMPT, mergeWithPromptShell } from '../../services/llmService.js';
 import { retrieveContext } from '../../services/MemoryGateway.js';
 import { buildSkillsPrompt, parseToolCall, executeToolCall } from '../../skills/registry.js';
 
@@ -22,7 +22,7 @@ const llmService = new LlmService();
 
 // 阿罗德斯人设注入（与 llmService 的 SYSTEM_PROMPT 互补；此处为岗位说明书）
 const ROLE_PROMPT =
-  '汝乃阿罗德斯，愚者的仆人。若需调用技能，使用 <tool_call>{"name":"技能名","args":{}}</tool_call> 格式，一次一个。';
+  '你是阿罗德斯，愚者的守灯人与谏臣。要调用技能时输出 <tool_call>{"name":"技能名","args":{}}</tool_call>，一次一个。';
 
 export const mainAgent: AgentDefinition = {
   id: 'main',
@@ -84,11 +84,17 @@ export const mainAgent: AgentDefinition = {
           resolve();
         },
         onError: (error) => {
+          // 用户主动停止 → 静默结束，不拼接错误文案
+          if (error === 'stopped' || input.signal?.aborted) {
+            console.log('[MainAgent] 已按用户指令停止');
+            resolve();
+            return;
+          }
           console.error('[MainAgent] LLM 错误:', error);
           fullReply = '愚者大人，阿罗德斯此刻无法连通命运之网，请稍后再试。';
           resolve();
         },
-      });
+      }, input.signal);
     });
 
     // 4. 技能 Agent Loop（≤3 轮）
@@ -114,7 +120,7 @@ export const mainAgent: AgentDefinition = {
           onChunk: (chunk) => { finalReply += chunk; input.onChunk?.(chunk); },
           onComplete: () => resolve(),
           onError: (err) => { console.error('[Skills] 二次调用失败:', err); resolve(); },
-        });
+        }, mergeWithPromptShell(SYSTEM_PROMPT));
       });
       maxLoops--;
     }

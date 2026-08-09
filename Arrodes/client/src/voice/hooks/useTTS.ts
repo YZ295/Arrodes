@@ -1,8 +1,8 @@
 /**
- * TTS Hook v5 — 纯云端模式
+ * TTS Hook v6 — 纯本地模式（T7 移除云端）
  *
- * - 只使用服务端 Edge TTS，无本地 Web Speech 降级
- * - 云端不可用时：显示「无法连接云端语音服务」，不发声
+ * - 使用服务端本地 CosyVoice 合成（零成本、离线稳定、隐私不出本机）
+ * - 服务端不可用时：显示「无法连接语音服务」，不发声
  * - AudioContext 预热（用户首次交互后）
  * - 可见错误反馈 + 手动重播
  * - 预创建的 <audio> DOM 元素绕过 autoplay 限制
@@ -11,6 +11,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { AudioContextManager } from '../../modules/voice/AudioContextManager';
 import { useAudioLevelStore } from '../../shared/stores/useAudioLevelStore';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
+import { replayAudio } from './ttsLogic';
 
 // ===== 类型 =====
 
@@ -45,6 +46,10 @@ interface UseTtsReturn {
   unlockAudio: () => Promise<void>;
   /** 手动重播最近一段语音 */
   replay: () => void;
+  /** 静音状态：true 时语音输出关闭（不合成不播放） */
+  isMuted: boolean;
+  /** 切换静音 */
+  toggleMuted: () => void;
 }
 
 // ===== 默认配置 =====
@@ -64,6 +69,25 @@ export function useTTS(): UseTtsReturn {
   const [config, setConfigState] = useState<TtsConfig>(DEFAULT_CONFIG);
   const [voices, setVoices] = useState<TtsVoice[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // 静音开关（语音输出可关闭）：关闭时 speak 不触发合成、不播放（用户"不想听了"）
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    try { return localStorage.getItem('arrodes.ttsMuted') === '1'; } catch { return false; }
+  });
+
+  // C7 修复：副作用移出 state updater（React 要求 updater 纯函数）
+  // - 持久化 + 开启静音时停掉当前播放
+  useEffect(() => {
+    try { localStorage.setItem('arrodes.ttsMuted', isMuted ? '1' : '0'); } catch { /* ignore */ }
+    if (isMuted) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setIsSpeaking(false);
+    }
+  }, [isMuted]);
+
+  const toggleMuted = useCallback(() => {
+    setIsMuted((prev) => !prev);
+  }, []);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastTextRef = useRef<string>('');
@@ -147,7 +171,7 @@ export function useTTS(): UseTtsReturn {
         }
       })
       .catch(() => {
-        setError('无法连接云端语音服务');
+        setError('无法连接语音服务');
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -188,62 +212,102 @@ export function useTTS(): UseTtsReturn {
     if (levelTimerRef.current) { clearInterval(levelTimerRef.current); levelTimerRef.current = null; }
   }, []);
 
-  // ---- 手动重播 ----
+  // ---- 手动重播（C6 修复：本地 wav 也可重播，旧反向判断已移除） ----
   const replay = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio && audio.src && !audio.src.includes('data:audio/wav')) {
-      audio.currentTime = 0;
-      audio.play().catch((err) => {
-        console.warn('[TTS] replay 失败:', err);
-      });
-    }
+    replayAudio(audioRef.current, (err) => {
+      console.warn('[TTS] replay 失败:', err);
+    });
   }, []);
 
-  // ---- 云端 TTS（Edge TTS 服务端合成） ----
+  // ---- TTS 引擎（纯本地 CosyVoice；云端已移除） ----
   const speakServer = useCallback(async (text: string): Promise<void> => {
-    const res = await fetch('/api/v1/tts/synthesize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        voice: currentVoice,
-        rate: config.rate,
-        pitch: config.pitch,
-        engine: 'edge',
-      }),
-    });
+    // 纯本地引擎：零成本、离线稳定、隐私不出本机。重试由服务端内置（指数退避 5 次）。
+    const engine = 'local';
+    let lastErr: unknown = null;
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `TTS ${res.status}` }));
-      throw new Error(err.error || `TTS ${res.status}`);
-    }
-
-    const data = await res.json();
-    if (!data.audioBase64) {
-      throw new Error('服务端返回的音频为空');
-    }
-
-    const audio = audioRef.current;
-    if (!audio) throw new Error('audio 元素未就绪');
-
-    return new Promise((resolve, reject) => {
-      audio.onended = () => { setIsSpeaking(false); resolve(); };
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        reject(new Error('音频播放失败（autoplay 被拦截或音频损坏）'));
-      };
-      audio.src = `data:${data.contentType || 'audio/mpeg'};base64,${data.audioBase64}`;
-      audio.play().catch((err) => {
-        setIsSpeaking(false);
-        reject(new Error(`play() 失败: ${err.message || err}`));
+    // 合成 + 播放单次尝试（返回 base64 数据）
+    const trySynthesize = async (voiceId: string, promptWav?: string, promptText?: string) => {
+      const res = await fetch('/api/v1/tts/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          voice: voiceId,
+          rate: config.rate,
+          pitch: config.pitch,
+          engine,
+          ...(promptWav ? { promptWav, promptText } : {}),
+        }),
       });
-    });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `TTS ${res.status}` }));
+        throw new Error(err.error || `TTS ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data.audioBase64) throw new Error('服务端返回的音频为空');
+      return data;
+    };
+
+    try {
+      // T9 自定义音色：voice 为 custom:xxx 时，查询参考音频路径传给服务端（zero-shot 克隆）
+      let promptWav: string | undefined;
+      let promptText: string | undefined;
+      const isCustom = currentVoice.startsWith('custom:');
+      if (isCustom) {
+        const customId = currentVoice.replace('custom:', '');
+        try {
+          const vres = await fetch('/api/v1/tts/custom-voices');
+          const vdata = await vres.json();
+          const found = (vdata.voices || []).find((v: { id: string; path: string }) => v.id === customId);
+          if (found) {
+            promptWav = found.path;
+            promptText = '你好，我是你的专属语音助手。'; // 参考音频配套提示文本
+          }
+        } catch { /* 查不到则回退默认音色 */ }
+      }
+
+      let data: { audioBase64: string; contentType: string };
+      try {
+        data = await trySynthesize(currentVoice, promptWav, promptText);
+      } catch (err) {
+        if (isCustom) {
+          // 1.2 自定义音色失败 → 自动回退默认音色（HoloJarvis 借鉴：克隆音不可用回退系统音）
+          console.warn('[TTS] 自定义音色合成失败，回退默认音色:', err instanceof Error ? err.message : err);
+          data = await trySynthesize('default');
+        } else {
+          throw err;
+        }
+      }
+
+      const audio = audioRef.current;
+      if (!audio) throw new Error('audio 元素未就绪');
+
+      await new Promise<void>((resolve, reject) => {
+          audio.onended = () => { setIsSpeaking(false); resolve(); };
+          audio.onerror = () => {
+            setIsSpeaking(false);
+            reject(new Error('音频播放失败（autoplay 被拦截或音频损坏）'));
+          };
+          audio.src = `data:${data.contentType || 'audio/mpeg'};base64,${data.audioBase64}`;
+          audio.play().catch((err) => {
+            setIsSpeaking(false);
+            reject(new Error(`play() 失败: ${err.message || err}`));
+          });
+        });
+        return; // 播放成功
+      } catch (err) {
+        lastErr = err;
+        console.warn('[TTS] 本地语音引擎失败:', err instanceof Error ? err.message : err);
+      }
+    throw lastErr instanceof Error ? lastErr : new Error('本地语音引擎不可用');
   }, [currentVoice, config.rate, config.pitch]);
 
   // ---- 主 speak 方法（代际计数器防旧音频残留） ----
   const generationRef = useRef(0);
   const speak = useCallback(async (text: string) => {
     if (!text || !text.trim()) return;
+    // 静音模式：不触发语音合成、不播放（只保留文字展示）
+    if (isMuted) return;
     setError(null);
     lastTextRef.current = text;
 
@@ -256,13 +320,13 @@ export function useTTS(): UseTtsReturn {
       await speakServer(text);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'unknown';
-      console.warn('[TTS] 云端语音失败:', msg);
-      // 纯云端模式：不发声，只提示
+      console.warn('[TTS] 本地语音失败:', msg);
+      // 纯本地模式：不发声，只提示
       if (gen === generationRef.current) {
-        setError('无法连接云端语音服务');
+        setError('无法连接语音服务');
       }
     }
-  }, [speakServer, stop]);
+  }, [speakServer, stop, isMuted]);
 
   // ---- 卸载清理 ----
   useEffect(() => {
@@ -282,5 +346,7 @@ export function useTTS(): UseTtsReturn {
     error,
     unlockAudio,
     replay,
+    isMuted,
+    toggleMuted,
   };
 }

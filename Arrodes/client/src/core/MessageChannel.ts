@@ -40,6 +40,14 @@ export interface ChannelCallbacks {
   onRawMessage?: (msg: WSServerMessage) => void;
 }
 
+/** 单次请求的订阅回调（方案 A：按 requestId 认领事件，并发不串线） */
+export interface RequestSubscription {
+  onChunk?: (data: WSChunkData) => void;
+  onComplete?: (data: WSCompleteData) => void;
+  onStopped?: () => void;
+  onError?: (error: string) => void;
+}
+
 // ===== 配置 =====
 
 const DEFAULT_CONFIG = {
@@ -65,6 +73,8 @@ export class MessageChannel {
     string,
     { resolve: (value: unknown) => void; reject: (reason: unknown) => void; timeout: ReturnType<typeof setTimeout> }
   > = new Map();
+  /** 请求订阅表（方案 A）：requestId → 该请求的事件回调 */
+  private subscriptions: Map<string, RequestSubscription> = new Map();
   private requestIdCounter = 0;
 
   /** 获取单例 */
@@ -142,6 +152,24 @@ export class MessageChannel {
   }
 
   /**
+   * 订阅某次请求的事件流（方案 A：按 requestId 认领）
+   * @returns 退订函数（请求结束后调用，清理订阅）
+   */
+  subscribe(requestId: string, sub: RequestSubscription): () => void {
+    this.subscriptions.set(requestId, sub);
+    return () => {
+      this.subscriptions.delete(requestId);
+    };
+  }
+
+  /**
+   * 生成新的请求标识（供发送消息时使用）
+   */
+  nextRequestId(): string {
+    return `req_${++this.requestIdCounter}_${Date.now()}`;
+  }
+
+  /**
    * 注册消息回调
    */
   setCallbacks(callbacks: ChannelCallbacks): void {
@@ -205,14 +233,39 @@ export class MessageChannel {
   }
 
   private handleMessage(msg: WSServerMessage): void {
+    // 方案 A：优先按 requestId 派发给订阅者（并发请求不串线）
+    // 判别联合：msg.type 收窄后 msg.data 自动有强类型（阶段3）
+    const sub = msg.requestId ? this.subscriptions.get(msg.requestId) : undefined;
+    if (sub) {
+      switch (msg.type) {
+        case 'chunk':
+          // chunk 是流式的：既给订阅者（管道等待），也继续走全局回调（UI 实时渲染）
+          // 不能 return——否则 UI 收不到流式内容，气泡不更新 → "思考中"卡死
+          sub.onChunk?.(msg.data);
+          break;
+        case 'complete':
+          // complete 也需双重派发：订阅者（管道 resolve）+ 全局（UI 清 loading / 标记 -done）
+          sub.onComplete?.(msg.data);
+          break;
+        case 'stopped':
+          sub.onStopped?.();
+          return;
+        case 'error':
+          sub.onError?.(msg.data.error);
+          return;
+        default:
+          break;
+      }
+    }
+
     switch (msg.type) {
       case 'chunk':
-        this.callbacks.onChunk?.(msg.data as unknown as WSChunkData);
+        this.callbacks.onChunk?.(msg.data);
         break;
       case 'complete': {
-        const data = msg.data as unknown as WSCompleteData;
+        const data = msg.data;
         // 检查是否有匹配的 pending request
-        const requestId = (msg.data as Record<string, unknown>).requestId as string | undefined;
+        const requestId = msg.requestId;
         if (requestId && this.pendingRequests.has(requestId)) {
           const pending = this.pendingRequests.get(requestId)!;
           clearTimeout(pending.timeout);
@@ -223,13 +276,11 @@ export class MessageChannel {
         break;
       }
       case 'memory':
-        this.callbacks.onMemory?.(msg.data as unknown as WSMemoryData);
+        this.callbacks.onMemory?.(msg.data);
         break;
-      case 'error': {
-        const error = (msg.data as { error?: string }).error || '未知错误';
-        this.callbacks.onError?.(error);
+      case 'error':
+        this.callbacks.onError?.(msg.data.error);
         break;
-      }
       default:
         break;
     }

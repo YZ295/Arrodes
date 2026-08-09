@@ -130,7 +130,7 @@ function VisionResult({
       </div>
       <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{description}</p>
       {(durationMs || model) && (
-        <div className="mt-2 text-[10px] text-gray-500 flex gap-3">
+        <div className="mt-2 text-[13px] text-gray-500 flex gap-3">
           {model && <span>模型: {model}</span>}
           {durationMs && <span>耗时: {(durationMs / 1000).toFixed(1)}s</span>}
         </div>
@@ -260,7 +260,7 @@ export default function VisionPanel() {
           <circle cx="12" cy="13" r="4" />
         </svg>
         <span className="text-sm font-medium text-gray-200">视觉识别</span>
-        {result && <span className="text-[10px] text-green-400">✓ 已识别</span>}
+        {result && <span className="text-[13px] text-green-400">✓ 已识别</span>}
       </div>
 
       {/* 错误提示 */}

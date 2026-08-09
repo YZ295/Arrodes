@@ -2,7 +2,7 @@
 
 - 阶段：`implementing`
 - 项目类型：`legacy`
-- 当前分支：`feature/desktop-shell`
+- 当前分支：`feature/workspace-v2`
 - 活动变更：`desktop-shell`
 - 变更模式：`full`
 

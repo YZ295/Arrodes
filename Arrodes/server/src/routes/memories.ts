@@ -6,6 +6,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { MemoryRepository } from '../db/memory-repo.js';
 import type { MemoryRowWithSession } from '../db/memory-repo.js';
+import { extractPersonEntities } from '../services/MemoryGateway.js';
 
 export function createMemoryRouter(): Router {
   const router = Router();
@@ -41,7 +42,10 @@ export function createMemoryRouter(): Router {
       );
     }
 
-    res.json({ memories });
+    // 人物识别（阶段2：记忆中出现的人名实体，供前端人物卡展示）
+    const persons = extractPersonEntities(memories);
+
+    res.json({ memories, persons });
   });
 
   // DELETE /api/v1/memories/:id - 删除单条记忆

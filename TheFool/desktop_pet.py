@@ -2,10 +2,10 @@ import sys
 import os
 import random
 import math
+import requests
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QMenu, QVBoxLayout
-from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QBrush, QPen, QPolygon
-from PySide6.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRectF
-from PySide6.QtCore import Signal
+from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QBrush, QPen, QPolygon, QRadialGradient
+from PySide6.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QRectF, QThread, Signal
 
 
 def resource_path(relative_path):
@@ -15,6 +15,56 @@ def resource_path(relative_path):
         return os.path.join(sys._MEIPASS, relative_path)
     # 正常运行时的路径
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
+
+
+class PetStatusPoller(QThread):
+    """阿罗德斯任务状态轮询线程（不阻塞 UI）
+
+    每 3 秒请求主后端 /api/v1/pet/status：
+    - busy=True → 正在处理任务（气泡显示任务描述）
+    - lastResult 变化 → 任务完成（气泡显示结果摘要）
+    后端不可达时静默（桌宠保持本地语录模式）
+    """
+    task_updated = Signal(str)          # 新任务开始
+    result_updated = Signal(str)        # 任务完成，显示结果
+    idle = Signal()                     # 空闲
+
+    def __init__(self, backend_url="http://127.0.0.1:3002", interval_ms=3000):
+        super().__init__()
+        self.backend_url = backend_url
+        self.interval_ms = interval_ms
+        self._running = True
+        self._last_result_at = None
+        self._was_busy = False
+
+    def run(self):
+        while self._running:
+            try:
+                r = requests.get(f"{self.backend_url}/api/v1/pet/status", timeout=2)
+                if r.status_code == 200:
+                    data = r.json()
+                    busy = bool(data.get("busy"))
+                    task = data.get("task")
+                    result = data.get("lastResult")
+                    result_at = data.get("lastResultAt")
+
+                    if busy and task:
+                        if not self._was_busy:
+                            self.task_updated.emit(f"🛠 {task}")
+                        self._was_busy = True
+                    else:
+                        # 完成态：结果时间戳变化才提示（避免重复）
+                        if result and result_at != self._last_result_at:
+                            self.result_updated.emit(f"✨ {result}")
+                            self._last_result_at = result_at
+                        self._was_busy = False
+            except Exception:
+                pass  # 后端不可达，保持本地模式
+            self.msleep(self.interval_ms)
+
+    def stop(self):
+        self._running = False
+        self.wait(3000)
 
 
 # 对话气泡内容
@@ -59,14 +109,22 @@ class BubbleWidget(QWidget):
 
     def show_text(self, text, duration=2500):
         self.text = text
-        # 计算气泡大小
+        # 多行自动换行：限宽 320px，按换行后实际尺寸计算气泡大小（长文本不再单行溢出）
         font = QFont("Microsoft YaHei", 10)
         metrics = self.fontMetrics()
-        text_width = metrics.horizontalAdvance(text)
-        text_height = metrics.height()
+        max_width = 320
         padding_x = 18
         padding_y = 12
-        self.setFixedSize(text_width + padding_x * 2, text_height + padding_y * 2)
+        # 用 boundingRect 计算在限宽下的换行尺寸
+        br = metrics.boundingRect(
+            QRectF(0, 0, max_width, 10000),
+            Qt.TextWordWrap | Qt.AlignLeft,
+            text,
+        )
+        # 单行短文本不强制拉满限宽（贴合内容）
+        bubble_w = min(int(br.width()) + padding_x * 2, max_width + padding_x * 2)
+        bubble_h = int(br.height()) + padding_y * 2
+        self.setFixedSize(bubble_w, bubble_h)
         self.update()
         self.show()
         self.timer.start(duration)
@@ -95,12 +153,12 @@ class BubbleWidget(QWidget):
         painter.setPen(Qt.NoPen)
         painter.drawPolygon(points)
 
-        # 文字
+        # 文字（多行自动换行 + 垂直居中）
         painter.setPen(QColor(50, 50, 50))
         font = QFont("Microsoft YaHei", 10)
         painter.setFont(font)
         text_rect = self.rect().adjusted(18, 12, -18, -20)
-        painter.drawText(text_rect, Qt.AlignCenter, self.text)
+        painter.drawText(text_rect, Qt.AlignCenter | Qt.TextWordWrap, self.text)
 
 
 class DesktopPet(QWidget):
@@ -116,7 +174,7 @@ class DesktopPet(QWidget):
         self.animations = []  # 活跃的动画列表
 
         # 加载图片
-        img_path = resource_path("character_no_bg.png")
+        img_path = resource_path("character_transparent.png")
         self.original_pixmap = QPixmap(img_path)
 
         self.scaled_pixmap = self.original_pixmap.scaled(
@@ -138,6 +196,12 @@ class DesktopPet(QWidget):
         self.anim_frame = 0
         self.anim_total_frames = 0
 
+        # 阿罗德斯任务状态轮询（集成：显示当前任务 + 结果）
+        self.poller = PetStatusPoller()
+        self.poller.task_updated.connect(lambda t: self.bubble.show_text(t, 5000))
+        self.poller.result_updated.connect(lambda r: self.bubble.show_text(r, 6000))
+        self.poller.start()
+
     def init_ui(self):
         # 窗口设置
         self.setWindowFlags(
@@ -146,7 +210,9 @@ class DesktopPet(QWidget):
             Qt.Tool
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_NoSystemBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setAutoFillBackground(False)
 
         # 设置窗口大小
         self.update_size()
@@ -164,19 +230,28 @@ class DesktopPet(QWidget):
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
-                background-color: white;
-                border: 1px solid #ddd;
+                background-color: #ffffff;
+                color: #333333;
+                border: 1px solid #cccccc;
                 border-radius: 8px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 8px 20px;
-                border-radius: 4px;
+                padding: 6px;
                 font-family: "Microsoft YaHei";
                 font-size: 10pt;
             }
+            QMenu::item {
+                padding: 8px 24px;
+                border-radius: 4px;
+                color: #333333;
+                background-color: transparent;
+            }
             QMenu::item:selected {
-                background-color: #e8f0fe;
+                background-color: #e6f3ff;
+                color: #0066cc;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: #e0e0e0;
+                margin: 4px 8px;
             }
         """)
 
@@ -237,7 +312,41 @@ class DesktopPet(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        # ===== 立体增强 1：底部投影（让桌宠"站"起来） =====
+        shadow_h = int(18 * self.scale)
+        shadow_w = int(self.width() * 0.8)
+        shadow_x = int(self.width() * 0.1)
+        shadow_y = self.height() - shadow_h
+        # 用多层椭圆模拟柔和投影（边缘羽化）
+        for i in range(3, -1, -1):
+            alpha = 30 - i * 7
+            if alpha <= 0:
+                continue
+            shrink = i * 3
+            grad = QRadialGradient(
+                self.width() / 2, shadow_y + shadow_h / 2,
+                max(shadow_w / 2, 1)
+            )
+            grad.setColorAt(0, QColor(0, 0, 0, alpha))
+            grad.setColorAt(1, QColor(0, 0, 0, 0))
+            painter.setBrush(QBrush(grad))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(
+                shadow_x + shrink, shadow_y + shrink,
+                shadow_w - shrink * 2, shadow_h - shrink * 2
+            )
+
+        # ===== 立体增强 2：底部光晕（呼吸光，让桌宠"发光"） =====
+        breathe = 0.55 + 0.2 * math.sin(self.anim_frame / 8.0)
+        glow = QRadialGradient(self.width() / 2, self.height() * 0.7, self.width() * 0.55)
+        glow.setColorAt(0, QColor(120, 200, 255, int(45 * breathe)))
+        glow.setColorAt(1, QColor(120, 200, 255, 0))
+        painter.setBrush(QBrush(glow))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(0, 0, self.width(), self.height())
 
         # 应用动画变换
         painter.save()
@@ -366,6 +475,9 @@ def main():
 
     pet = DesktopPet()
     pet.show()
+
+    # 退出时停轮询线程
+    app.aboutToQuit.connect(pet.poller.stop)
 
     sys.exit(app.exec())
 

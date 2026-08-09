@@ -6,18 +6,19 @@
  *
  * 布局：
  * ┌─────────────────────────────┐
+ * │ [状态栏: ●已连接  播报中  隐藏]│ ← 含对话界面显隐切换
  * │ 消息列表 (可滚动, 完整内容)   │  ← 用户/AI 气泡
- * │  [AI] 完整的回复...          │
- * │  [用户] 你好                │
  * ├─────────────────────────────┤
- * │ 记忆提示 / 录音指示          │
- * ├─────────────────────────────┤
- * │ [🎤] [输入框........] [→]   │  ← 底部输入栏
+ * │ [🎤] [输入框.....光束边框] [■][→] │  ← 底部输入栏
  * └─────────────────────────────┘
  */
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import AudioVisualizer from './AudioVisualizer';
 import MirrorShardText from './MirrorShardText';
+import StatusBar from './StatusBar';
+import BorderBeam from './BorderBeam';
+import AgentStatusOrb from './AgentStatusOrb';
+import NeonInputBar from './NeonInputBar';
 import type { Message } from '@shared/types';
 
 interface ChatOverlayProps {
@@ -38,6 +39,11 @@ interface ChatOverlayProps {
   sendTextMessage: (text: string) => void;
   replayTTS: () => void;
   stopTTS: () => void;
+  /** 静音开关 */
+  isMuted: boolean;
+  toggleMuted: () => void;
+  /** 完整停止：停语音 + 停 AI 思考 + 停任务 */
+  stopAll: () => void;
 }
 
 export default function ChatOverlay(props: ChatOverlayProps) {
@@ -45,12 +51,23 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     messages, isRecording, recordingDuration, recordingVolume,
     isLoading, isConnected, interimText, isSpeaking,
     ttsError, error, showMemoryToast, memoryToastText,
-    startRecording, stopRecording, sendTextMessage, replayTTS, stopTTS,
+    startRecording, stopRecording, sendTextMessage, replayTTS, stopTTS, stopAll,
+    isMuted, toggleMuted,
   } = props;
 
   const [text, setText] = useState('');
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // 对话界面隐藏状态（persist：用户偏好）
+  const [uiHidden, setUiHidden] = useState<boolean>(() => {
+    try { return localStorage.getItem('arrodes.uiHidden') === '1'; } catch { return false; }
+  });
+  const toggleUiHidden = () => {
+    setUiHidden((p) => {
+      const next = !p;
+      try { localStorage.setItem('arrodes.uiHidden', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   // 最新的 AI 消息和用户消息
   const lastAiMsg = [...messages].reverse().find((m) => m.role === 'assistant');
@@ -81,13 +98,27 @@ export default function ChatOverlay(props: ChatOverlayProps) {
 
   return (
     <div className="absolute inset-0 z-30 flex flex-col pointer-events-none">
-      {/* 顶部：完整对话消息列表（可滚动） */}
+      {/* 顶部状态栏（连接 / 播报 / 引擎 / 界面显隐） */}
+      <StatusBar
+        isConnected={isConnected}
+        isSpeaking={isSpeaking}
+        ttsError={ttsError}
+        uiHidden={uiHidden}
+        onToggleUi={toggleUiHidden}
+        isMuted={isMuted}
+        onToggleMuted={toggleMuted}
+      />
+
+      {/* 顶部：完整对话消息列表（可滚动，水平居中） */}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto pointer-events-auto px-6 pt-4 pb-2
-          [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]"
+        className={`flex-1 overflow-y-auto px-6 pt-4 pb-2 flex justify-center
+          [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]
+          transition-all duration-500 ease-in-out ${
+          uiHidden ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'
+        }`}
       >
-        <div className="max-w-2xl mx-auto flex flex-col justify-end gap-2 min-h-full">
+        <div className="w-full max-w-2xl flex flex-col justify-end gap-2 min-h-full">
           {messages.length === 0 && !isLoading ? (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-sm text-white/20 tracking-wider">向阿罗德斯问点什么吧</p>
@@ -96,54 +127,59 @@ export default function ChatOverlay(props: ChatOverlayProps) {
             messages.map((m) => {
               const isUser = m.role === 'user';
               const isLastAi = m.id === lastAiMsg?.id;
+              // 最新 AI 消息：边框光束（border-beam 效果，视觉强调 AI 活跃）
+              const bubble = (
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap break-words ${
+                    isUser
+                      ? 'bg-cyan-500/20 border border-cyan-400/20 text-cyan-100/90'
+                      : 'bg-white/5 border border-white/10 text-white/85'
+                  }`}
+                >
+                  {!isUser && isLastAi ? (
+                    <MirrorShardText
+                      text={m.content}
+                      charDelay={12}
+                      color="#e0f7fa"
+                      className="text-[15px] md:text-[17px]"
+                    />
+                  ) : (
+                    m.content
+                  )}
+                </div>
+              );
               return (
                 <div key={m.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                      isUser
-                        ? 'bg-cyan-500/20 border border-cyan-400/20 text-cyan-100/90'
-                        : 'bg-white/5 border border-white/10 text-white/85'
-                    }`}
-                  >
-                    {!isUser && isLastAi ? (
-                      <MirrorShardText
-                        text={m.content}
-                        charDelay={12}
-                        color="#e0f7fa"
-                        className="text-sm md:text-base"
-                      />
-                    ) : (
-                      m.content
-                    )}
-                  </div>
+                  {!isUser && isLastAi ? (
+                    <BorderBeam duration={6} colorVariant="ocean" radius={16} active={!uiHidden} borderWidth={1} fitContent>
+                      {bubble}
+                    </BorderBeam>
+                  ) : (
+                    bubble
+                  )}
                 </div>
               );
             })
           )}
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="flex gap-2 px-4 py-3">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="w-2 h-2 bg-cyan-400/60 rounded-full animate-bounce"
-                    style={{ animationDelay: `${i * 150}ms` }}
-                  />
-                ))}
-              </div>
+            <div className="flex items-center justify-start gap-2 px-4 py-3">
+              <AgentStatusOrb state="working" size={20} label="AI 思考中" />
+              <span className="text-[16px] text-white/30">思考中…</span>
             </div>
           )}
         </div>
       </div>
 
       {/* 中部：用户输入预览（星球下方） */}
-      <div className="flex items-start justify-center px-8 pb-2 min-h-[40px]">
+      <div className={`flex items-start justify-center px-8 pb-2 min-h-[40px] transition-all duration-500 ease-in-out ${
+        uiHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      }`}>
         {interimText && isRecording ? (
           <p className="text-sm text-cyan-300/60 animate-pulse text-center max-w-md font-mono tracking-wide">
             {interimText}
           </p>
         ) : lastUserMsg ? (
-          <p className="text-xs text-white/25 text-center max-w-md truncate font-mono">
+          <p className="text-[16px] text-white/25 text-center max-w-md truncate font-mono">
             ▸ {lastUserMsg.content}
           </p>
         ) : null}
@@ -152,21 +188,21 @@ export default function ChatOverlay(props: ChatOverlayProps) {
       {/* 记忆提示 */}
       {showMemoryToast && (
         <div className="px-8 pb-1 text-center">
-          <span className="text-xs text-green-400/60 animate-fade-in">{memoryToastText}</span>
+          <span className="text-[16px] text-green-400/60 animate-fade-in">{memoryToastText}</span>
         </div>
       )}
 
       {/* 错误提示 */}
       {error && (
         <div className="px-8 pb-1 text-center">
-          <span className="text-xs text-red-400/60">{error}</span>
+          <span className="text-[16px] text-red-400/60">{error}</span>
         </div>
       )}
 
       {/* TTS 错误（含重播） */}
       {ttsError && !error && (
         <div className="px-8 pb-1 text-center">
-          <button onClick={replayTTS} className="text-xs text-red-400/60 hover:text-red-300 pointer-events-auto">
+          <button onClick={replayTTS} className="text-[16px] text-red-400/60 hover:text-red-300 pointer-events-auto">
             {ttsError} · ▶ 重播
           </button>
         </div>
@@ -175,81 +211,30 @@ export default function ChatOverlay(props: ChatOverlayProps) {
       {/* 录音指示器 */}
       {isRecording && (
         <div className="px-8 pb-1 flex items-center justify-center gap-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          <AgentStatusOrb state="listening" size={20} label="聆听中" />
           <AudioVisualizer mode="bars" level={recordingVolume} isActive color="#ef4444" width={160} height={16} />
-          <span className="text-xs text-red-300/80">{recordingDuration}s</span>
+          <span className="text-[16px] text-red-300/80">{recordingDuration}s</span>
         </div>
       )}
 
-      {/* 底部输入栏 */}
-      <div className="px-8 pb-6 pt-2 pointer-events-auto">
-        <div className="max-w-2xl mx-auto flex items-end gap-2">
-          {/* 麦克风按钮 */}
-          <button
-            onMouseDown={(e) => { e.preventDefault(); if (isConnected) startRecording(); }}
-            onMouseUp={() => stopRecording()}
-            onMouseLeave={() => { if (isRecording) stopRecording(); }}
-            disabled={!isConnected}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
-              isRecording
-                ? 'bg-red-500 scale-110 shadow-lg shadow-red-500/40'
-                : 'bg-white/5 hover:bg-white/10 border border-white/10'
-            } disabled:opacity-30`}
-            title={isRecording ? '松开发送' : '按住说话'}
-          >
-            {isRecording ? (
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="5" width="4" height="14" rx="1" />
-                <rect x="14" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-white/70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-14 0M12 18v3M9 21h6" />
-              </svg>
-            )}
-          </button>
-
-          {/* 文字输入 */}
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isConnected ? '输入消息…' : '正在连接…'}
-            disabled={!isConnected}
-            rows={1}
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white/90
-              placeholder-white/20 outline-none resize-none focus:border-cyan-400/30 focus:bg-white/8
-              transition-all max-h-32 disabled:opacity-30"
-            style={{ minHeight: '44px' }}
-          />
-
-          {/* 停止语音按钮（常驻，点击即中断） */}
-          <button
-            onClick={stopTTS}
-            disabled={!isSpeaking && !isLoading}
-            className="w-11 h-11 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0
-              hover:bg-red-500/30 transition-all disabled:opacity-20 disabled:hover:bg-red-500/15"
-            title="停止语音"
-          >
-            <svg className="w-4 h-4 text-red-300" fill="currentColor" viewBox="0 0 24 24">
-              <rect x="6" y="6" width="12" height="12" rx="1.5" />
-            </svg>
-          </button>
-
-          {/* 发送按钮 */}
-          <button
-            onClick={handleSend}
-            disabled={!text.trim() || !isConnected}
-            className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/80 to-cyan-700/80
-              flex items-center justify-center shrink-0 disabled:opacity-20 hover:from-cyan-400/80 hover:to-cyan-600/80
-              transition-all"
-          >
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-            </svg>
-          </button>
-        </div>
+      {/* 底部输入栏（NeonInputBar：黑色主题 + 环绕彩灯 + 按钮内嵌；始终显示不被隐藏，水平居中） */}
+      <div className="flex justify-center px-4 pb-5 pt-2 pointer-events-auto">
+        <NeonInputBar
+          text={text}
+          onTextChange={setText}
+          onKeyDown={handleKeyDown}
+          placeholder={isConnected ? '输入消息…' : '正在连接…'}
+          disabled={!isConnected}
+          isRecording={isRecording}
+          isSpeaking={isSpeaking}
+          isLoading={isLoading}
+          onMicDown={() => { if (isConnected) startRecording(); }}
+          onMicUp={stopRecording}
+          onMicLeave={() => { if (isRecording) stopRecording(); }}
+          onStop={stopAll}
+          onSend={handleSend}
+          canSend={!!text.trim() && isConnected}
+        />
       </div>
     </div>
   );

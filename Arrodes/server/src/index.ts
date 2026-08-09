@@ -22,12 +22,24 @@ import { createTtsRouter } from './routes/tts.js';
 import { createUsageRouter } from './routes/usage.js';
 import { createSttRouter } from './routes/stt.js';
 import { createWorkspaceRouter } from './routes/workspace.js';
+import { createWorkspacesRouter } from './routes/workspaces.js';
+import { createPetRouter } from './routes/pet.js';
+import { createPromptShellRouter } from './routes/promptShell.js';
 import { harness } from './harness/harness.js';
 // 加载内置技能
 import './skills/builtin.js';
 // 电脑操作技能（正式版，后注册覆盖同名试探版）
 import './skills/computer.js';
+// 联网检索技能（治"无根之知"）
+import './skills/web.js';
+// 定时提醒技能（治"无法主动行动"）
+import './skills/reminder.js';
+// 开发工作流技能族（grill-me / to-spec / to-tickets / implement / code-review / improve-architecture）
+import './skills/devworkflow.js';
+// 天气查询技能（HoloJarvis 借鉴：Open-Meteo 免 key）
+import './skills/weather.js';
 import { getAllSkills, registerSkill, unregisterSkill } from './skills/registry.js';
+import { startMainloop } from './services/mainloop.js';
 
 const app = express();
 const server = createServer(app);
@@ -55,6 +67,9 @@ app.use('/api/v1/tts', createTtsRouter());
 app.use('/api/v1/usage', createUsageRouter());
 app.use('/api/v1/stt', createSttRouter());
 app.use('/api/v1/workspace', createWorkspaceRouter());
+app.use('/api/v1/pet', createPetRouter());
+app.use('/api/v1/prompt-shell', createPromptShellRouter());
+app.use('/api/v1/workspaces', createWorkspacesRouter());
 
 // ---- 多 Agent 展示（Harness）----
 app.get('/api/v1/agents', (_req, res) => {
@@ -155,3 +170,6 @@ server.listen(config.port, () => {
   console.log(`[Arodes] 服务器已启动 -> http://localhost:${config.port}`);
   console.log(`[Arodes] WebSocket 路径 -> ws://localhost:${config.port}/v1/chat`);
 });
+
+// ---- 主循环（BaiLongma 借鉴：空闲心跳 + 提醒推送 + 主动记忆整理） ----
+startMainloop(wss);
