@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MessageChannel } from './MessageChannel.js';
+import type { WSChunkData, WSCompleteData } from '@shared/types';
 
 // 需要访问私有 handleMessage，通过实例方法触发
 function makeChannel() {
@@ -15,18 +16,18 @@ function makeChannel() {
 }
 
 describe('MessageChannel 双重派发', () => {
-  let subChunk: ReturnType<typeof vi.fn>;
-  let subComplete: ReturnType<typeof vi.fn>;
-  let globalChunk: ReturnType<typeof vi.fn>;
-  let globalComplete: ReturnType<typeof vi.fn>;
+  let subChunk: ReturnType<typeof vi.fn<(data: WSChunkData) => void>>;
+  let subComplete: ReturnType<typeof vi.fn<(data: WSCompleteData) => void>>;
+  let globalChunk: ReturnType<typeof vi.fn<(data: WSChunkData) => void>>;
+  let globalComplete: ReturnType<typeof vi.fn<(data: WSCompleteData) => void>>;
   let m: ReturnType<typeof makeChannel>;
 
   beforeEach(() => {
     m = makeChannel();
-    subChunk = vi.fn();
-    subComplete = vi.fn();
-    globalChunk = vi.fn();
-    globalComplete = vi.fn();
+    subChunk = vi.fn<(data: WSChunkData) => void>();
+    subComplete = vi.fn<(data: WSCompleteData) => void>();
+    globalChunk = vi.fn<(data: WSChunkData) => void>();
+    globalComplete = vi.fn<(data: WSCompleteData) => void>();
     m.channel.setCallbacks({ onChunk: globalChunk, onComplete: globalComplete });
   });
 
@@ -53,7 +54,6 @@ describe('MessageChannel 双重派发', () => {
     const subStopped = vi.fn();
     const globalStopped = vi.fn();
     m.channel.subscribe('req_1', { onStopped: subStopped });
-    m.channel.setCallbacks({ onStopped: globalStopped as never });
     m.handle({ type: 'stopped', requestId: 'req_1' });
     expect(subStopped).toHaveBeenCalled();
     expect(globalStopped).not.toHaveBeenCalled();

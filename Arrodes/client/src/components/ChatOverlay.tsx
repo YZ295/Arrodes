@@ -51,7 +51,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     messages, isRecording, recordingDuration, recordingVolume,
     isLoading, isConnected, interimText, isSpeaking,
     ttsError, error, showMemoryToast, memoryToastText,
-    startRecording, stopRecording, sendTextMessage, replayTTS, stopTTS, stopAll,
+    startRecording, stopRecording, sendTextMessage, replayTTS, stopAll,
     isMuted, toggleMuted,
   } = props;
 

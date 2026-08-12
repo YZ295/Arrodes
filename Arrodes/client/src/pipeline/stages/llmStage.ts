@@ -10,6 +10,7 @@
  */
 import type { StageConfig, StageInput, StageOutput, LlmInferenceOutput } from '@shared/types/pipeline';
 import { MessageChannel } from '../../core/MessageChannel';
+import type { IntentResult } from '@shared/types';
 
 export function createLlmStage(): StageConfig<string, LlmInferenceOutput> {
   return {
@@ -21,7 +22,7 @@ export function createLlmStage(): StageConfig<string, LlmInferenceOutput> {
       const channel = MessageChannel.getInstance();
       const sessionId = input.context.sessionId;
       const content = input.context.rawInput || '';
-      const intentData = input.context.state.intent;
+      const intentData = input.context.state.intent as IntentResult | undefined;
 
       if (!channel.isConnected()) {
         throw new Error('未连接到服务器');

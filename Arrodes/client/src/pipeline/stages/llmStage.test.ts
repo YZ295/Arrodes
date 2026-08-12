@@ -23,8 +23,6 @@ vi.mock('../../core/MessageChannel', () => ({
   },
 }));
 
-import { MessageChannel } from '../../core/MessageChannel';
-
 function makeInput(overrides?: Partial<StageInput['context']>): StageInput<string> {
   return {
     context: {
