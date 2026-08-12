@@ -7,32 +7,52 @@
   ],
   "quality_commands": [
     {
-      "name": "pytest",
+      "name": "vitest-server",
       "command": [
-        "python",
-        "-m",
-        "pytest"
+        "npm",
+        "--prefix",
+        "Arrodes/server",
+        "run",
+        "test"
       ],
       "required": true,
       "enabled": true
     },
     {
-      "name": "pyright",
+      "name": "vitest-client",
       "command": [
-        "pyright"
+        "npm",
+        "--prefix",
+        "Arrodes/client",
+        "run",
+        "test"
       ],
       "required": true,
       "enabled": true
     },
     {
-      "name": "ruff",
+      "name": "tsc-server",
       "command": [
-        "ruff",
-        "check",
-        "."
+        "npm",
+        "--prefix",
+        "Arrodes/server",
+        "run",
+        "typecheck"
       ],
-      "required": false,
-      "enabled": false
+      "required": true,
+      "enabled": true
+    },
+    {
+      "name": "build-client",
+      "command": [
+        "npm",
+        "--prefix",
+        "Arrodes/client",
+        "run",
+        "build"
+      ],
+      "required": true,
+      "enabled": true
     }
   ],
   "coverage_must_not_decrease_when_configured": true,

@@ -46,3 +46,51 @@
 - 压力测试未做
 - 模态弹窗（B4/D）需真机人工确认后点击（设计如此，非缺陷）
 - client 主 bundle 1.25 MB（>500 kB 警告），建议后续 code-splitting（非本变更范围）
+
+## 复核验证：2026-08-12（配置与数据一致性修复）
+
+### 环境
+
+- Windows / Node 24（开发机），构建产物均为当日重新生成
+
+### 本轮修复内容
+
+- `$HOME/.arrodes/.env` 与 `server/.env`：`PORT=3002`、`NODE_ENV=production`、`DB_PATH` 改为绝对路径（`Arrodes/server/data`）
+- `desktop/main.ts`：fork 增加 `cwd=server 目录` 与 `DB_PATH` 绝对路径；新增端口预检（REQ-004）、`/api/health` 就绪轮询（REQ-003）、后端意外退出弹窗（REQ-005）
+- `server/src/config.ts`：repo .env 加载路径 `../../.env` → `../.env`（此前 `server/.env` 从未被加载）
+- 根 `data/` 空壳库（0 会话）已备份至 `data-backup-2026-08-12/` 并从原位移除
+
+### 结果
+
+| 验证项 | 结果 | 证据 |
+|---|---|---|
+| server `tsc` + typecheck | 通过 | `npm --prefix Arrodes/server run build` / `run typecheck` 退出码 0 |
+| desktop `tsc` | 通过 | `npm --prefix Arrodes/desktop run build` 退出码 0 |
+| 从 server 目录启动 | 通过 | `/api/health` 200；`GET /` 200 返回 index.html；会话读取 server/data 真库 |
+| 从仓库根启动 | 通过 | 同上；不再创建根 `data/`，DB 仍落 `server/data` |
+| 端口预检 / health 轮询 / 崩溃提示 | 通过（代码审查） | `desktop/main.ts` 已实现 `isPortInUse`、`waitForHealth`、退出弹窗路径 |
+
+## 打包验证：2026-08-12（electron-builder 26.15.3）
+
+### 环境与命令
+
+- `NODE_OPTIONS=--use-system-ca`（本机根 CA）+ `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`（GitHub release-assets DNS 不稳）
+- `npm --prefix Arrodes/desktop run dist`（tsc + electron-builder --win nsis）
+
+### 结果
+
+| 验证项 | 结果 | 证据 |
+|---|---|---|
+| NSIS 安装包 | 通过 | `release3/Arrodes-Setup-1.0.0.exe`（133.9MB，2026-08-12 22:32） |
+| win-unpacked 应用本体 | 通过 | 阿罗德斯.exe（electron 43.4.0），asar 完整性已更新 |
+| server/dist 进包 | 通过 | config.js 含 `../.env` 修复；data/ 未进包 |
+| client/dist 进包 | 通过 | 新构建产物（含人物卡改动） |
+| server/node_modules 进包 | 通过（修复） | 116.7MB 全量，better-sqlite3 prebuilds（win32-x64.node）在包内；原配置因 electron-builder 过滤规则导致 node_modules 从未进包，已拆分为独立 extraResources 条目 |
+| .env 出包 | 通过 | resources/server 下无 .env |
+| tts-sidecar 进包 | 通过 | tts_sidecar.py + requirements.txt |
+
+### 已知遗留
+
+- 安装包未实机安装运行验证（需人工安装后启动、确认后端拉起与 DB 落盘）
+- 应用图标为默认 Electron 图标（未配置 win icon）
+- server/node_modules 含 devDependencies，体积可裁剪

@@ -12,21 +12,21 @@
   "approvals": {
     "baseline": {
       "valid": true,
-      "digest": "b318a0bd103e43c529bc64a3e170d4fb6aac782e0e593747c0d7757e0cb68077",
-      "approved_at": "2026-08-01T10:56:11+08:00",
-      "head_before": "122f65e692f81c1da1df75ea973e84312d796815"
+      "digest": "e2612df9780fdd28df39aac99c842f8777ababfb3f3cd88906e9e0cdb41c23bb",
+      "approved_at": "2026-08-12T22:33:10+08:00",
+      "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
     },
     "spec": {
       "valid": true,
-      "digest": "a2fa1e13546a4609b0e7d1522e33f350e145ce35672740b470efc10c2b908078",
-      "approved_at": "2026-08-01T13:03:08+08:00",
-      "head_before": "1db6f4896562f67f8b3fa9aa4d99ef26ffdfb806"
+      "digest": "eb62cc0f3ec63f2fafa81d151cf1e318966d5ca51267a3f582b2704c4bd6f0e2",
+      "approved_at": "2026-08-12T22:33:11+08:00",
+      "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
     },
     "plan": {
       "valid": true,
-      "digest": "5a73c4bee3268b2545d9becb0cde6fad84a75dfc0daccbaba01b9bb089c03a69",
-      "approved_at": "2026-08-01T13:03:08+08:00",
-      "head_before": "1db6f4896562f67f8b3fa9aa4d99ef26ffdfb806"
+      "digest": "c5e739bf844328fee26a820ee0ee6658c0b64bb3d72bf84392d80e0a65a73161",
+      "approved_at": "2026-08-12T22:33:12+08:00",
+      "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
     },
     "hotfix": {
       "valid": false,
