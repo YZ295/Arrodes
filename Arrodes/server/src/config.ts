@@ -10,9 +10,11 @@ if (existsSync(userEnvPath)) {
   dotenv.config({ path: userEnvPath });
 }
 
-// 2. 再加载 repo 内 .env（仅含占位符/默认值，可被上一步覆盖）
+// 2. 再加载 repo 内 .env（server/.env，仅含占位符/默认值，可被上一步覆盖）
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const envPath = resolve(__dirname, '../../.env');
+// dist/ 运行时 __dirname = server/dist → ../.env = server/.env；
+// src/ 开发时 __dirname = server/src → ../.env = server/.env。两条路径一致。
+const envPath = resolve(__dirname, '../.env');
 if (existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }

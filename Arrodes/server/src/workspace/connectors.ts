@@ -22,14 +22,16 @@ export interface AgentConnector {
   capabilities: string[];
 }
 
+// 本机路径集中管理且可被环境变量覆盖（不硬编码到代码语义中）：
+// WORKBUDDY_PATH / MARVIS_KB_PATH / CROW5_ROOT / HERMES_VERSIONS_DIR
 const BASE_PATHS = {
-  workbuddy: 'E:/project/Crow5/Arrodes/.workbuddy',
-  marvis: 'E:/AI/Marvis/Knowledgebase',
-  crow5: 'E:/project/Crow5',
+  workbuddy: process.env.WORKBUDDY_PATH || 'E:/project/Crow5/Arrodes/.workbuddy',
+  marvis: process.env.MARVIS_KB_PATH || 'E:/AI/Marvis/Knowledgebase',
+  crow5: process.env.CROW5_ROOT || 'E:/project/Crow5',
 };
 
 /** 桌面版 Hermes runtime 根目录（versions 下按时间取最新） */
-const HERMES_VERSIONS_DIR = 'E:/AI/Hermes/Hermes Agent CN Desktop/data/versions';
+const HERMES_VERSIONS_DIR = process.env.HERMES_VERSIONS_DIR || 'E:/AI/Hermes/Hermes Agent CN Desktop/data/versions';
 const HERMES_RUNTIME_EXE = 'hermes-agent-cn-runtime-win32-x64.exe';
 
 /** 探测桌面版 Hermes runtime：扫描 versions 目录取最新可用版本（避免硬编码版本号） */
