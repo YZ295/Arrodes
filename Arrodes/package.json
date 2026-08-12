@@ -1,7 +1,7 @@
 {
   "main": "desktop/dist/main.js",
   "scripts": {
-    "desktop": "electron .",
+    "desktop": "npm run desktop:build && electron .",
     "desktop:build": "cd desktop && npm run build"
   },
   "devDependencies": {
