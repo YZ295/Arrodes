@@ -1,0 +1,58 @@
+# ============================================================
+# tts-sidecar 依赖锁定（2026-08-08 从 cosyvoice conda 环境导出）
+#
+# 安装方式（创建独立环境）：
+#   conda create -n cosyvoice python=3.10 -y
+#   conda activate cosyvoice
+#   pip install -r requirements.txt
+#
+# 注意：
+# - torch/torchaudio 版本带 +cu121（CUDA 12.1）；CPU 机器改为
+#   pip install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+# - 模型权重不随 requirements 分发：
+#   从 ModelScope 下载 CosyVoice2-0.5B 到 CosyVoice-unzip/cosyvoice-main/pretrained_models/
+#   modelscope download --model iic/CosyVoice2-0.5B --local_dir CosyVoice-unzip/cosyvoice-main/pretrained_models/CosyVoice2-0.5B
+# - 参考音频（zero-shot 默认音色）需从 CosyVoice 仓库 asset/ 获取 zero_shot_prompt.wav
+# ============================================================
+
+# ---- 侧车运行时（tts_sidecar.py 直接依赖）----
+fastapi==0.115.6
+uvicorn==0.30.0
+pydantic==2.7.0
+
+# ---- CosyVoice2 核心 ----
+torch==2.4.1+cu121
+torchaudio==2.4.1+cu121
+onnxruntime==1.18.0
+numpy==1.26.4
+librosa==0.10.2
+matcha-tts==0.0.7.2
+huggingface-hub==0.36.2
+transformers==4.44.2
+hyperpyyaml==1.2.3
+gradio==3.43.2
+gdown==5.1.0
+modelscope==1.20.0
+
+# ---- 其余依赖（从 CosyVoice 官方 requirements.txt 提取，去掉 linux-only 项）----
+# 见：CosyVoice-unzip/cosyvoice-main/requirements.txt
+conformer==0.3.2
+diffusers==0.29.0
+grpcio==1.57.0
+grpcio-tools==1.57.0
+hydra-core==1.3.2
+HyperPyYAML==1.2.3
+inflect==7.3.1
+networkx==3.1
+omegaconf==2.3.0
+onnx==1.16.0
+openai-whisper==20231117
+protobuf==4.25
+pyarrow==18.1.0
+pyworld==0.3.4
+rich==13.7.1
+soundfile==0.12.1
+tensorboard==2.14.0
+x-transformers==2.11.24
+wetext==0.0.4
+wget==3.2

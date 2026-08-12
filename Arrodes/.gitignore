@@ -47,5 +47,10 @@ tts-sidecar/CosyVoice-src/
 tts-sidecar/CosyVoice/
 tts-sidecar/custom-voices/
 
+# tts-sidecar 运行时产物（源码需入库；模型/音色/缓存不入库）
+tts-sidecar/output/
+tts-sidecar/.trash-test/
+tts-sidecar/mpl-cache/
+
 # 编译临时
 *.spec
