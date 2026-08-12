@@ -2,6 +2,7 @@
   "name": "arrodes-desktop",
   "version": "1.0.0",
   "description": "阿罗德斯 - 桌面版",
+  "author": "Arrodes",
   "main": "dist/main.js",
   "type": "module",
   "scripts": {
@@ -11,8 +12,8 @@
     "dist": "npm run build && electron-builder --win nsis"
   },
   "devDependencies": {
-    "electron": "^31.7.7",
-    "electron-builder": "^24.13.3",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.9.3"
   },
   "build": {
@@ -31,9 +32,14 @@
         "to": "server",
         "filter": [
           "dist/**",
-          "node_modules/**",
-          "package.json",
-          ".env"
+          "package.json"
+        ]
+      },
+      {
+        "from": "../server/node_modules",
+        "to": "server/node_modules",
+        "filter": [
+          "**/*"
         ]
       },
       {
