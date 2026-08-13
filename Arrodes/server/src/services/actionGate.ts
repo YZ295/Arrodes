@@ -40,6 +40,10 @@ export const RISK_RULES: Record<string, Risk> = {
   lock_screen: 'high',
   mcp_list_tools: 'low',
   mcp_call_tool: 'high',
+  exec_command: 'high',
+  write_file: 'high',
+  read_file: 'low',
+  minimax_tts: 'low',
 };
 
 export function classifyAction(skill: string): Risk {

@@ -9,6 +9,7 @@ import { SessionRepository } from '../db/session-repo.js';
 import { loadProfile } from '../services/MemoryGateway.js';
 import { config } from '../config.js';
 import { initModelRegistry } from '../services/modelRegistry.js';
+import { actionGate } from '../services/actionGate.js';
 
 /** 记忆搜索 */
 registerSkill({
@@ -268,6 +269,37 @@ registerSkill({
 
 // ===== 系统操控技能 =====
 
+/** 直通执行命令（确认后调用，绕过门禁二次排队；内部保留拦截黑名单） */
+async function runExecCommand(args: Record<string, unknown>): Promise<string> {
+  const cmd = String(args.command || '').trim();
+  if (!cmd) return '错误: 命令不能为空';
+
+  const blocked = [
+    'rm -rf', 'del /S', 'del /F', 'format', 'shutdown', 'restart',
+    'reg delete', 'sc delete', 'taskkill /F /IM', 'net stop', ':(){',
+    '/dev/null >', 'mkfs', 'dd if=', '> nul', '2>nul',
+  ];
+  const cmdLower = cmd.toLowerCase();
+  for (const b of blocked) {
+    if (cmdLower.includes(b.toLowerCase())) return `安全拦截: 禁止执行含「${b}」的命令`;
+  }
+
+  try {
+    const { execSync } = await import('node:child_process');
+    const output = execSync(cmd, {
+      cwd: process.cwd(),
+      timeout: 30000,
+      encoding: 'utf-8',
+      maxBuffer: 10 * 1024 * 1024,
+      windowsHide: true,
+    });
+    return output.slice(0, 2000).trim() || '命令执行成功（无输出）';
+  } catch (err: any) {
+    const msg = err.stderr || err.message || String(err);
+    return `命令执行失败: ${msg.slice(0, 500)}`;
+  }
+}
+
 /** 执行命令（安全沙箱） */
 registerSkill({
   name: 'exec_command',
@@ -276,35 +308,16 @@ registerSkill({
     { name: 'command', type: 'string', required: true, description: '要执行的命令（如 dir, echo, git status 等非交互命令）' },
   ],
   execute: async (args) => {
-    const cmd = String(args.command || '').trim();
-    if (!cmd) return '错误: 命令不能为空';
-
-    // 安全沙箱：拦截危险操作
-    const blocked = [
-      'rm -rf', 'del /S', 'del /F', 'format', 'shutdown', 'restart',
-      'reg delete', 'sc delete', 'taskkill /F /IM', 'net stop', ':(){',
-      '/dev/null >', 'mkfs', 'dd if=', '> nul', '2>nul',
-    ];
-    const cmdLower = cmd.toLowerCase();
-    for (const b of blocked) {
-      if (cmdLower.includes(b.toLowerCase())) return `安全拦截: 禁止执行含「${b}」的命令`;
+    const outcome = actionGate.request(
+      'exec_command',
+      args,
+      `执行命令 ${String(args.command ?? '').trim() || '(空)'}`,
+      runExecCommand,
+    );
+    if (outcome.pending) {
+      return `⚠️ 需要你确认：${outcome.pending.description}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;
     }
-
-    try {
-      const { execSync } = await import('node:child_process');
-      const output = execSync(cmd, {
-        cwd: process.cwd(),
-        timeout: 30000,
-        encoding: 'utf-8',
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-        windowsHide: true,
-      });
-      const clean = output.slice(0, 2000);
-      return clean.trim() || '命令执行成功（无输出）';
-    } catch (err: any) {
-      const msg = err.stderr || err.message || String(err);
-      return `命令执行失败: ${msg.slice(0, 500)}`;
-    }
+    return runExecCommand(args);
   },
 });
 
@@ -349,6 +362,38 @@ registerSkill({
 });
 
 /** 写入文件 */
+async function runWriteFile(args: Record<string, unknown>): Promise<string> {
+  const filePath = String(args.path || '').trim();
+  const content = String(args.content || '');
+  const overwrite = args.overwrite === true;
+  if (!filePath) return '错误: 路径不能为空';
+  if (!content) return '错误: 内容不能为空';
+
+  const dangerous = ['/etc/', '/boot/', 'C:\\Windows\\', 'C:\\Program Files\\', 'System32', '.bashrc', '.zshrc', '.env'];
+  for (const d of dangerous) {
+    if (filePath.replace(/\\/g, '/').toLowerCase().includes(d.toLowerCase().replace(/\\/g, '/'))) {
+      return `安全拦截: 禁止写入系统路径 "${d}"`;
+    }
+  }
+
+  try {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    if (!overwrite && fs.existsSync(filePath)) {
+      fs.appendFileSync(filePath, '\n' + content, 'utf-8');
+      return `已追加写入 ${filePath}`;
+    }
+
+    fs.writeFileSync(filePath, content, 'utf-8');
+    return `已写入 ${filePath} (${content.length} 字符)`;
+  } catch (err: any) {
+    return `写入失败: ${err.message?.slice(0, 200) || String(err)}`;
+  }
+}
+
 registerSkill({
   name: 'write_file',
   description: '创建或写入本地文件。当用户说"帮我写一个文件""创建xx文件""保存到文件"时使用。会追加写入，不会覆盖已有内容。',
@@ -358,37 +403,16 @@ registerSkill({
     { name: 'overwrite', type: 'boolean', required: false, description: '是否覆盖已有文件（默认 false，追加写入）' },
   ],
   execute: async (args) => {
-    const filePath = String(args.path || '').trim();
-    const content = String(args.content || '');
-    const overwrite = args.overwrite === true;
-    if (!filePath) return '错误: 路径不能为空';
-    if (!content) return '错误: 内容不能为空';
-
-    // 拦截危险路径
-    const dangerous = ['/etc/', '/boot/', 'C:\\Windows\\', 'C:\\Program Files\\', 'System32', '.bashrc', '.zshrc', '.env'];
-    for (const d of dangerous) {
-      if (filePath.replace(/\\/g, '/').toLowerCase().includes(d.toLowerCase().replace(/\\/g, '/'))) {
-        return `安全拦截: 禁止写入系统路径 "${d}"`;
-      }
+    const outcome = actionGate.request(
+      'write_file',
+      args,
+      `写入文件 ${String(args.path ?? '').trim() || '(空)'}`,
+      runWriteFile,
+    );
+    if (outcome.pending) {
+      return `⚠️ 需要你确认：${outcome.pending.description}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;
     }
-
-    try {
-      const fs = await import('node:fs');
-      const path = await import('node:path');
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-      if (!overwrite && fs.existsSync(filePath)) {
-        // 追加模式
-        fs.appendFileSync(filePath, '\n' + content, 'utf-8');
-        return `已追加写入 ${filePath}`;
-      }
-
-      fs.writeFileSync(filePath, content, 'utf-8');
-      return `已写入 ${filePath} (${content.length} 字符)`;
-    } catch (err: any) {
-      return `写入失败: ${err.message?.slice(0, 200) || String(err)}`;
-    }
+    return runWriteFile(args);
   },
 });
 

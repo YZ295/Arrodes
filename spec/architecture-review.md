@@ -1,0 +1,110 @@
+# 架构评审：基于 Harness 的统一工具授权与能力分层
+
+> 日期：2026-08-13
+> 触发：借鉴 Daisy-Voice-Agent，完善阿罗德斯架构。
+> 范围：server 的 Harness / 技能注册表 / actionGate；不改变公开协议与行为基线。
+
+## 1. 现状架构
+
+阿罗德斯 server 以 Harness（多 Agent 编排）为中心：
+
+```
+WS message
+  -> ws/handler.ts（显式记忆指令 -> 桌面确认 -> 意图路由）
+  -> Harness.route(content) -> main | memory | dev
+  -> Agent 流式 LLM -> <tool_call> 技能循环（<=3 轮）
+  -> Skill Registry（全局 Map<name, AgentSkill>）
+       |- builtin.ts：记忆/时间/会话/系统/TTS/文件/命令
+       |- desktop.ts：winops 桌面操控（走 actionGate）
+       |- mcp.ts：MCP 调用（走 actionGate）
+       |- browser.ts / weather.ts / reminder.ts / devworkflow.ts / computer.ts / web.ts
+  -> actionGate：低风险自动执行，高风险入待确认队列
+```
+
+关键文件：
+
+- Arrodes/server/src/harness/harness.ts（Agent 注册/路由/重试/任务日志）
+- Arrodes/server/src/skills/registry.ts（技能注册表 + tool_call 协议）
+- Arrodes/server/src/skills/builtin.ts（内聚度最低，承载 6 类能力）
+- Arrodes/server/src/services/actionGate.ts（分级授权）
+- Arrodes/server/src/ws/handler.ts（确认短句直通执行）
+
+## 2. 与 Daisy 的对照（含「文件操作」澄清）
+
+Daisy 不是「没有文件操作」，而是文件操作以 LLM 工具调用形式存在，没有独立的文件管理界面，因此在功能宣传和浏览源码时容易被忽略。
+
+证据（forestai123456/Daisy-Voice-Agent，main 分支）：
+
+- src/main/llm/tools.ts 的 availableTools 明确定义：read_file、write_file、create_file、delete_file、list_directory、run_shell_command、download_media、scrape_url、trim_video、convert_video、convert_document、edit_document（.docx）、edit_pdf、get_clipboard_text、write_clipboard_text。
+- src/main/control/macos.ts 的 executeTool 用 fs.readFileSync / fs.writeFileSync / fs.unlinkSync 真实实现，不是空壳。
+- src/main/llm/system-prompt.ts 把文件工具压缩为一行「read_file / write_file / create_file / delete_file / list_directory：文件操作」，并附「文档/文件编辑规范」（编辑后回读验证、.docx 用 edit_document、PDF 用 edit_pdf）。
+
+因此「感觉没有文件操作」的可能原因：
+
+1. 文件能力完全由自然语言触发，没有可视化文件面板。
+2. 在 45+ 个工具里只有一行描述，不突出。
+3. README 把卖点放在「操控电脑、语音」，文件处理只占表格一行。
+4. 若看的是旧版或其他 fork，文件工具可能更少。
+
+Daisy 架构为扁平工具注册表：availableTools（一个 schema 数组）+ executeTool（macos.ts 里的超长 switch，约 1400 行），LLM 直接选工具。元数据用零散的 Set（SILENT_ACTION_TOOLS、INSPECTION_TOOLS、CONTINUE_AFTER_TOOLS）散落在 deepseek.ts。
+
+阿罗德斯已有的 Harness 比 Daisy 更结构化（Agent 分层 + 技能注册表 + 意图路由），但技能注册表缺少元数据、风险规则未统一，是本次要补的架构缺口。
+
+## 3. 架构债清单
+
+| 级别 | 问题 | 证据 | 状态 |
+|---|---|---|---|
+| P1 | 风险规则散落：exec_command / write_file 用内联黑名单，绕过统一 actionGate，违背 D3=A 分级授权 | builtin.ts（exec/write 内联 blocklist）、actionGate.ts（RISK_RULES 只覆盖 desktop/mcp） | 已修复 |
+| P2 | 技能注册表无 risk/readOnly 元数据，Harness 无法统一展示与执行策略 | registry.ts 的 AgentSkill 只有 name/description/args/execute | 待办 S1 |
+| P2 | exec_command 黑名单是字符串包含匹配，可被等价写法绕过 | builtin.ts runExecCommand | 待办 S5 |
+| P2 | builtin.ts 上帝模块：记忆/时间/会话/系统/TTS/文件/命令混在一个文件 | builtin.ts 约 400 行 | 待办 S4 |
+| P2 | 技能执行后无闭环回读验证，Daisy 有 read-after-write 校验 | harness/agents/main.ts 技能循环只注入结果 | 待办 S2 |
+| P3 | 无孤儿 tool_call 清理（Daisy cleanOrphanedTools 已处理） | harness/agents/main.ts 直接拼接历史 | 待办 S3 |
+| P3 | 上下文固定取最近 10 条，长会话截断 | ws/handler.ts .slice(-10) | 设计行为，暂不处理 |
+
+## 4. 目标架构
+
+以 Harness 为唯一编排中心，把「能力」与「执行策略」解耦：
+
+```mermaid
+graph TD
+    U[用户消息] --> H[Harness.route]
+    H --> A[Agent: main/memory/dev]
+    A --> R[Skill Registry]
+    R --> M[Skill 元数据: risk / readOnly / verify]
+    R --> G[actionGate 统一前置]
+    G -->|low| E[执行 + 回读验证]
+    G -->|high| Q[待确认队列]
+    Q -->|确认| E
+```
+
+目标：
+
+1. 技能注册表扩展元数据：risk（low/high）、readOnly、可选 verify(args, result)。
+2. actionGate 成为所有有副作用技能的唯一执行前置；内联黑名单降级为执行器内部防线。
+3. Agent 技能循环增加可选闭环验证：写操作后回读、命令后校验结果，失败则回报而不是谎称完成。
+4. 按能力组拆分 builtin.ts（memory / file / command / utility），减少上帝模块。
+
+## 5. 本次已实施（低风险、行为对齐 D3=A）
+
+- actionGate.ts：风险规则集中补充 exec_command（high）、write_file（high）、read_file（low）、minimax_tts（low）。
+- builtin.ts：抽取 runExecCommand / runWriteFile 为直通执行器，exec_command 与 write_file 改为经 actionGate.request 统一门禁；原有拦截黑名单保留在执行器内。
+- builtin.test.ts：新增 3 条测试，锁定「exec/write 需确认、read 低风险」。
+
+效果：文件写入与命令执行现在和桌面操控、MCP 一致——高危先生成待确认项，回复「确认/取消」后经直通执行器处理，不再绕过授权模型。
+
+## 6. 后续步骤（按风险从低到高）
+
+- S1（低风险）：AgentSkill 增加 risk/readOnly 元数据，GET /api/v1/skills 与技能提示词暴露风险分级。行为不变，可独立验证。
+- S3（低风险）：main/dev Agent 历史拼接前清理孤儿 tool_call/工具结果（借鉴 cleanOrphanedTools）。
+- S5（中风险）：exec_command 黑名单升级为结构化危险模式匹配。
+- S2（中风险）：技能循环增加闭环回读验证，需验证 LLM 二次生成行为不退化。
+- S4（结构性）：按能力组拆分 builtin.ts，需先补特征测试再拆分，须用户单独批准。
+
+## 7. 验证证据与回滚
+
+验证：Arrodes/server typecheck 通过；npx vitest run src 21 文件 / 125 用例全绿。
+
+回滚：本改动为行为增强（文件写/命令执行由「直接执行」变为「确认后执行」）。若需恢复旧行为，回退 actionGate.ts 与 builtin.ts 中 exec_command/write_file 的相关改动即可；新增测试可保留或一并回退。
+
+遗留风险：确认动作仍依赖用户回复短句；exec_command 黑名单仍是字符串匹配（见 S5）。
