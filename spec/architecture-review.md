@@ -57,8 +57,8 @@ Daisy 架构为扁平工具注册表：availableTools（一个 schema 数组）+
 | P1 | 风险规则散落：exec_command / write_file 用内联黑名单，绕过统一 actionGate，违背 D3=A 分级授权 | builtin.ts（exec/write 内联 blocklist）、actionGate.ts（RISK_RULES 只覆盖 desktop/mcp） | 已修复 |
 | P2 | 技能注册表无 risk/readOnly 元数据，Harness 无法统一展示与执行策略 | registry.ts 的 AgentSkill 只有 name/description/args/execute | 已修复（S1） |
 | P2 | exec_command 黑名单是字符串包含匹配，可被等价写法绕过 | builtin.ts runExecCommand | 已修复（S5） |
-| P2 | builtin.ts 上帝模块：记忆/时间/会话/系统/TTS/文件/命令混在一个文件 | builtin.ts 约 400 行 | 待办 S4 |
-| P2 | 技能执行后无闭环回读验证，Daisy 有 read-after-write 校验 | harness/agents/main.ts 技能循环只注入结果 | 待办 S2 |
+| P2 | builtin.ts 上帝模块：记忆/时间/会话/系统/TTS/文件/命令混在一个文件 | builtin.ts 约 400 行 | 已修复（S4） |
+| P2 | 技能执行后无闭环回读验证，Daisy 有 read-after-write 校验 | harness/agents/main.ts 技能循环只注入结果 | 已修复（S2，技能层回读核验） |
 | P3 | 无孤儿 tool_call 清理（Daisy cleanOrphanedTools 已处理） | harness/agents/main.ts 直接拼接历史 | 不适用（文本式 tool_call 协议） |
 | P3 | 上下文固定取最近 10 条，长会话截断 | ws/handler.ts .slice(-10) | 设计行为，暂不处理 |
 
@@ -93,6 +93,8 @@ graph TD
 - server/src/index.ts：注册 files.ts，并让 GET /api/v1/skills 返回 risk 字段（S1 第一步，风险分级对 UI/调用方可观测）。
 - registry.ts / files.ts：AgentSkill 增加 readOnly 元数据，文件技能标注只读/可写，GET /api/v1/skills 暴露 readOnly（S1 收尾）。
 - skills/builtin.ts：exec_command 黑名单升级为结构化拦截（危险子串 + 命令动词精确匹配，含 .exe/.com 扩展名），避免 `echo shutdown` 等误伤并拦截 `format.com` 等绕过（S5）。
+- skills/builtin.ts 按能力组拆分为 memory.ts / command.ts / utility.ts，移除死导入与无人使用的 loadProfile 重导出（S4）。
+- skills/files.ts：写/建/删/移/复在返回前回读核验，失败即报「核验失败」而不是谎称完成（S2）。
 - 测试：builtin.test.ts（exec 需确认）+ files.test.ts（只读自动执行、写操作需确认）。
 
 效果：阿罗德斯具备完整文件操作能力，且命令与文件写操作和桌面操控、MCP 一致——高危先生成待确认项，回复「确认/取消」后经直通执行器处理，不再绕过授权模型。
@@ -102,13 +104,13 @@ graph TD
 - S1（完成）：AgentSkill 增加 readOnly 元数据，GET /api/v1/skills 暴露 risk/readOnly；risk 仍由 actionGate 单一来源派生。
 - S3（不适用）：阿罗德斯用文本式 `<tool_call>` 协议，不持久化原生 tool_calls，跨轮无孤儿工具调用可清理。
 - S5（完成）：exec_command 黑名单已升级为结构化危险模式匹配。
-- S2（中风险）：技能循环增加闭环回读验证，需验证 LLM 二次生成行为不退化。
-- S4（进行中）：按能力组拆分 builtin.ts（已拆出 files.ts；memory/command/utility 仍待拆）。
+- S2（完成）：文件写操作在技能层回读核验（存在性 / 内容 / 大小），无需改 LLM 二次生成流程。
+- S4（完成）：builtin.ts 已拆为 memory.ts / command.ts / utility.ts。
 
 ## 7. 验证证据与回滚
 
-验证：Arrodes/server typecheck 通过；npx vitest run src 22 文件 / 130 用例全绿。
+验证：Arrodes/server typecheck 通过；npx vitest run src 22 文件 / 131 用例全绿。
 
 回滚：本改动为行为增强（文件写/命令执行由「直接执行」变为「确认后执行」）。若需恢复旧行为，回退 actionGate.ts 与 builtin.ts 中 exec_command/write_file 的相关改动即可；新增测试可保留或一并回退。
 
-遗留风险：确认动作仍依赖用户回复短句；exec_command 结构化拦截仍属黑名单防御，不能替代确认授权。
+遗留风险：确认动作仍依赖用户回复短句；exec_command 结构化拦截仍属黑名单防御，不能替代确认授权；只读技能元数据当前仅标注 files 族，其余技能可按需补齐。

@@ -53,6 +53,16 @@ describe('文件操作技能分级授权', () => {
     actionGate.deny(actionGate.getLatest()!.id);
   });
 
+  it('create_file 确认执行后回读核验', async () => {
+    const target = path.join(tmpDir, 'verified.txt');
+    await executeToolCall('create_file', { path: target, content: 'ok' });
+    const pending = actionGate.getLatest()!;
+    const result = await pending.executor!(pending.args);
+    expect(result).toContain('核验');
+    expect(fs.readFileSync(target, 'utf-8')).toBe('ok');
+    actionGate.deny(pending.id);
+  });
+
   afterAll(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

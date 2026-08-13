@@ -99,10 +99,12 @@ function writeFile(args: Record<string, unknown>): string {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   if (!overwrite && fs.existsSync(filePath)) {
     fs.appendFileSync(filePath, '\n' + content, 'utf-8');
-    return `已追加写入 ${filePath}`;
+  } else {
+    fs.writeFileSync(filePath, content, 'utf-8');
   }
-  fs.writeFileSync(filePath, content, 'utf-8');
-  return `已写入 ${filePath} (${content.length} 字符)`;
+  const verified = fs.readFileSync(filePath, 'utf-8');
+  if (!verified.includes(content)) throw new Error(`核验失败: 写入内容不一致 ${filePath}`);
+  return `已写入并核验 ${filePath} (${content.length} 字符)`;
 }
 
 function createFile(args: Record<string, unknown>): string {
@@ -112,7 +114,8 @@ function createFile(args: Record<string, unknown>): string {
   if (fs.existsSync(filePath)) throw new Error(`文件已存在: ${filePath}`);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf-8');
-  return `已创建 ${filePath}`;
+  if (fs.readFileSync(filePath, 'utf-8') !== content) throw new Error(`核验失败: 内容不一致 ${filePath}`);
+  return `已创建并核验 ${filePath}`;
 }
 
 function deleteFile(args: Record<string, unknown>): string {
@@ -123,10 +126,11 @@ function deleteFile(args: Record<string, unknown>): string {
   if (stat.isDirectory()) {
     if (fs.readdirSync(filePath).length > 0) throw new Error(`目录非空，拒绝删除: ${filePath}`);
     fs.rmdirSync(filePath);
-    return `已删除空目录 ${filePath}`;
+  } else {
+    fs.unlinkSync(filePath);
   }
-  fs.unlinkSync(filePath);
-  return `已删除文件 ${filePath}`;
+  if (fs.existsSync(filePath)) throw new Error(`核验失败: 路径仍存在 ${filePath}`);
+  return `已删除并核验 ${filePath}`;
 }
 
 function moveFile(args: Record<string, unknown>): string {
@@ -136,7 +140,8 @@ function moveFile(args: Record<string, unknown>): string {
   if (!fs.existsSync(source)) throw new Error(`源不存在: ${source}`);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.renameSync(source, target);
-  return `已移动 ${source} -> ${target}`;
+  if (!fs.existsSync(target) || fs.existsSync(source)) throw new Error(`核验失败: 移动未生效 ${source} -> ${target}`);
+  return `已移动并核验 ${source} -> ${target}`;
 }
 
 function copyFile(args: Record<string, unknown>): string {
@@ -146,7 +151,10 @@ function copyFile(args: Record<string, unknown>): string {
   if (!fs.existsSync(source)) throw new Error(`源不存在: ${source}`);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(source, target);
-  return `已复制 ${source} -> ${target}`;
+  if (!fs.existsSync(target) || fs.statSync(target).size !== fs.statSync(source).size) {
+    throw new Error(`核验失败: 复制结果不一致 ${source} -> ${target}`);
+  }
+  return `已复制并核验 ${source} -> ${target}`;
 }
 
 function registerFileSkill(spec: FileSkillSpec): void {

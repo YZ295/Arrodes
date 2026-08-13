@@ -1,15 +1,15 @@
 /**
- * 内置命令技能分级授权测试
+ * 命令技能分级授权测试
  *
- * 验证 exec_command 走统一 actionGate（高危需确认，不直接执行）。
+ * 验证 exec_command 走统一 actionGate（高危需确认，不直接执行），
+ * 以及命令黑名单的结构化拦截。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { executeToolCall } from './registry.js';
 import { actionGate, classifyAction } from '../services/actionGate.js';
-// 模块加载时注册内置技能
-import { blockedCommandReason } from './builtin.js';
+import { blockedCommandReason } from './command.js';
 
-describe('内置命令技能分级授权', () => {
+describe('命令技能分级授权', () => {
   beforeEach(() => {
     for (const item of actionGate.list()) actionGate.deny(item.id);
   });
