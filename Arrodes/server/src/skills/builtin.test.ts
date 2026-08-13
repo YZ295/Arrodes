@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { executeToolCall } from './registry.js';
 import { actionGate, classifyAction } from '../services/actionGate.js';
 // 模块加载时注册内置技能
-import './builtin.js';
+import { blockedCommandReason } from './builtin.js';
 
 describe('内置命令技能分级授权', () => {
   beforeEach(() => {
@@ -24,5 +24,18 @@ describe('内置命令技能分级授权', () => {
     const pending = actionGate.getLatest();
     expect(pending?.skill).toBe('exec_command');
     actionGate.deny(pending!.id);
+  });
+
+  it('结构化拦截：危险命令动词（含扩展名）被拦', () => {
+    expect(blockedCommandReason('format c:')).toContain('安全拦截');
+    expect(blockedCommandReason('format.com c:')).toContain('安全拦截');
+    expect(blockedCommandReason('shutdown /s')).toContain('安全拦截');
+    expect(blockedCommandReason('rd /s /q C:\\tmp')).toContain('安全拦截');
+  });
+
+  it('结构化拦截：无害命令不被误伤', () => {
+    expect(blockedCommandReason('echo shutdown')).toBeNull();
+    expect(blockedCommandReason('git status')).toBeNull();
+    expect(blockedCommandReason('dir')).toBeNull();
   });
 });

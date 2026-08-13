@@ -269,20 +269,41 @@ registerSkill({
 
 // ===== 系统操控技能 =====
 
+const BLOCKED_SUBSTRINGS = [
+  'rm -rf', 'del /s', 'del /f', 'reg delete', 'sc delete',
+  'taskkill /f /im', 'net stop', ':(){', '/dev/null >', 'mkfs',
+  'dd if=', '> nul', '2>nul',
+];
+
+const BLOCKED_VERBS = new Set([
+  'format', 'shutdown', 'restart', 'reg', 'sc', 'taskkill',
+  'net', 'del', 'rd', 'rmdir', 'erase', 'diskpart',
+]);
+
+/** 结构化命令拦截：先匹配危险子串，再按命令动词（含 .exe/.com 等扩展名）精确拦截 */
+export function blockedCommandReason(cmd: string): string | null {
+  const lower = cmd.toLowerCase();
+  for (const s of BLOCKED_SUBSTRINGS) {
+    if (lower.includes(s)) return `禁止执行含「${s}」的命令`;
+  }
+  const match = cmd.match(/^(?:"([^"]+)"|'([^']+)'|([^\s]+))/);
+  const first = (match?.[1] ?? match?.[2] ?? match?.[3] ?? '').replace(/["']/g, '');
+  const base = first.split(/[\\/]/).pop()?.toLowerCase() ?? '';
+  for (const verb of BLOCKED_VERBS) {
+    if (base === verb || base.startsWith(`${verb}.`)) {
+      return `安全拦截: 禁止执行命令「${verb}」`;
+    }
+  }
+  return null;
+}
+
 /** 直通执行命令（确认后调用，绕过门禁二次排队；内部保留拦截黑名单） */
 async function runExecCommand(args: Record<string, unknown>): Promise<string> {
   const cmd = String(args.command || '').trim();
   if (!cmd) return '错误: 命令不能为空';
 
-  const blocked = [
-    'rm -rf', 'del /S', 'del /F', 'format', 'shutdown', 'restart',
-    'reg delete', 'sc delete', 'taskkill /F /IM', 'net stop', ':(){',
-    '/dev/null >', 'mkfs', 'dd if=', '> nul', '2>nul',
-  ];
-  const cmdLower = cmd.toLowerCase();
-  for (const b of blocked) {
-    if (cmdLower.includes(b.toLowerCase())) return `安全拦截: 禁止执行含「${b}」的命令`;
-  }
+  const blocked = blockedCommandReason(cmd);
+  if (blocked) return blocked;
 
   try {
     const { execSync } = await import('node:child_process');
