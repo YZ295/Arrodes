@@ -123,6 +123,9 @@ export const EVENTS = {
   NAV_SEARCH_SELECT: 'nav:search:select',
   NAV_LIST_SELECT: 'nav:list:select',
 
+  // 记忆库搜索请求（人物卡点击人物 → MemoryPanel 自动填入搜索词）
+  MEMORY_SEARCH_REQUEST: 'memory:search:request',
+
   // 应用
   APP_READY: 'app:ready',
 } as const;

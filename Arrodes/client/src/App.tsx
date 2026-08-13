@@ -104,6 +104,7 @@ const App = memo(function App() {
             ttsVoices={voice.ttsVoices}
             setTtsConfig={voice.setTtsConfig}
             onBack={() => setSidebarView('conversation')}
+            onNavigate={setSidebarView}
           />
         )}
 

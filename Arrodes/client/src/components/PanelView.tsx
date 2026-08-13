@@ -6,10 +6,10 @@
  */
 import { memo, useState, useEffect } from 'react';
 import type { SidebarView } from './Sidebar';
-import Avatar from './Avatar';
 import ModelSettings from './ModelSettings';
 import TTSControl from './TTSControl';
 import MemoryPanel from './MemoryPanel';
+import ProfilePanel from './ProfilePanel';
 import VisionPanel from '../modules/vision/VisionPanel';
 import WorkspacePanel from './WorkspacePanel';
 
@@ -19,6 +19,8 @@ interface PanelViewProps {
   ttsVoices: Array<{ id: string; name: string; gender: string; style: string }>;
   setTtsConfig: (config: Partial<{ engine: 'server'; voiceId: string; rate: number; pitch: number }>) => void;
   onBack: () => void;
+  /** 切换到指定视图（人物卡点击人物 → 记忆库搜索） */
+  onNavigate: (view: SidebarView) => void;
 }
 
 function PlaceholderPanel({ title, description, icon }: { title: string; description: string; icon: string }) {
@@ -34,7 +36,7 @@ function PlaceholderPanel({ title, description, icon }: { title: string; descrip
 }
 
 export default memo(function PanelView(props: PanelViewProps) {
-  const { view, ttsConfig, setTtsConfig, onBack } = props;
+  const { view, ttsConfig, setTtsConfig, onBack, onNavigate } = props;
 
   return (
     <div className="absolute inset-0 z-35 flex justify-end pointer-events-none">
@@ -60,7 +62,7 @@ export default memo(function PanelView(props: PanelViewProps) {
         <div className="flex-1 overflow-y-auto">
           {view === 'skills' && <SkillsPanel />}
           {view === 'workspace' && <WorkspacePanel />}
-          {view === 'profile' && <ProfilePanel />}
+          {view === 'profile' && <ProfilePanel onNavigate={onNavigate} />}
           {view === 'memory' && <MemoryPanel onClose={onBack} />}
           {view === 'vision' && <VisionPanel />}
           {view === 'settings' && (
@@ -92,34 +94,6 @@ export default memo(function PanelView(props: PanelViewProps) {
     </div>
   );
 });
-
-function ProfilePanel() {
-  return (
-    <div className="p-5 flex flex-col items-center text-center">
-      <Avatar size={120} showHalo glow />
-      <h2 className="mt-4 text-xl font-semibold text-white/90">阿罗德斯</h2>
-      <p className="text-sm text-white/30 mt-1">虚空之镜 · 命运之音</p>
-
-      <div className="mt-6 w-full space-y-3 text-left">
-        <ProfileField label="身份" value="德尔斐神谕的化身，以助手之姿侍奉愚者" />
-        <ProfileField label="性格" value="忠诚、谦逊、略带神秘、知识渊博" />
-        <ProfileField label="语气" value="古雅而不涩，深邃而不故作高深" />
-        <ProfileField label="自称" value="在下 / 阿罗德斯" />
-        <ProfileField label="边界" value="绝不僭越，绝不欺骗，绝对忠诚" />
-        <ProfileField label="使命" value="非答案的提供者，而是思考的同行者" />
-      </div>
-    </div>
-  );
-}
-
-function ProfileField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white/3 rounded-lg px-4 py-2.5 border border-white/5">
-      <div className="text-[16px] text-white/25 uppercase tracking-wider mb-0.5">{label}</div>
-      <div className="text-sm text-white/60">{value}</div>
-    </div>
-  );
-}
 
 function AdvancedPanel() {
   return (

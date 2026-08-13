@@ -3,11 +3,12 @@
  * 可视化展示当前会话和跨会话记忆，支持搜索、过滤、删除
  *
  * 数据来源：
- * - 当前会话记忆：从 chatStore 获取
+ * - 当前会话记忆：通过 /api/v1/memories 查询
  * - 全局记忆搜索：GET /api/v1/memories?q=xxx
  */
 import { useState, useEffect, useCallback } from 'react';
 import type { MemoryNode, MemoryType } from '@shared/types';
+import { eventBus, EVENTS } from '../shared/events/EventBus';
 
 /* ============================================================
  * MemoryCard — 单条记忆卡片
@@ -106,6 +107,14 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
   useEffect(() => {
     loadMemories();
   }, [loadMemories]);
+
+  // 人物卡点击人物 → 自动填入搜索词（事件驱动，避免跨组件耦合）
+  useEffect(() => {
+    return eventBus.on(EVENTS.MEMORY_SEARCH_REQUEST, (payload) => {
+      const { query } = (payload || {}) as { query?: string };
+      if (query) setSearchQuery(query);
+    });
+  }, []);
 
   // 删除记忆
   const handleDelete = useCallback(async (id: string) => {
