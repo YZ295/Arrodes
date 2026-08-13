@@ -2,13 +2,14 @@
  * 服务端语音识别 (STT)
  *
  * 解决 Electron 壳内浏览器 SpeechRecognition 不可用的问题（报 network 错误）。
- * 前端把录音 Blob 上传到这里，转发给 OpenAI 兼容的 ASR 服务：
- * - SiliconFlow SenseVoiceSmall（免费额度，中文顶尖）—— 首选
- * - 可替换为任何 OpenAI 兼容 /v1/audio/transcriptions 端点
+ * D2=C 混合策略：默认在线 SiliconFlow；可切换 local（faster-whisper 侧车）
+ * 与 auto（本地优先，失败回退在线）。模式持久化于 data/stt-mode.json。
  */
 import { Router } from 'express';
 import multer from 'multer';
 import { config } from '../config.js';
+import { transcribeAudio, STT_MODES, isSttMode } from '../services/sttService.js';
+import { getSttMode, setSttMode } from '../services/sttSettings.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -18,13 +19,30 @@ const upload = multer({
 export function createSttRouter(): Router {
   const router = Router();
 
-  // 状态检查：服务端 STT 是否可用（前端据此决定识别路径）
+  // 状态检查：服务端 STT 是否可用 + 当前模式（前端据此决定识别路径）
   router.get('/status', (_req, res) => {
     res.json({
       available: !!config.siliconflowApiKey,
       provider: 'siliconflow',
       model: 'SenseVoiceSmall',
+      mode: getSttMode(),
     });
+  });
+
+  // 当前 STT 模式
+  router.get('/mode', (_req, res) => {
+    res.json({ mode: getSttMode(), modes: STT_MODES });
+  });
+
+  // 切换 STT 模式（持久化，重启保留）
+  router.post('/mode', (req, res) => {
+    const mode = req.body?.mode;
+    if (!isSttMode(mode)) {
+      res.status(400).json({ error: `mode 必须是 ${STT_MODES.join('/')} 之一` });
+      return;
+    }
+    setSttMode(mode);
+    res.json({ mode });
   });
 
   router.post('/transcribe', upload.single('audio'), async (req, res) => {
@@ -32,50 +50,20 @@ export function createSttRouter(): Router {
       res.status(400).json({ error: '缺少音频文件（字段名 audio）' });
       return;
     }
-    if (!config.siliconflowApiKey) {
-      res.status(503).json({ error: 'SILICONFLOW_API_KEY 未配置，无法使用服务端语音识别' });
-      return;
-    }
-
     try {
-      const form = new FormData();
-      // SenseVoiceSmall 期望 wav/flac/mp3/m4a/webm；webm(opus) 也可，格式由服务端探测
-      const filename = req.file.originalname && req.file.originalname.length > 0
-        ? req.file.originalname
-        : `audio-${Date.now()}.webm`;
-      // Buffer<ArrayBufferLike> 与 BlobPart 泛型不匹配（TS7），取底层 ArrayBuffer
-      const audioBytes = req.file.buffer.buffer.slice(
-        req.file.buffer.byteOffset,
-        req.file.buffer.byteOffset + req.file.buffer.byteLength,
-      ) as ArrayBuffer;
-      form.append('file', new Blob([audioBytes], { type: req.file.mimetype }), filename);
-      form.append('model', 'FunAudioLLM/SenseVoiceSmall');
-
-      const resp = await fetch(`${config.siliconflowBaseUrl}/v1/audio/transcriptions`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${config.siliconflowApiKey}` },
-        body: form,
-        signal: AbortSignal.timeout(30000),
+      const filename = req.file.originalname || `audio-${Date.now()}.webm`;
+      const outcome = await transcribeAudio(getSttMode(), req.file.buffer, filename, req.file.mimetype, {
+        fetchFn: fetch,
+        localUrl: 'http://127.0.0.1:12002',
+        siliconflowBaseUrl: config.siliconflowBaseUrl,
+        siliconflowApiKey: config.siliconflowApiKey,
       });
-
-      if (!resp.ok) {
-        const errBody = await resp.text().catch(() => '');
-        console.error('[STT] SiliconFlow 错误:', resp.status, errBody.slice(0, 200));
-        res.status(502).json({ error: `语音识别服务错误 (${resp.status})` });
-        return;
-      }
-
-      const data = await resp.json() as { text?: string };
-      const text = (data.text || '').trim();
-      if (!text) {
-        res.status(422).json({ error: '未识别到语音内容' });
-        return;
-      }
-      res.json({ text });
+      res.json({ text: outcome.text, engine: outcome.engine, usedFallback: outcome.usedFallback ?? false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知错误';
-      console.error('[STT] 服务端识别异常:', msg);
-      res.status(500).json({ error: `语音识别失败: ${msg}` });
+      console.error('[STT] 识别异常:', msg);
+      const status = /未配置/.test(msg) ? 503 : /未识别到语音/.test(msg) ? 422 : 500;
+      res.status(status).json({ error: `语音识别失败: ${msg}` });
     }
   });
 

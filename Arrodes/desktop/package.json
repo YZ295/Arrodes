@@ -32,6 +32,7 @@
         "to": "server",
         "filter": [
           "dist/**",
+          "scripts/**",
           "package.json"
         ]
       },

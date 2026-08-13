@@ -17,6 +17,8 @@ import { memoryAgent } from '../harness/agents/memory.js';
 import { devAgent } from '../harness/agents/dev.js';
 import { updatePetTask, updatePetResult } from '../services/petStatus.js';
 import { handleExplicitMemory } from '../services/explicitMemory.js';
+import { actionGate, matchConfirmIntent } from '../services/actionGate.js';
+import { executeToolCall } from '../skills/registry.js';
 import type { WSClientMessage, WSServerMessage } from '../../../shared/types/index.js';
 
 // 注册多 Agent（模块加载时）
@@ -119,6 +121,25 @@ async function handleChatMessage(ws: WebSocket, msg: WSClientMessage): Promise<v
   if (explicit.handled) {
     updatePetResult(explicit.reply || '');
     send({ type: 'complete', data: { content: explicit.reply || '已处理', memories: [] } });
+    activeTasks.delete(msg.sessionId);
+    return;
+  }
+
+  // 1.6 桌面操作确认/取消（D3=A：高风险操作短句确认，不经 LLM，防误听）
+  const pendingAction = actionGate.getLatest();
+  const confirmIntent = pendingAction ? matchConfirmIntent(msg.content) : null;
+  if (pendingAction && confirmIntent) {
+    if (confirmIntent === 'confirm') {
+      const item = actionGate.confirm(pendingAction.id);
+      const result = item?.executor
+        ? await item.executor(item.args)
+        : await executeToolCall(item!.skill, item!.args);
+      updatePetResult(result);
+      send({ type: 'complete', data: { content: `已执行：${result}`, memories: [] } });
+    } else {
+      actionGate.deny(pendingAction.id);
+      send({ type: 'complete', data: { content: '已取消该操作。', memories: [] } });
+    }
     activeTasks.delete(msg.sessionId);
     return;
   }

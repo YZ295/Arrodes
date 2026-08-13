@@ -25,6 +25,7 @@ import { createWorkspaceRouter } from './routes/workspace.js';
 import { createWorkspacesRouter } from './routes/workspaces.js';
 import { createPetRouter } from './routes/pet.js';
 import { createPromptShellRouter } from './routes/promptShell.js';
+import { createActionsRouter } from './routes/actions.js';
 import { harness } from './harness/harness.js';
 // 加载内置技能
 import './skills/builtin.js';
@@ -38,6 +39,12 @@ import './skills/reminder.js';
 import './skills/devworkflow.js';
 // 天气查询技能（HoloJarvis 借鉴：Open-Meteo 免 key）
 import './skills/weather.js';
+// 桌面操控技能族（Daisy/HoloJarvis 借鉴，分级授权）
+import './skills/desktop.js';
+// 浏览器/站内搜索直达技能
+import './skills/browser.js';
+// MCP 生态接入技能（MCP_SERVERS 环境变量配置）
+import './skills/mcp.js';
 import { getAllSkills, registerSkill, unregisterSkill } from './skills/registry.js';
 import { startMainloop } from './services/mainloop.js';
 
@@ -70,6 +77,7 @@ app.use('/api/v1/workspace', createWorkspaceRouter());
 app.use('/api/v1/pet', createPetRouter());
 app.use('/api/v1/prompt-shell', createPromptShellRouter());
 app.use('/api/v1/workspaces', createWorkspacesRouter());
+app.use('/api/v1/actions', createActionsRouter());
 
 // ---- 多 Agent 展示（Harness）----
 app.get('/api/v1/agents', (_req, res) => {
