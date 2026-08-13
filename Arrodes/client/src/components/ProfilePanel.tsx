@@ -3,7 +3,7 @@
  *
  * 三块内容：
  * 1. 阿罗德斯身份卡 —— 守灯人 + 四戒（与 SYSTEM_PROMPT 人设一致）
- * 2. 行为准则卡 —— 愚者大人设定的「谦逊简洁」行为规范（可一键复制）
+ * 2. 行为准则卡 —— 愚者大人设定的「世界级专家」行为规范（可一键复制）
  * 3. 记忆中的人物 —— 后端 extractPersonEntities 识别的人物实体，点击可跳记忆库搜索
  */
 import { useState, useEffect, useCallback } from 'react';
