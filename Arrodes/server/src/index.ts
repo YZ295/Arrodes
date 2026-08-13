@@ -27,6 +27,7 @@ import { createPetRouter } from './routes/pet.js';
 import { createPromptShellRouter } from './routes/promptShell.js';
 import { createActionsRouter } from './routes/actions.js';
 import { harness } from './harness/harness.js';
+import { classifyAction } from './services/actionGate.js';
 // 加载内置技能
 import './skills/builtin.js';
 // 电脑操作技能（正式版，后注册覆盖同名试探版）
@@ -45,6 +46,8 @@ import './skills/desktop.js';
 import './skills/browser.js';
 // MCP 生态接入技能（MCP_SERVERS 环境变量配置）
 import './skills/mcp.js';
+// 文件操作技能族（read/write/create/delete/list/move/copy，统一 actionGate）
+import './skills/files.js';
 import { getAllSkills, registerSkill, unregisterSkill } from './skills/registry.js';
 import { startMainloop } from './services/mainloop.js';
 
@@ -94,6 +97,7 @@ app.get('/api/v1/skills', (_req, res) => {
     name: s.name,
     description: s.description,
     args: s.args,
+    risk: classifyAction(s.name),
   }));
   res.json({ skills });
 });

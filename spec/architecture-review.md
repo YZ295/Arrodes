@@ -85,21 +85,23 @@ graph TD
 3. Agent 技能循环增加可选闭环验证：写操作后回读、命令后校验结果，失败则回报而不是谎称完成。
 4. 按能力组拆分 builtin.ts（memory / file / command / utility），减少上帝模块。
 
-## 5. 本次已实施（低风险、行为对齐 D3=A）
+## 5. 本次已实施
 
-- actionGate.ts：风险规则集中补充 exec_command（high）、write_file（high）、read_file（low）、minimax_tts（low）。
-- builtin.ts：抽取 runExecCommand / runWriteFile 为直通执行器，exec_command 与 write_file 改为经 actionGate.request 统一门禁；原有拦截黑名单保留在执行器内。
-- builtin.test.ts：新增 3 条测试，锁定「exec/write 需确认、read 低风险」。
+- actionGate.ts：风险规则集中补充命令与文件技能（exec_command/write_file/create_file/delete_file/move_file/copy_file 为 high；read_file/list_directory/get_file_info/minimax_tts 为 low）。
+- skills/files.ts：新增完整文件操作技能族（list_directory / read_file / get_file_info / write_file / create_file / delete_file / move_file / copy_file），统一经 actionGate 分级授权。
+- skills/builtin.ts：把 read_file / write_file 迁出到 files.ts（S4 拆分第一步），保留 exec_command；命令黑名单仍为执行器内部防线。
+- server/src/index.ts：注册 files.ts，并让 GET /api/v1/skills 返回 risk 字段（S1 第一步，风险分级对 UI/调用方可观测）。
+- 测试：builtin.test.ts（exec 需确认）+ files.test.ts（只读自动执行、写操作需确认）。
 
-效果：文件写入与命令执行现在和桌面操控、MCP 一致——高危先生成待确认项，回复「确认/取消」后经直通执行器处理，不再绕过授权模型。
+效果：阿罗德斯具备完整文件操作能力，且命令与文件写操作和桌面操控、MCP 一致——高危先生成待确认项，回复「确认/取消」后经直通执行器处理，不再绕过授权模型。
 
 ## 6. 后续步骤（按风险从低到高）
 
-- S1（低风险）：AgentSkill 增加 risk/readOnly 元数据，GET /api/v1/skills 与技能提示词暴露风险分级。行为不变，可独立验证。
+- S1（进行中）：AgentSkill 增加 risk/readOnly 元数据，GET /api/v1/skills 与技能提示词暴露风险分级（本次已做 GET 暴露 risk；下一步是把元数据落到 AgentSkill 定义并全量标注）。
 - S3（低风险）：main/dev Agent 历史拼接前清理孤儿 tool_call/工具结果（借鉴 cleanOrphanedTools）。
 - S5（中风险）：exec_command 黑名单升级为结构化危险模式匹配。
 - S2（中风险）：技能循环增加闭环回读验证，需验证 LLM 二次生成行为不退化。
-- S4（结构性）：按能力组拆分 builtin.ts，需先补特征测试再拆分，须用户单独批准。
+- S4（进行中）：按能力组拆分 builtin.ts（本次已拆出 files.ts；memory/command/utility 仍待拆）。
 
 ## 7. 验证证据与回滚
 

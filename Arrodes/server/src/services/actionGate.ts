@@ -44,6 +44,12 @@ export const RISK_RULES: Record<string, Risk> = {
   write_file: 'high',
   read_file: 'low',
   minimax_tts: 'low',
+  list_directory: 'low',
+  get_file_info: 'low',
+  create_file: 'high',
+  delete_file: 'high',
+  move_file: 'high',
+  copy_file: 'high',
 };
 
 export function classifyAction(skill: string): Risk {
