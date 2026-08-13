@@ -1,0 +1,112 @@
+{
+  "workflow_version": 2,
+  "project_kind": "legacy",
+  "phase": "ready-to-archive",
+  "active_change": {
+    "slug": "desktop-shell",
+    "type": "feature",
+    "mode": "full",
+    "branch": "feature/desktop-shell",
+    "created_at": "2026-08-01T11:05:42+08:00"
+  },
+  "approvals": {
+    "baseline": {
+      "valid": true,
+      "digest": "e2612df9780fdd28df39aac99c842f8777ababfb3f3cd88906e9e0cdb41c23bb",
+      "approved_at": "2026-08-12T22:33:10+08:00",
+      "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
+    },
+    "spec": {
+      "valid": true,
+      "digest": "eb62cc0f3ec63f2fafa81d151cf1e318966d5ca51267a3f582b2704c4bd6f0e2",
+      "approved_at": "2026-08-12T22:33:11+08:00",
+      "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
+    },
+    "plan": {
+      "valid": true,
+      "digest": "c5e739bf844328fee26a820ee0ee6658c0b64bb3d72bf84392d80e0a65a73161",
+      "approved_at": "2026-08-12T22:33:12+08:00",
+      "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
+    },
+    "hotfix": {
+      "valid": false,
+      "digest": null,
+      "approved_at": null
+    }
+  },
+  "dependency_approvals": [
+    {
+      "name": "desktop-shell",
+      "approved_at": "2026-08-01T12:40:16+08:00"
+    }
+  ],
+  "verification": {
+    "scope": "full",
+    "passed": true,
+    "verified_at": "2026-08-13T19:16:39+08:00",
+    "fingerprint": "3c5e043050c8859bdc12393119de0c52d29dd4fd956687b5e29e00a51d398e3a",
+    "head": "d4ec2a54e780ab37fdd790b925670a803046869d",
+    "results": [
+      {
+        "name": "vitest-server",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/server",
+          "run",
+          "test"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> arrodes-server@0.1.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/server\n\n\n Test Files  40 passed (40)\n      Tests  242 passed (242)\n   Start at  19:16:31\n   Duration  2.38s (transform 6.37s, setup 0ms, import 11.79s, tests 2.06s, environment 4ms)\n\n(node:2308) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:2308) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)\n(node:8888) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:8888) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)"
+      },
+      {
+        "name": "vitest-client",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/client",
+          "run",
+          "test"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> client@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/client\n\n\n Test Files  3 passed (3)\n      Tests  15 passed (15)\n   Start at  19:16:34\n   Duration  241ms (transform 51ms, setup 0ms, import 85ms, tests 13ms, environment 0ms)"
+      },
+      {
+        "name": "tsc-server",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/server",
+          "run",
+          "typecheck"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> arrodes-server@0.1.0 typecheck\n> tsc --noEmit"
+      },
+      {
+        "name": "build-client",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/client",
+          "run",
+          "build"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> client@0.0.0 build\n> tsc -b && vite build\n\n\u001b[36mvite v8.1.5 \u001b[32mbuilding client environment for production...\u001b[36m\u001b[39m\n\u001b[2K\ntransforming...✓ 623 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                              0.76 kB │ gzip:   0.43 kB\ndist/assets/arrodes_avatar-BZH2u6cA.jpg    238.38 kB\ndist/assets/index-CAFzQZZT.css              54.46 kB │ gzip:   9.14 kB\ndist/assets/index-BHsCx-NN.js            1,186.98 kB │ gzip: 330.99 kB\n\n\u001b[32m✓ built in 336ms\u001b[39m\n\u001b[33m[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001b[39m"
+      }
+    ]
+  },
+  "task_progress": [],
+  "last_completed": {
+    "change_id": "fix3",
+    "type": "hotfix",
+    "description": "精简 voice 子组件，消除构建竞态",
+    "archive_path": "spec/archive/2026-07-24-fix3/",
+    "completed_at": "2026-07-24T23:30:00+08:00"
+  }
+}

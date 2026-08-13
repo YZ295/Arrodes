@@ -9,7 +9,7 @@
     {
       "name": "vitest-server",
       "command": [
-        "npm",
+        "npm.cmd",
         "--prefix",
         "Arrodes/server",
         "run",
@@ -21,7 +21,7 @@
     {
       "name": "vitest-client",
       "command": [
-        "npm",
+        "npm.cmd",
         "--prefix",
         "Arrodes/client",
         "run",
@@ -33,7 +33,7 @@
     {
       "name": "tsc-server",
       "command": [
-        "npm",
+        "npm.cmd",
         "--prefix",
         "Arrodes/server",
         "run",
@@ -45,7 +45,7 @@
     {
       "name": "build-client",
       "command": [
-        "npm",
+        "npm.cmd",
         "--prefix",
         "Arrodes/client",
         "run",
