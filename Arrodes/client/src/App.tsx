@@ -24,6 +24,7 @@ import ChatOverlay from './components/ChatOverlay';
 import PanelView from './components/PanelView';
 import Universe from './universe/Universe';
 import Subtitle from './components/Subtitle';
+import ConfirmDialog from './components/ConfirmDialog';
 import { useVoiceChat } from './voice/hooks/useVoiceChat';
 
 const App = memo(function App() {
@@ -110,6 +111,9 @@ const App = memo(function App() {
 
         {/* 全局 AI 字幕（跟随 TTS 朗读，全屏居中） */}
         <Subtitle />
+
+        {/* 高风险操作确认弹窗 */}
+        <ConfirmDialog messages={voice.messages} onAppendAssistant={voice.appendAssistantMessage} />
       </div>
     </div>
   );

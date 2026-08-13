@@ -45,6 +45,8 @@ interface UseVoiceChatReturn {
   stopTTS: () => void;
   /** 完整停止：停语音 + 停 LLM 思考 + 停任务执行（用户真实意图：不想再听） */
   stopAll: () => void;
+  /** 追加一条助手消息（供确认弹窗回填执行结果） */
+  appendAssistantMessage: (content: string) => void;
   /** 静音开关：关闭语音输出（不合成不播放） */
   toggleMuted: () => void;
   /** 解锁音频（首次交互后调用） */
@@ -188,6 +190,14 @@ export function useVoiceChat(): UseVoiceChatReturn {
 
   const sendTextMessage = useCallback((text: string) => sendMessage(text, false), [sendMessage]);
 
+  // 追加助手消息（确认弹窗执行后回填结果，不触发新的 LLM 流程）
+  const appendAssistantMessage = useCallback((content: string) => {
+    setMessages((prev) => [
+      ...prev,
+      { id: uid(), role: 'assistant', content, timestamp: new Date().toISOString(), isVoice: false },
+    ]);
+  }, [setMessages]);
+
   // 卸载清理
   useEffect(() => () => { ttsStop(); }, [ttsStop]);
 
@@ -215,6 +225,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
     unlockAudio,
     stopTTS: ttsStop,
     stopAll,
+    appendAssistantMessage,
     toggleMuted: ttsToggleMuted,
     ttsConfig: { engine: ttsConfig.engine, voiceId: ttsConfig.voiceId, rate: ttsConfig.rate, pitch: ttsConfig.pitch },
     ttsVoices,
