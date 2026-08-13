@@ -25,6 +25,8 @@ export interface AgentSkill {
   description: string;
   /** 参数定义 */
   args: SkillArg[];
+  /** 是否只读（不产生副作用）；用于前端展示与后续提示词分层 */
+  readOnly?: boolean;
   /** 执行技能 */
   execute: (args: Record<string, unknown>) => Promise<string>;
 }

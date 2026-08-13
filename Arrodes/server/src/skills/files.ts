@@ -15,6 +15,7 @@ interface FileSkillSpec {
   name: string;
   description: string;
   args: SkillArg[];
+  readOnly: boolean;
   describe: (args: Record<string, unknown>) => string;
   run: (args: Record<string, unknown>) => string;
 }
@@ -161,6 +162,7 @@ function registerFileSkill(spec: FileSkillSpec): void {
     name: spec.name,
     description: spec.description,
     args: spec.args,
+    readOnly: spec.readOnly,
     execute: async (args) => {
       const outcome = actionGate.request(spec.name, args, spec.describe(args), run);
       if (outcome.pending) {
@@ -173,6 +175,7 @@ function registerFileSkill(spec: FileSkillSpec): void {
 
 registerFileSkill({
   name: 'list_directory',
+  readOnly: true,
   description: '列出指定目录下的文件和文件夹。当用户说"看看目录里有什么""列出文件"时使用。',
   args: [
     { name: 'path', type: 'string', required: false, description: '目录路径，默认当前工作目录' },
@@ -183,6 +186,7 @@ registerFileSkill({
 
 registerFileSkill({
   name: 'read_file',
+  readOnly: true,
   description: '读取本地文本文件内容。当用户说"看看这个文件""帮我读一下那个文件"时使用。',
   args: [
     { name: 'path', type: 'string', required: true, description: '文件路径' },
@@ -194,6 +198,7 @@ registerFileSkill({
 
 registerFileSkill({
   name: 'get_file_info',
+  readOnly: true,
   description: '查看文件或目录的基本信息（类型、大小、修改时间）。',
   args: [
     { name: 'path', type: 'string', required: true, description: '文件或目录路径' },
@@ -204,6 +209,7 @@ registerFileSkill({
 
 registerFileSkill({
   name: 'write_file',
+  readOnly: false,
   description: '写入内容到指定文件（默认追加，可覆盖）。当用户说"帮我写文件""保存到文件"时使用。',
   args: [
     { name: 'path', type: 'string', required: true, description: '文件路径' },
@@ -216,6 +222,7 @@ registerFileSkill({
 
 registerFileSkill({
   name: 'create_file',
+  readOnly: false,
   description: '创建新文件（已存在则报错，避免误覆盖）。',
   args: [
     { name: 'path', type: 'string', required: true, description: '文件路径' },
@@ -227,6 +234,7 @@ registerFileSkill({
 
 registerFileSkill({
   name: 'delete_file',
+  readOnly: false,
   description: '删除指定文件或空目录（非空目录会拒绝删除）。',
   args: [
     { name: 'path', type: 'string', required: true, description: '要删除的文件或空目录路径' },
@@ -237,6 +245,7 @@ registerFileSkill({
 
 registerFileSkill({
   name: 'move_file',
+  readOnly: false,
   description: '移动或重命名文件。',
   args: [
     { name: 'source', type: 'string', required: true, description: '源路径' },
@@ -248,6 +257,7 @@ registerFileSkill({
 
 registerFileSkill({
   name: 'copy_file',
+  readOnly: false,
   description: '复制文件。',
   args: [
     { name: 'source', type: 'string', required: true, description: '源路径' },

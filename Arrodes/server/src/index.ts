@@ -98,6 +98,7 @@ app.get('/api/v1/skills', (_req, res) => {
     description: s.description,
     args: s.args,
     risk: classifyAction(s.name),
+    readOnly: s.readOnly ?? false,
   }));
   res.json({ skills });
 });

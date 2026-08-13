@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { executeToolCall } from './registry.js';
+import { executeToolCall, getSkill } from './registry.js';
 import { actionGate, classifyAction } from '../services/actionGate.js';
 import './files.js';
 
@@ -27,6 +27,14 @@ describe('文件操作技能分级授权', () => {
     expect(classifyAction('delete_file')).toBe('high');
     expect(classifyAction('move_file')).toBe('high');
     expect(classifyAction('copy_file')).toBe('high');
+  });
+
+  it('只读元数据正确标记', () => {
+    expect(getSkill('list_directory')?.readOnly).toBe(true);
+    expect(getSkill('read_file')?.readOnly).toBe(true);
+    expect(getSkill('get_file_info')?.readOnly).toBe(true);
+    expect(getSkill('create_file')?.readOnly).toBe(false);
+    expect(getSkill('write_file')?.readOnly).toBe(false);
   });
 
   it('list_directory 低风险自动执行', async () => {
