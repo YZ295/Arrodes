@@ -19,6 +19,7 @@ import { updatePetTask, updatePetResult } from '../services/petStatus.js';
 import { handleExplicitMemory } from '../services/explicitMemory.js';
 import { actionGate, matchConfirmIntent } from '../services/actionGate.js';
 import { executeToolCall } from '../skills/registry.js';
+import { deriveSessionHistory } from '../services/modelHistory.js';
 import type { WSClientMessage, WSServerMessage } from '../../../shared/types/index.js';
 
 // 注册多 Agent（模块加载时）
@@ -155,7 +156,7 @@ async function handleChatMessage(ws: WebSocket, msg: WSClientMessage): Promise<v
   const result = await harness.execute(routedAgent, ctx, {
     content: msg.content,
     isVoice: msg.isVoice,
-    history: messageRepo.findBySession(msg.sessionId).slice(-10),
+    history: deriveSessionHistory(msg.sessionId),
     memories: [],
     onChunk: (text) => {
       if (!signal.aborted) send({ type: 'chunk', data: { content: text } });

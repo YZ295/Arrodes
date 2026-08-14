@@ -11,6 +11,7 @@ import { AgentDefinition } from '../agent.js';
 import { MessageRepository } from '../../db/message-repo.js';
 import { SessionRepository } from '../../db/session-repo.js';
 import { LlmService } from '../../services/llmService.js';
+import { assembleModelMessages } from '../../services/modelHistory.js';
 import { buildSkillsPrompt, parseToolCall, executeToolCall } from '../../skills/registry.js';
 
 const messageRepo = new MessageRepository();
@@ -33,16 +34,13 @@ export const devAgent: AgentDefinition = {
     const sessionId = ctx.sessionId;
     const skillsPrompt = buildSkillsPrompt();
 
-    // 1. LLM 生成：开发人设 + 技能提示 + 用户请求
-    const messages = [
-      { role: 'system' as const, content: DEV_ROLE_PROMPT },
-      ...(skillsPrompt ? [{ role: 'system' as const, content: skillsPrompt }] : []),
-      ...input.history.slice(-4).map((m) => ({
-        role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: m.content,
-      })),
-      { role: 'user' as const, content: input.content },
-    ];
+    // 1. LLM 生成：技能提示 + 历史 + 用户请求（DEV_ROLE_PROMPT 由 chatStreamSimple 注入）
+    const messages = assembleModelMessages({
+      skillsPrompt,
+      history: input.history,
+      userMessage: input.content,
+      maxHistory: 4,
+    });
 
     let reply = '';
     let toolCount = 0;

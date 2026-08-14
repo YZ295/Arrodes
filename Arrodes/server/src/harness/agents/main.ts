@@ -14,6 +14,7 @@ import { MessageRepository } from '../../db/message-repo.js';
 import { SessionRepository } from '../../db/session-repo.js';
 import { LlmService, SYSTEM_PROMPT, mergeWithPromptShell } from '../../services/llmService.js';
 import { retrieveContext } from '../../services/MemoryGateway.js';
+import { assembleModelMessages } from '../../services/modelHistory.js';
 import { buildSkillsPrompt, parseToolCall, executeToolCall } from '../../skills/registry.js';
 
 const messageRepo = new MessageRepository();
@@ -38,28 +39,13 @@ export const mainAgent: AgentDefinition = {
     // 1. 检索上下文（记忆 + 画像 + 摘要）
     const memoryCtx = await retrieveContext(input.content, sessionId);
 
-    // 2. 构建对话上下文
-    const llmMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [];
-
-    if (memoryCtx.profile) {
-      llmMessages.push({ role: 'system', content: memoryCtx.profile });
-    }
-    if (memoryCtx.memories.length > 0) {
-      const memoryText = memoryCtx.memories
-        .map((m) => `- ${m.content}（类型: ${m.type}）`)
-        .join('\n');
-      llmMessages.push({
-        role: 'system',
-        content: `以下是与本次对话相关的过往记忆：\n${memoryText}\n\n请自然地引用这些记忆。`,
-      });
-    }
-    const skillsPrompt = buildSkillsPrompt();
-    if (skillsPrompt) {
-      llmMessages.push({ role: 'system', content: skillsPrompt });
-    }
-    for (const h of input.history) {
-      llmMessages.push({ role: h.role, content: h.content });
-    }
+    // 2. 从会话日志投影模型消息（画像 + 记忆 + 技能 + 历史）
+    const llmMessages = assembleModelMessages({
+      profile: memoryCtx.profile,
+      memories: memoryCtx.memories,
+      skillsPrompt: buildSkillsPrompt(),
+      history: input.history,
+    });
 
     // 3. LLM 流式生成（25s 超时保护）
     let fullReply = '';
