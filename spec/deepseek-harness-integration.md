@@ -25,5 +25,5 @@
 - [x] **会话日志投影**（模型可见 ⟺ 已记录）：`services/modelHistory.ts` 提供 `deriveSessionHistory` 与 `assembleModelMessages`，main/dev/handler 已统一使用（`2c5b0fa`）。
 - [x] **turn 生命周期事件**：`Harness` 增加 `on`/`emit`（返回 disposer），发出 `turn:start` / `turn:end` / `turn:error`（`64c143b`）。
 - [x] **能力 seam 化（部分）**：fs（`services/fsProvider.ts`）、subprocess（`services/commandProvider.ts`）已抽象为 Definition/Provider/Consumer 三角（`a92ed7e`）。
-- [ ] **llm seam**：把 DeepSeek 适配器抽象为 `LlmProvider`（当前 `llmService.ts` 已较隔离，但未定义 Provider 接口）。
-- [ ] **profiles/bundles**：按配置文件组合插件树（当前无此概念）。
+- [x] **llm seam**：`services/llmProvider.ts` 定义 `LlmProvider` / `DeepSeekLlmProvider`，`llmService.ts` 退化为策略层（密钥 / 额度 / 用量）（`663d8c4`）。
+- [x] **profiles/bundles（轻量版）**：`services/skillProfile.ts` 按配置启用/禁用技能（`SKILL_PROFILE_FILE` 或 `data/skill-profiles.json`），注册表 `setSkillEnabled` 生效于提示词与执行（`2f0918f`）。
