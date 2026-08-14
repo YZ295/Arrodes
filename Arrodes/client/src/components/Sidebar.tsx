@@ -38,17 +38,101 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'conversation', label: '对话', icon: 'M', available: true },
-  { id: 'workspace', label: '工作区', icon: 'K', available: true, hint: 'Agent 大宇宙' },
-  { id: 'skills', label: '技能', icon: 'T', available: true },
-  { id: 'workflow', label: '工作流', icon: 'W', available: false, hint: '即将支持 n8n / Coze' },
-  { id: 'profile', label: '画像', icon: 'P', available: true },
-  { id: 'memory', label: '记忆', icon: 'R', available: true },
-  { id: 'vision', label: '视觉', icon: 'V', available: true },
-  { id: 'settings', label: '配置', icon: 'S', available: true },
-  { id: 'mobile', label: '移动端', icon: 'D', available: false, hint: '待开发' },
-  { id: 'advanced', label: '高级', icon: 'A', available: true },
+  { id: 'conversation', label: '对话', icon: 'conversation', available: true },
+  { id: 'workspace', label: '工作区', icon: 'workspace', available: true, hint: 'Agent 大宇宙' },
+  { id: 'skills', label: '技能', icon: 'skills', available: true },
+  { id: 'workflow', label: '工作流', icon: 'workflow', available: false, hint: '即将支持 n8n / Coze' },
+  { id: 'profile', label: '画像', icon: 'profile', available: true },
+  { id: 'memory', label: '记忆', icon: 'memory', available: true },
+  { id: 'vision', label: '视觉', icon: 'vision', available: true },
+  { id: 'settings', label: '配置', icon: 'settings', available: true },
+  { id: 'mobile', label: '移动端', icon: 'mobile', available: false, hint: '待开发' },
+  { id: 'advanced', label: '高级', icon: 'advanced', available: true },
 ];
+
+function NavIcon({ id }: { id: SidebarView }) {
+  const props = {
+    className: 'w-5 h-5',
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  switch (id) {
+    case 'conversation':
+      return (
+        <svg {...props}>
+          <path d="M21 11.5a8.5 8.5 0 01-8.5 8.5H5l-2.5 2V15A8.5 8.5 0 0111 3h1.5A8.5 8.5 0 0121 11.5z" />
+        </svg>
+      );
+    case 'workspace':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="4" />
+          <ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(-22 12 12)" />
+        </svg>
+      );
+    case 'skills':
+      return (
+        <svg {...props}>
+          <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+        </svg>
+      );
+    case 'workflow':
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="6" height="6" rx="1.5" />
+          <rect x="15" y="15" width="6" height="6" rx="1.5" />
+          <path d="M6 9v3a3 3 0 003 3h6" />
+        </svg>
+      );
+    case 'profile':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5 20c.8-3.5 3.5-5 7-5s6.2 1.5 7 5" />
+        </svg>
+      );
+    case 'memory':
+      return (
+        <svg {...props}>
+          <path d="M12 3a4 4 0 014 4v1a4 4 0 014 4v3a4 4 0 01-4 4H8a5 5 0 01-5-5v-2a5 5 0 015-5h1a4 4 0 014-4z" />
+        </svg>
+      );
+    case 'vision':
+      return (
+        <svg {...props}>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case 'settings':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1" />
+        </svg>
+      );
+    case 'mobile':
+      return (
+        <svg {...props}>
+          <rect x="7" y="2" width="10" height="20" rx="2.5" />
+          <path d="M11 18h2" />
+        </svg>
+      );
+    case 'advanced':
+      return (
+        <svg {...props}>
+          <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 interface SidebarProps {
   currentView: SidebarView;
@@ -144,7 +228,7 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
   return (
     <div className={`relative z-40 h-full transition-all duration-300 ${
       collapsed ? 'w-14' : 'w-64'
-    } bg-black/40 backdrop-blur-xl border-r border-white/5 flex flex-col`}>
+    } bg-[#0a0e27]/75 backdrop-blur-2xl border-r border-white/5 flex flex-col`}>
       {/* 右侧边框光束（border-beam 效果：光点沿侧边栏右缘周期性扫过） */}
       {!collapsed && <SidebarBeam />}
       {/* 折叠按钮 */}
@@ -164,7 +248,9 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
       <div className="px-4 py-5 flex items-center gap-2 overflow-hidden shrink-0">
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-amber-700
           flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
-          <span className="text-[16px] font-bold text-black">F</span>
+          <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l2.4 6.2L21 10l-6.6 1.8L12 18l-2.4-6.2L3 10l6.6-1.8z" />
+          </svg>
         </div>
         {!collapsed && (
           <div className="flex flex-col min-w-0">
@@ -199,10 +285,10 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
               {active && (
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-amber-400" />
               )}
-              <span className={`w-5 h-5 shrink-0 flex items-center justify-center text-[16px] font-mono ${
+              <span className={`w-5 h-5 shrink-0 flex items-center justify-center transition-colors ${
                 active ? 'text-amber-400' : ''
               }`}>
-                {item.icon}
+                <NavIcon id={item.id} />
               </span>
               {!collapsed && (
                 <span className="text-[16px] font-medium truncate flex-1 text-left">{item.label}</span>

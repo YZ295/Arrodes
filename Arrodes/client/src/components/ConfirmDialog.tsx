@@ -1,8 +1,8 @@
 /**
  * 高风险操作确认弹窗
  *
- * 服务端 actionGate 生成待确认项后，本组件通过 /api/v1/actions/pending
- * 拉取最新待确认操作，弹出确认/取消对话框；确认/取消走 REST 接口。
+ * 视觉语言：与全局「深空 + 玻璃 + 金色」一致——深蓝玻璃底、金色描边与光晕、
+ * 盾形图标、金色主按钮，避免普通暗色弹窗的廉价感。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Message } from '@shared/types';
@@ -82,31 +82,45 @@ export default function ConfirmDialog({ messages, onAppendAssistant }: ConfirmDi
   if (!pending) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-auto">
-      <div className="w-[min(92vw,420px)] rounded-2xl border border-amber-400/20 bg-[#0d1017]/95 p-5 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <div className="text-2xl">⚠️</div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-amber-300/90">需要你的确认</h3>
-            <p className="mt-2 text-[15px] text-white/80 leading-relaxed break-words">{pending.description}</p>
-            <p className="mt-2 text-[12px] text-white/30">该操作有风险，确认后才会执行。</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#02040a]/60 backdrop-blur-md px-4 animate-fade-in">
+      <div className="w-full max-w-[420px] rounded-2xl overflow-hidden border border-amber-400/20 bg-[#0b1022]/90 backdrop-blur-xl shadow-[0_24px_80px_-28px_rgba(255,205,0,0.4)]">
+        {/* 顶部金色光带 */}
+        <div className="h-0.5 bg-gradient-to-r from-transparent via-amber-400/80 to-transparent" />
+
+        <div className="p-6">
+          <div className="flex items-start gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400/20 to-amber-600/10 border border-amber-400/25 flex items-center justify-center shadow-[0_0_24px_-4px_rgba(255,205,0,0.5)]">
+              <svg className="w-5 h-5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M12 2l7 3v6c0 4.4-3 7.8-7 9-4-1.2-7-4.6-7-9V5l7-3z" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M9.5 12l1.8 1.8 3.4-3.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-amber-200/95">需要你的确认</h3>
+              <p className="text-[13px] text-white/35 mt-0.5">高风险操作 · 确认后才会执行</p>
+            </div>
           </div>
-        </div>
-        <div className="mt-5 flex justify-end gap-3">
-          <button
-            onClick={cancel}
-            disabled={busy}
-            className="px-4 py-2 rounded-lg text-sm text-white/70 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
-          >
-            取消
-          </button>
-          <button
-            onClick={confirm}
-            disabled={busy}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-black bg-amber-400 hover:bg-amber-300 transition-colors disabled:opacity-50"
-          >
-            {busy ? '执行中…' : '确认执行'}
-          </button>
+
+          <div className="mt-4 rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3.5">
+            <p className="text-[15px] text-white/85 leading-relaxed break-words">{pending.description}</p>
+          </div>
+
+          <div className="mt-5 flex justify-end gap-2.5">
+            <button
+              onClick={cancel}
+              disabled={busy}
+              className="px-4 py-2 rounded-lg text-[14px] text-white/60 hover:text-white/90 bg-white/5 hover:bg-white/10 border border-white/10 transition-all"
+            >
+              取消
+            </button>
+            <button
+              onClick={confirm}
+              disabled={busy}
+              className="px-5 py-2 rounded-lg text-[14px] font-medium text-[#1a1400] bg-gradient-to-br from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 shadow-[0_8px_24px_-8px_rgba(255,205,0,0.7)] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {busy ? '执行中…' : '确认执行'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
