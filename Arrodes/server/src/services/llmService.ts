@@ -9,17 +9,7 @@
 import { getCurrentModel, getApiKeyForModel } from './modelRegistry.js';
 import { usageService } from './usageService.js';
 import { getPromptShellText } from './promptShell.js';
-
-interface LlmMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
-interface LlmStreamCallbacks {
-  onChunk: (text: string) => void;
-  onComplete: (fullText: string) => void;
-  onError: (error: string) => void;
-}
+import { getLlmProvider, type LlmMessage, type LlmStreamCallbacks } from './llmProvider.js';
 
 interface LlmRequestOptions {
   /** 注入的系统提示词（chatSimple 用轻量版，chatStream 用完整人设） */
@@ -155,93 +145,24 @@ export class LlmService {
     payload.push(...userMessages);
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (model.requiresKey !== false && apiKey) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      }
-
-      const requestBody = JSON.stringify({
+      await getLlmProvider().request(payload, {
         model: model.modelName,
-        messages: payload,
+        baseUrl: model.baseUrl,
+        providerName: model.provider,
+        apiKey: model.requiresKey !== false ? (apiKey ?? undefined) : undefined,
+        requiresKey: model.requiresKey !== false,
         stream: options.stream,
-        max_tokens: options.maxTokens,
+        maxTokens: options.maxTokens,
         temperature: options.temperature,
+        signal: options.signal,
+      }, {
+        onChunk: (text) => callbacks.onChunk(text),
+        onComplete: (text, usage) => {
+          this.recordUsage(model.id, payload, text, usage);
+          callbacks.onComplete(text);
+        },
+        onError: (error) => callbacks.onError(error),
       });
-
-      const response = await fetch(`${model.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers,
-        body: requestBody,
-        signal: options.signal, // 取消信号 → 中断 HTTP 请求（停止 LLM 推理）
-      });
-
-      if (!response.ok) {
-        const errBody = await response.text().catch(() => '');
-        callbacks.onError(`${model.provider} ${response.status}: ${errBody.slice(0, 200)}`);
-        return;
-      }
-
-      if (!options.stream) {
-        // 非流式：一次返回（同时回调 onChunk，兼容依赖该通道的调用方）
-        const json = await response.json() as {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-        };
-        const text = json.choices?.[0]?.message?.content || '';
-        this.recordUsage(model.id, payload, text, json.usage);
-        callbacks.onChunk(text);
-        callbacks.onComplete(text);
-        return;
-      }
-
-      // 流式 SSE 解析
-      const reader = response.body?.getReader();
-      if (!reader) {
-        callbacks.onError('Response body is not readable');
-        return;
-      }
-
-      const decoder = new TextDecoder();
-      let fullText = '';
-      let buffer = '';
-      let streamUsage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
-
-      while (true) {
-        if (options.signal?.aborted) {
-          // 用户已停止：中断流式读取，不再回调 onComplete（前端不会收到 complete）
-          callbacks.onError('stopped');
-          return;
-        }
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === 'data: [DONE]') continue;
-          if (!trimmed.startsWith('data: ')) continue;
-
-          try {
-            const json = JSON.parse(trimmed.slice(6));
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) {
-              fullText += delta;
-              callbacks.onChunk(delta);
-            }
-            if (json.usage) streamUsage = json.usage;
-          } catch {
-            // skip parse errors
-          }
-        }
-      }
-
-      this.recordUsage(model.id, payload, fullText, streamUsage);
-      callbacks.onComplete(fullText);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知 LLM 错误';
       callbacks.onError(msg);
