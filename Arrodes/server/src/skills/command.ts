@@ -2,6 +2,7 @@
  * 命令执行技能（结构化拦截 + actionGate 分级授权）
  */
 import { registerSkill } from './registry.js';
+import { getCommandProvider } from '../services/commandProvider.js';
 
 const BLOCKED_SUBSTRINGS = [
   'rm -rf', 'del /s', 'del /f', 'reg delete', 'sc delete',
@@ -39,20 +40,15 @@ async function runExecCommand(args: Record<string, unknown>): Promise<string> {
   const blocked = blockedCommandReason(cmd);
   if (blocked) return blocked;
 
-  try {
-    const { execSync } = await import('node:child_process');
-    const output = execSync(cmd, {
-      cwd: process.cwd(),
-      timeout: 30000,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024,
-      windowsHide: true,
-    });
-    return output.slice(0, 2000).trim() || '命令执行成功（无输出）';
-  } catch (err: any) {
-    const msg = err.stderr || err.message || String(err);
-    return `命令执行失败: ${msg.slice(0, 500)}`;
+  const outcome = getCommandProvider().run(cmd, {
+    cwd: process.cwd(),
+    timeoutMs: 30000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (outcome.exitCode !== 0) {
+    return `命令执行失败: ${outcome.stderr.slice(0, 500)}`;
   }
+  return outcome.stdout.slice(0, 2000).trim() || '命令执行成功（无输出）';
 }
 
 /** 执行命令（安全沙箱） */

@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { executeToolCall, getSkill } from './registry.js';
 import { actionGate, classifyAction } from '../services/actionGate.js';
+import { setFsProvider, LocalFsProvider, type FsProvider } from '../services/fsProvider.js';
 import './files.js';
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arrodes-files-test-'));
@@ -61,6 +62,35 @@ describe('文件操作技能分级授权', () => {
     expect(result).toContain('核验');
     expect(fs.readFileSync(target, 'utf-8')).toBe('ok');
     actionGate.deny(pending.id);
+  });
+
+  it('能力 seam：文件技能消费可替换的 FsProvider', async () => {
+    const reads: string[] = [];
+    const fake: FsProvider = {
+      exists: () => true,
+      readdir: () => [{ name: 'fake.txt', isDirectory: false, size: 3 }],
+      stat: () => ({ isFile: true, isDirectory: false, size: 3, mtimeMs: Date.now() }),
+      readFile: (p) => {
+        reads.push(p);
+        return 'hi';
+      },
+      mkdirp: () => {},
+      appendFile: () => {},
+      writeFile: () => {},
+      rmdir: () => {},
+      unlink: () => {},
+      rename: () => {},
+      copyFile: () => {},
+    };
+
+    setFsProvider(fake);
+    try {
+      const result = await executeToolCall('read_file', { path: 'E:/fake/note.txt' });
+      expect(result).toContain('note.txt');
+      expect(reads.length).toBeGreaterThan(0);
+    } finally {
+      setFsProvider(new LocalFsProvider());
+    }
   });
 
   afterAll(() => {

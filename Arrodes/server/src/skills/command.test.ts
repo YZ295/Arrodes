@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { executeToolCall } from './registry.js';
 import { actionGate, classifyAction } from '../services/actionGate.js';
 import { blockedCommandReason } from './command.js';
+import { setCommandProvider, LocalCommandProvider, type CommandProvider } from '../services/commandProvider.js';
 
 describe('命令技能分级授权', () => {
   beforeEach(() => {
@@ -37,5 +38,27 @@ describe('命令技能分级授权', () => {
     expect(blockedCommandReason('echo shutdown')).toBeNull();
     expect(blockedCommandReason('git status')).toBeNull();
     expect(blockedCommandReason('dir')).toBeNull();
+  });
+
+  it('能力 seam：exec_command 消费可替换的 CommandProvider', async () => {
+    let ran = '';
+    const fake: CommandProvider = {
+      run: (command) => {
+        ran = command;
+        return { stdout: 'ok', stderr: '', exitCode: 0 };
+      },
+    };
+
+    setCommandProvider(fake);
+    try {
+      await executeToolCall('exec_command', { command: 'echo hi' });
+      const pending = actionGate.getLatest()!;
+      const result = await pending.executor!(pending.args);
+      expect(result).toBe('ok');
+      expect(ran).toBe('echo hi');
+      actionGate.deny(pending.id);
+    } finally {
+      setCommandProvider(new LocalCommandProvider());
+    }
   });
 });

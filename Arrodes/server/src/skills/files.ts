@@ -6,9 +6,9 @@
  *
  * 所有技能统一经 actionGate 分级授权：低风险自动执行，高风险生成待确认项。
  */
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { registerSkill, type SkillArg } from './registry.js';
+import { getFsProvider } from '../services/fsProvider.js';
 
 interface FileSkillSpec {
   name: string;
@@ -42,21 +42,22 @@ function resolvePath(input: unknown): string {
 }
 
 function listDirectory(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const dir = args.path ? resolvePath(args.path) : process.cwd();
-  if (!fs.existsSync(dir)) throw new Error(`目录不存在: ${dir}`);
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  if (!fs.exists(dir)) throw new Error(`目录不存在: ${dir}`);
+  const entries = fs.readdir(dir);
   if (entries.length === 0) return '目录为空';
   return entries
     .map((entry) => {
-      const full = path.join(dir, entry.name);
-      const kind = entry.isDirectory() ? '[目录]' : '[文件]';
-      const size = entry.isDirectory() ? '-' : `${fs.statSync(full).size}B`;
+      const kind = entry.isDirectory ? '[目录]' : '[文件]';
+      const size = entry.isDirectory ? '-' : `${entry.size}B`;
       return `- ${kind} ${entry.name} ${size}`;
     })
     .join('\n');
 }
 
 function readFile(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const filePath = resolvePath(args.path);
   const maxLines = Number(args.lines) || 50;
 
@@ -66,12 +67,12 @@ function readFile(args: Record<string, unknown>): string {
     throw new Error('安全拦截: 禁止读取敏感配置文件');
   }
 
-  if (!fs.existsSync(filePath)) throw new Error(`文件不存在: ${filePath}`);
-  const stat = fs.statSync(filePath);
-  if (!stat.isFile()) throw new Error(`不是文件: ${filePath}`);
+  if (!fs.exists(filePath)) throw new Error(`文件不存在: ${filePath}`);
+  const stat = fs.stat(filePath);
+  if (!stat.isFile) throw new Error(`不是文件: ${filePath}`);
   if (stat.size > 500 * 1024) throw new Error(`文件过大（${(stat.size / 1024).toFixed(1)}KB），最大 500KB`);
 
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const content = fs.readFile(filePath);
   const lines = content.split('\n');
   const preview = lines.slice(0, maxLines).join('\n');
   const suffix = lines.length > maxLines ? `\n... (共 ${lines.length} 行，仅显示前 ${maxLines} 行)` : '';
@@ -79,78 +80,84 @@ function readFile(args: Record<string, unknown>): string {
 }
 
 function getFileInfo(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const filePath = resolvePath(args.path);
-  if (!fs.existsSync(filePath)) throw new Error(`路径不存在: ${filePath}`);
-  const stat = fs.statSync(filePath);
+  if (!fs.exists(filePath)) throw new Error(`路径不存在: ${filePath}`);
+  const stat = fs.stat(filePath);
   return [
     `路径: ${filePath}`,
-    `类型: ${stat.isDirectory() ? '目录' : '文件'}`,
+    `类型: ${stat.isDirectory ? '目录' : '文件'}`,
     `大小: ${stat.size} 字节`,
-    `修改时间: ${stat.mtime.toISOString()}`,
+    `修改时间: ${new Date(stat.mtimeMs).toISOString()}`,
   ].join('\n');
 }
 
 function writeFile(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const filePath = resolvePath(args.path);
   const content = String(args.content || '');
   const overwrite = args.overwrite === true;
   guardMutate(filePath);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  if (!overwrite && fs.existsSync(filePath)) {
-    fs.appendFileSync(filePath, '\n' + content, 'utf-8');
+  fs.mkdirp(path.dirname(filePath));
+  if (!overwrite && fs.exists(filePath)) {
+    fs.appendFile(filePath, '\n' + content);
   } else {
-    fs.writeFileSync(filePath, content, 'utf-8');
+    fs.writeFile(filePath, content);
   }
-  const verified = fs.readFileSync(filePath, 'utf-8');
+  const verified = fs.readFile(filePath);
   if (!verified.includes(content)) throw new Error(`核验失败: 写入内容不一致 ${filePath}`);
   return `已写入并核验 ${filePath} (${content.length} 字符)`;
 }
 
 function createFile(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const filePath = resolvePath(args.path);
   const content = String(args.content ?? '');
   guardMutate(filePath);
-  if (fs.existsSync(filePath)) throw new Error(`文件已存在: ${filePath}`);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, content, 'utf-8');
-  if (fs.readFileSync(filePath, 'utf-8') !== content) throw new Error(`核验失败: 内容不一致 ${filePath}`);
+  if (fs.exists(filePath)) throw new Error(`文件已存在: ${filePath}`);
+  fs.mkdirp(path.dirname(filePath));
+  fs.writeFile(filePath, content);
+  if (fs.readFile(filePath) !== content) throw new Error(`核验失败: 内容不一致 ${filePath}`);
   return `已创建并核验 ${filePath}`;
 }
 
 function deleteFile(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const filePath = resolvePath(args.path);
   guardMutate(filePath);
-  if (!fs.existsSync(filePath)) throw new Error(`路径不存在: ${filePath}`);
-  const stat = fs.statSync(filePath);
-  if (stat.isDirectory()) {
-    if (fs.readdirSync(filePath).length > 0) throw new Error(`目录非空，拒绝删除: ${filePath}`);
-    fs.rmdirSync(filePath);
+  if (!fs.exists(filePath)) throw new Error(`路径不存在: ${filePath}`);
+  const stat = fs.stat(filePath);
+  if (stat.isDirectory) {
+    if (fs.readdir(filePath).length > 0) throw new Error(`目录非空，拒绝删除: ${filePath}`);
+    fs.rmdir(filePath);
   } else {
-    fs.unlinkSync(filePath);
+    fs.unlink(filePath);
   }
-  if (fs.existsSync(filePath)) throw new Error(`核验失败: 路径仍存在 ${filePath}`);
+  if (fs.exists(filePath)) throw new Error(`核验失败: 路径仍存在 ${filePath}`);
   return `已删除并核验 ${filePath}`;
 }
 
 function moveFile(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const source = resolvePath(args.source);
   const target = resolvePath(args.target);
   guardMutate(target);
-  if (!fs.existsSync(source)) throw new Error(`源不存在: ${source}`);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.renameSync(source, target);
-  if (!fs.existsSync(target) || fs.existsSync(source)) throw new Error(`核验失败: 移动未生效 ${source} -> ${target}`);
+  if (!fs.exists(source)) throw new Error(`源不存在: ${source}`);
+  fs.mkdirp(path.dirname(target));
+  fs.rename(source, target);
+  if (!fs.exists(target) || fs.exists(source)) throw new Error(`核验失败: 移动未生效 ${source} -> ${target}`);
   return `已移动并核验 ${source} -> ${target}`;
 }
 
 function copyFile(args: Record<string, unknown>): string {
+  const fs = getFsProvider();
   const source = resolvePath(args.source);
   const target = resolvePath(args.target);
   guardMutate(target);
-  if (!fs.existsSync(source)) throw new Error(`源不存在: ${source}`);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.copyFileSync(source, target);
-  if (!fs.existsSync(target) || fs.statSync(target).size !== fs.statSync(source).size) {
+  if (!fs.exists(source)) throw new Error(`源不存在: ${source}`);
+  fs.mkdirp(path.dirname(target));
+  fs.copyFile(source, target);
+  if (!fs.exists(target) || fs.stat(target).size !== fs.stat(source).size) {
     throw new Error(`核验失败: 复制结果不一致 ${source} -> ${target}`);
   }
   return `已复制并核验 ${source} -> ${target}`;
