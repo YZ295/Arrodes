@@ -18,9 +18,35 @@ import type {
   TaskRecord,
 } from './agent.js';
 
+export type HarnessEvent =
+  | { type: 'turn:start'; sessionId: string; agentId: string }
+  | { type: 'turn:end'; sessionId: string; agentId: string; failed: boolean }
+  | { type: 'turn:error'; sessionId: string; agentId: string; error: string };
+
+type HarnessListener = (event: HarnessEvent) => void;
+
 export class Harness {
   private agents = new Map<string, AgentDefinition>();
   private tasks: TaskRecord[] = [];
+  private listeners = new Set<HarnessListener>();
+
+  /** 订阅生命周期事件；返回 disposer（卸载即回滚，借鉴 Cordis 注册即副作用） */
+  on(listener: HarnessListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private emit(event: HarnessEvent): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch (err) {
+        console.warn('[Harness] 事件监听器异常:', err);
+      }
+    }
+  }
 
   // ============================================================
   // Agent 注册表
@@ -124,6 +150,7 @@ export class Harness {
       inputPreview: input.content.slice(0, 40),
     };
     this.logTask(record);
+    this.emit({ type: 'turn:start', sessionId: ctx.sessionId, agentId });
 
     const retries = options.retries ?? 1;
     let lastError: unknown;
@@ -135,6 +162,7 @@ export class Harness {
         record.finishedAt = Date.now();
         record.durationMs = record.finishedAt - record.startedAt;
         record.error = result.error;
+        this.emit({ type: 'turn:end', sessionId: ctx.sessionId, agentId, failed: result.failed ?? false });
         return result;
       } catch (err) {
         lastError = err;
@@ -150,6 +178,7 @@ export class Harness {
     record.durationMs = record.finishedAt - record.startedAt;
     record.error = lastError instanceof Error ? lastError.message : String(lastError);
     console.error(`[Harness] ${agentId} 执行失败:`, record.error);
+    this.emit({ type: 'turn:error', sessionId: ctx.sessionId, agentId, error: record.error });
 
     return { reply: '', failed: true, error: record.error };
   }
