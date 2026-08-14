@@ -28,6 +28,7 @@ import { createPromptShellRouter } from './routes/promptShell.js';
 import { createActionsRouter } from './routes/actions.js';
 import { harness } from './harness/harness.js';
 import { classifyAction } from './services/actionGate.js';
+import { applySkillProfile } from './services/skillProfile.js';
 // 加载内置技能
 import './skills/memory.js';
 import './skills/command.js';
@@ -50,7 +51,10 @@ import './skills/browser.js';
 import './skills/mcp.js';
 // 文件操作技能族（read/write/create/delete/list/move/copy，统一 actionGate）
 import './skills/files.js';
-import { getAllSkills, registerSkill, unregisterSkill } from './skills/registry.js';
+import { getAllSkills, registerSkill, unregisterSkill, isSkillEnabled } from './skills/registry.js';
+
+// 启动时按配置裁剪技能（profile 组合）
+applySkillProfile();
 import { startMainloop } from './services/mainloop.js';
 
 const app = express();
@@ -101,6 +105,7 @@ app.get('/api/v1/skills', (_req, res) => {
     args: s.args,
     risk: classifyAction(s.name),
     readOnly: s.readOnly ?? false,
+    enabled: isSkillEnabled(s.name),
   }));
   res.json({ skills });
 });

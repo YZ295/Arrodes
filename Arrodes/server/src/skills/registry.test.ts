@@ -8,6 +8,8 @@ import {
   registerSkill,
   registerToolPreHook,
   registerToolPostHook,
+  setSkillEnabled,
+  buildSkillsPrompt,
   executeToolCall,
 } from './registry.js';
 
@@ -53,5 +55,21 @@ describe('工具执行管线', () => {
     await executeToolCall('__pipeline_post_observe__', {});
     expect(seen).toBe('ok');
     dispose();
+  });
+
+  it('禁用技能后 executeToolCall 拒绝、buildSkillsPrompt 不包含（profile 组合）', async () => {
+    registerSkill({
+      name: '__profile_disable__',
+      description: 'x',
+      args: [],
+      risk: 'low',
+      execute: async () => 'ran',
+    });
+    setSkillEnabled('__profile_disable__', false);
+
+    expect(await executeToolCall('__profile_disable__', {})).toContain('禁用');
+    expect(buildSkillsPrompt()).not.toContain('__profile_disable__');
+
+    setSkillEnabled('__profile_disable__', true);
   });
 });

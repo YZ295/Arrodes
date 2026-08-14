@@ -87,6 +87,20 @@ registerToolPreHook(async (skill, args) => {
 // ===== 技能注册表 =====
 
 const skills = new Map<string, AgentSkill>();
+const disabledSkills = new Set<string>();
+
+/** 按配置启用/禁用技能（profile 组合：无需改代码即可裁剪能力面） */
+export function setSkillEnabled(name: string, enabled: boolean): void {
+  if (enabled) {
+    disabledSkills.delete(name);
+  } else {
+    disabledSkills.add(name);
+  }
+}
+
+export function isSkillEnabled(name: string): boolean {
+  return !disabledSkills.has(name);
+}
 
 export function registerSkill(skill: AgentSkill): void {
   skills.set(skill.name, skill);
@@ -111,6 +125,7 @@ export function buildSkillsPrompt(): string {
   if (skills.size === 0) return '';
 
   const skillList = Array.from(skills.values())
+    .filter((s) => !disabledSkills.has(s.name))
     .map((s) => {
       const args = s.args.map((a) => `"${a.name}"(${a.type}, ${a.required ? '必填' : '可选'}): ${a.description}`).join(', ');
       return `- **${s.name}**: ${s.description}。参数: ${args}`;
@@ -151,6 +166,7 @@ export async function executeToolCall(
 ): Promise<string> {
   const skill = skills.get(name);
   if (!skill) return `错误: 未找到技能 "${name}"`;
+  if (disabledSkills.has(name)) return `错误: 技能 "${name}" 已禁用`;
 
   try {
     for (const hook of preHooks) {
