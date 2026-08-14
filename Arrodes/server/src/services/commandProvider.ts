@@ -5,7 +5,7 @@
  * - LocalCommandProvider：Service Provider（node:child_process）
  * - Consumer：skills/command.ts 的 exec_command 技能
  */
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 
 export interface CommandOutcome {
   stdout: string;
@@ -18,6 +18,18 @@ export interface CommandProvider {
     command: string,
     opts: { cwd: string; timeoutMs: number; maxBuffer: number },
   ): CommandOutcome;
+  /** 异步执行（不阻塞事件循环），用于长任务 */
+  runAsync?(
+    command: string,
+    opts: { cwd: string; timeoutMs: number; maxBuffer: number },
+  ): Promise<AsyncCommandOutcome>;
+}
+
+export interface AsyncCommandOutcome {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
 }
 
 export class LocalCommandProvider implements CommandProvider {
@@ -38,6 +50,44 @@ export class LocalCommandProvider implements CommandProvider {
         exitCode: err.status ?? 1,
       };
     }
+  }
+
+  async runAsync(
+    command: string,
+    opts: { cwd: string; timeoutMs: number; maxBuffer: number },
+  ): Promise<AsyncCommandOutcome> {
+    return new Promise((resolvePromise) => {
+      const child = spawn(command, [], {
+        cwd: opts.cwd,
+        windowsHide: true,
+        shell: true,
+      });
+      let stdout = '';
+      let stderr = '';
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // ignore
+        }
+      }, opts.timeoutMs);
+      child.stdout?.on('data', (d: Buffer) => {
+        stdout += d.toString();
+      });
+      child.stderr?.on('data', (d: Buffer) => {
+        stderr += d.toString();
+      });
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        resolvePromise({ stdout, stderr: stderr || err.message, exitCode: -1, timedOut });
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        resolvePromise({ stdout, stderr, exitCode: code, timedOut });
+      });
+    });
   }
 }
 

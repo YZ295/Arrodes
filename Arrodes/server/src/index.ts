@@ -51,6 +51,8 @@ import './skills/browser.js';
 import './skills/mcp.js';
 // 文件操作技能族（read/write/create/delete/list/move/copy，统一 actionGate）
 import './skills/files.js';
+// 自我修改技能（委派本机 codex CLI，高风险需确认）
+import './skills/selfModify.js';
 import { getAllSkills, registerSkill, unregisterSkill, isSkillEnabled } from './skills/registry.js';
 
 // 启动时按配置裁剪技能（profile 组合）
