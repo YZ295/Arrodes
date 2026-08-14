@@ -8,6 +8,7 @@
  *   当需要执行操作时，输出：<tool_call>{ "name": "skill_name", "args": {...} }</tool_call>
  *   执行结果会自动注入为：系统通知: 技能执行结果: ...
  */
+import { actionGate, classifyAction } from '../services/actionGate.js';
 
 // ===== 技能接口 =====
 
@@ -27,9 +28,61 @@ export interface AgentSkill {
   args: SkillArg[];
   /** 是否只读（不产生副作用）；用于前端展示与后续提示词分层 */
   readOnly?: boolean;
+  /** 风险等级：高风险走 actionGate 确认（未填时按 actionGate 规则分类） */
+  risk?: 'low' | 'high';
+  /** 生成待确认描述 */
+  describe?: (args: Record<string, unknown>) => string;
   /** 执行技能 */
   execute: (args: Record<string, unknown>) => Promise<string>;
 }
+
+// ===== 工具执行管线（借鉴 DeepSeek Harness：策略与执行分离） =====
+
+export type ToolPreHook = (
+  skill: AgentSkill,
+  args: Record<string, unknown>,
+) => Promise<string | null>;
+
+export type ToolPostHook = (
+  skill: AgentSkill,
+  args: Record<string, unknown>,
+  result: string,
+) => Promise<void>;
+
+const preHooks: ToolPreHook[] = [];
+const postHooks: ToolPostHook[] = [];
+
+export function registerToolPreHook(hook: ToolPreHook): () => void {
+  preHooks.push(hook);
+  return () => {
+    const index = preHooks.indexOf(hook);
+    if (index >= 0) preHooks.splice(index, 1);
+  };
+}
+
+export function registerToolPostHook(hook: ToolPostHook): () => void {
+  postHooks.push(hook);
+  return () => {
+    const index = postHooks.indexOf(hook);
+    if (index >= 0) postHooks.splice(index, 1);
+  };
+}
+
+// 默认授权策略钩子：高风险技能先生成待确认项（等价于 tools/pre-execute 授权策略）
+registerToolPreHook(async (skill, args) => {
+  const risk = skill.risk ?? classifyAction(skill.name);
+  if (risk !== 'high') return null;
+  const outcome = actionGate.request(
+    skill.name,
+    args,
+    skill.describe?.(args) ?? `执行技能 ${skill.name}`,
+    skill.execute,
+  );
+  if (outcome.pending) {
+    return `⚠️ 需要你确认：${outcome.pending.description}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;
+  }
+  return null;
+});
 
 // ===== 技能注册表 =====
 
@@ -100,7 +153,14 @@ export async function executeToolCall(
   if (!skill) return `错误: 未找到技能 "${name}"`;
 
   try {
+    for (const hook of preHooks) {
+      const stopped = await hook(skill, args);
+      if (stopped != null) return stopped;
+    }
     const result = await skill.execute(args);
+    for (const hook of postHooks) {
+      await hook(skill, args, result);
+    }
     return result;
   } catch (err) {
     return `错误: ${err instanceof Error ? err.message : '执行失败'}`;

@@ -2,7 +2,6 @@
  * 命令执行技能（结构化拦截 + actionGate 分级授权）
  */
 import { registerSkill } from './registry.js';
-import { actionGate } from '../services/actionGate.js';
 
 const BLOCKED_SUBSTRINGS = [
   'rm -rf', 'del /s', 'del /f', 'reg delete', 'sc delete',
@@ -63,16 +62,7 @@ registerSkill({
   args: [
     { name: 'command', type: 'string', required: true, description: '要执行的命令（如 dir, echo, git status 等非交互命令）' },
   ],
-  execute: async (args) => {
-    const outcome = actionGate.request(
-      'exec_command',
-      args,
-      `执行命令 ${String(args.command ?? '').trim() || '(空)'}`,
-      runExecCommand,
-    );
-    if (outcome.pending) {
-      return `⚠️ 需要你确认：${outcome.pending.description}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;
-    }
-    return runExecCommand(args);
-  },
+  risk: 'high',
+  describe: (args) => `执行命令 ${String(args.command ?? '').trim() || '(空)'}`,
+  execute: runExecCommand,
 });

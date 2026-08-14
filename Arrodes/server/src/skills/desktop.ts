@@ -6,7 +6,7 @@
  */
 import { registerSkill, type SkillArg } from './registry.js';
 import { runWinOp, isDesktopToolsEnabled, type WinOp } from '../services/winops.js';
-import { actionGate } from '../services/actionGate.js';
+import { classifyAction } from '../services/actionGate.js';
 import { resolve } from 'node:path';
 
 function defaultScreenshotDir(): string {
@@ -83,20 +83,9 @@ function registerDesktopSkill(spec: DesktopSkillSpec): void {
     name: spec.name,
     description: spec.description,
     args: spec.args,
-    execute: async (args) => {
-      if (!isDesktopToolsEnabled()) {
-        return '桌面操控已关闭（环境变量 DESKTOP_TOOLS=off）';
-      }
-      const outcome = actionGate.request(spec.name, args, spec.describe(args), (a) =>
-        executeDesktopAction(spec, a),
-      );
-      if (outcome.pending) {
-        return `⚠️ 需要你确认：${outcome.pending.description}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;
-      }
-      const result = await runWinOp(spec.op, spec.payload ? spec.payload(args) : args);
-      if (!result.ok) return `操作失败: ${result.error || '未知错误'}`;
-      return formatResult(spec.op, result.data);
-    },
+    risk: classifyAction(spec.name),
+    describe: spec.describe,
+    execute: (args) => executeDesktopAction(spec, args),
   });
 }
 

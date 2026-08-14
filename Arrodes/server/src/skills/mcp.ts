@@ -6,7 +6,6 @@
  */
 import { registerSkill } from './registry.js';
 import { loadMcpRegistry } from '../services/mcpClient.js';
-import { actionGate } from '../services/actionGate.js';
 
 const registry = loadMcpRegistry();
 
@@ -81,6 +80,8 @@ registerSkill({
     { name: 'tool', type: 'string', required: true, description: '工具名' },
     { name: 'arguments', type: 'string', required: false, description: 'JSON 字符串形式的工具参数' },
   ],
+  risk: 'high',
+  describe: (args) => `调用 MCP 工具 ${String(args.server ?? '')}.${String(args.tool ?? '')}`,
   execute: async (args) => {
     const server = String(args.server || '').trim();
     const client = registry.get(server);
@@ -94,18 +95,6 @@ registerSkill({
     if (!parsedArgs.ok) {
       return `错误: ${parsedArgs.error}`;
     }
-    const toolArgs = parsedArgs.args;
-
-    const outcome = actionGate.request(
-      'mcp_call_tool',
-      args,
-      `调用 MCP 工具 ${server}.${tool}`,
-      (a) => executeMcpCallDirect(String(a.server), String(a.tool), toolArgsOrEmpty(a.arguments)),
-    );
-    if (outcome.pending) {
-      return `⚠️ 需要你确认：调用 MCP 工具 ${server}.${tool}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;
-    }
-
-    return executeMcpCallDirect(server, tool, toolArgs);
+    return executeMcpCallDirect(server, tool, parsedArgs.args);
   },
 });

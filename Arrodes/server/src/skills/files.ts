@@ -9,7 +9,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { registerSkill, type SkillArg } from './registry.js';
-import { actionGate } from '../services/actionGate.js';
 
 interface FileSkillSpec {
   name: string;
@@ -158,25 +157,19 @@ function copyFile(args: Record<string, unknown>): string {
 }
 
 function registerFileSkill(spec: FileSkillSpec): void {
-  const run = async (args: Record<string, unknown>): Promise<string> => {
-    try {
-      return spec.run(args);
-    } catch (err) {
-      return `失败: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
-
   registerSkill({
     name: spec.name,
     description: spec.description,
     args: spec.args,
     readOnly: spec.readOnly,
+    risk: spec.readOnly ? 'low' : 'high',
+    describe: spec.describe,
     execute: async (args) => {
-      const outcome = actionGate.request(spec.name, args, spec.describe(args), run);
-      if (outcome.pending) {
-        return `⚠️ 需要你确认：${outcome.pending.description}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;
+      try {
+        return spec.run(args);
+      } catch (err) {
+        return `失败: ${err instanceof Error ? err.message : String(err)}`;
       }
-      return run(args);
     },
   });
 }
