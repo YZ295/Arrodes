@@ -20,9 +20,9 @@
 
 效果：授权策略与技能执行解耦；后续加日志、审计、限流等策略只需注册 pre/post 钩子，不再改动技能本体。
 
-## 后续（按第一性原理排序）
+## 进展（按第一性原理排序）
 
-- **会话日志投影**（模型可见 ⟺ 已记录）：把 `ws/handler.ts` 里 `messageRepo.findBySession(...).slice(-10)` 抽成 `deriveMessages`。
-- **turn/step 生命周期事件**：`turn/start`、`step/start`、`step/end`、`turn/end` 作为可观测扩展点。
-- **能力 seam 化**：把 fs / subprocess / llm 抽象为 Provider 接口（当前 `winops` 已接近 Provider 形态）。
-- **profiles/bundles**：按配置文件组合插件树（当前无此概念）。
+- [x] **会话日志投影**（模型可见 ⟺ 已记录）：`services/modelHistory.ts` 提供 `deriveSessionHistory` 与 `assembleModelMessages`，main/dev/handler 已统一使用（`2c5b0fa`）。
+- [x] **turn 生命周期事件**：`Harness` 增加 `on`/`emit`（返回 disposer），发出 `turn:start` / `turn:end` / `turn:error`（`64c143b`）。
+- [ ] **能力 seam 化**：把 fs / subprocess / llm 抽象为 Definition/Provider/Consumer 三角（当前 `winops` 已接近 Provider 形态，但需补全三角）。
+- [ ] **profiles/bundles**：按配置文件组合插件树（当前无此概念）。
