@@ -24,5 +24,6 @@
 
 - [x] **会话日志投影**（模型可见 ⟺ 已记录）：`services/modelHistory.ts` 提供 `deriveSessionHistory` 与 `assembleModelMessages`，main/dev/handler 已统一使用（`2c5b0fa`）。
 - [x] **turn 生命周期事件**：`Harness` 增加 `on`/`emit`（返回 disposer），发出 `turn:start` / `turn:end` / `turn:error`（`64c143b`）。
-- [ ] **能力 seam 化**：把 fs / subprocess / llm 抽象为 Definition/Provider/Consumer 三角（当前 `winops` 已接近 Provider 形态，但需补全三角）。
+- [x] **能力 seam 化（部分）**：fs（`services/fsProvider.ts`）、subprocess（`services/commandProvider.ts`）已抽象为 Definition/Provider/Consumer 三角（`a92ed7e`）。
+- [ ] **llm seam**：把 DeepSeek 适配器抽象为 `LlmProvider`（当前 `llmService.ts` 已较隔离，但未定义 Provider 接口）。
 - [ ] **profiles/bundles**：按配置文件组合插件树（当前无此概念）。
