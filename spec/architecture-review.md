@@ -114,3 +114,41 @@ graph TD
 回滚：本改动为行为增强（文件写/命令执行由「直接执行」变为「确认后执行」）。若需恢复旧行为，回退 actionGate.ts 与 builtin.ts 中 exec_command/write_file 的相关改动即可；新增测试可保留或一并回退。
 
 遗留风险：确认动作仍依赖用户回复短句；exec_command 结构化拦截仍属黑名单防御，不能替代确认授权；只读技能元数据当前仅标注 files 族，其余技能可按需补齐。
+
+---
+
+# 工作区模块架构评估（2026-08-15，improve-architecture）
+
+## 现状
+
+```
+client/WorkspacePanel.tsx（~450 行：切换器/Agent 卡/聊天/任务/记忆/Obsidian/语音）
+  └─ /api/v1/workspaces/*  → routes/workspaces.ts（CRUD/成员/聊天/任务/记忆 五类职责）
+  └─ /api/v1/workspace/*   → routes/workspace.ts（概览/记忆/同步 Obsidian）
+       services/：agentAdapters（注册表+适配器）、agentTasks、agentMemories、obsidianMemory、repoRoot
+       db/：workspace-repo（含成员）、agent-chat-repo
+       workspace/：memory-hub
+```
+
+依赖方向无循环：routes → services → db/workspace；client → routes。适配器 seam（Definition/Provider/Consumer）完整。
+
+## 问题清单
+
+| 级别 | 问题 | 证据 | 状态 |
+|---|---|---|---|
+| P2 | routes/workspaces.ts 上帝路由：CRUD + 成员 + 聊天 + 任务 + 记忆 五类职责混在一个文件 | routes/workspaces.ts ~250 行 | 待办 S2 |
+| P2 | WorkspacePanel 上帝组件：切换器/Agent 卡/聊天/任务/记忆/Obsidian/语音全在一个组件 | WorkspacePanel.tsx ~450 行 | 待办 S3 |
+| P3 | 已接入校验重复 3 次（chat/tasks/memories） | workspaces.ts | 已修（抽 isConnectedAgent） |
+| P3 | repoRoot() 在 selfModify 与 workspaces 重复 | skills/selfModify.ts、routes/workspaces.ts | 已修（抽 services/repoRoot.ts） |
+| P3 | 路由层无契约测试（supertest 未引入），核心逻辑靠 service/仓库层测试覆盖 | routes/* | 待办 S4 |
+
+## 目标与重构步骤（按风险升序）
+
+- S1（已做）：抽 `services/repoRoot.ts`、抽 `isConnectedAgent` helper——行为不变，测试通过。
+- S2（结构性，需批准）：把 workspaces.ts 按职责拆为 `routes/workspaceMembers.ts`、`routes/workspaceAgents.ts`（聊天/任务/记忆），母路由挂载。
+- S3（结构性，需批准）：把 WorkspacePanel 拆出 `AgentChatPanel.tsx`（聊天+任务+语音+记忆保存），面板只留切换器/Agent 卡/记忆。
+- S4（低风险）：引入 supertest 给成员/聊天/任务/记忆路由补契约测试。
+
+## 验证
+
+server typecheck 通过；npx vitest run src 33 文件 / 166 用例全绿（S1 重构后行为不变）。

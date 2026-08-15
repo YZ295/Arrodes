@@ -8,14 +8,11 @@
  * （默认 danger-full-access，本机 Windows 沙箱起不来时兜底）。
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { registerSkill } from './registry.js';
 import { getCommandProvider, type AsyncCommandOutcome } from '../services/commandProvider.js';
-
-function repoRoot(): string {
-  return process.env.ARRODES_REPO_ROOT || resolve(process.cwd(), '..', '..');
-}
+import { repoRoot } from '../services/repoRoot.js';
 
 export async function runSelfModify(args: Record<string, unknown>): Promise<string> {
   const task = String(args.task || '').trim();

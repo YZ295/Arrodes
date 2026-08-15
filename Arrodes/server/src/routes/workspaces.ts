@@ -13,12 +13,14 @@ import { AgentChatRepository } from '../db/agent-chat-repo.js';
 import { agentAdapters } from '../services/agentAdapters.js';
 import { dispatchAgentTask } from '../services/agentTasks.js';
 import { recordAgentMemory } from '../services/agentMemories.js';
-import { resolve } from 'node:path';
+import { repoRoot } from '../services/repoRoot.js';
 
 const chatRepo = new AgentChatRepository();
 
-function repoRoot(): string {
-  return process.env.ARRODES_REPO_ROOT || resolve(process.cwd(), '..', '..');
+function isConnectedAgent(workspaceId: string, agentId: string): boolean {
+  return workspaceRepo.listMembers(workspaceId).some(
+    (m) => m.memberType === 'agent' && m.memberId === agentId,
+  );
 }
 
 export function createWorkspacesRouter(): Router {
@@ -99,10 +101,7 @@ export function createWorkspacesRouter(): Router {
       const ws = workspaceRepo.get(req.params.id);
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
       const agentId = req.params.agentId;
-      const connected = workspaceRepo.listMembers(ws.id).some(
-        (m) => m.memberType === 'agent' && m.memberId === agentId,
-      );
-      if (!connected) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
+      if (!isConnectedAgent(ws.id, agentId)) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
       const adapter = agentAdapters.get(agentId);
       if (!adapter) { res.status(400).json({ error: '该智能体暂不支持工作区对话' }); return; }
 
@@ -152,10 +151,7 @@ export function createWorkspacesRouter(): Router {
       const ws = workspaceRepo.get(req.params.id);
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
       const agentId = req.params.agentId;
-      const connected = workspaceRepo.listMembers(ws.id).some(
-        (m) => m.memberType === 'agent' && m.memberId === agentId,
-      );
-      if (!connected) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
+      if (!isConnectedAgent(ws.id, agentId)) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
       const adapter = agentAdapters.get(agentId);
       if (!adapter) { res.status(400).json({ error: '该智能体暂不支持派发任务' }); return; }
 
@@ -184,10 +180,7 @@ export function createWorkspacesRouter(): Router {
       const ws = workspaceRepo.get(req.params.id);
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
       const agentId = req.params.agentId;
-      const connected = workspaceRepo.listMembers(ws.id).some(
-        (m) => m.memberType === 'agent' && m.memberId === agentId,
-      );
-      if (!connected) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
+      if (!isConnectedAgent(ws.id, agentId)) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
       const content = String(req.body?.content ?? '').trim();
       if (!content) { res.status(400).json({ error: '内容不能为空' }); return; }
       const memory = recordAgentMemory({
