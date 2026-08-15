@@ -235,10 +235,11 @@ export default function WorkspacePanel() {
                   </button>
                   <button
                     onClick={() => setChatAgent(a.id)}
-                    disabled={!a.available || !connected.includes(a.id)}
+                    disabled={!a.available || !connected.includes(a.id) || a.type === 'native'}
+                    title={a.type === 'native' ? '阿罗德斯本体请在主对话中聊天' : '进入对话'}
                     className="text-[16px] px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors disabled:opacity-40"
                   >
-                    对话
+                    {a.type === 'native' ? '本体' : '对话'}
                   </button>
                 </div>
               </div>

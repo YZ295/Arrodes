@@ -45,7 +45,9 @@ export function createWorkspaceAgentsRouter(): Router {
 
       let reply: string;
       try {
-        reply = await adapter.run(task, { cwd: repoRoot(), signal: req.signal });
+        // 不用 req.signal：POST 长任务下请求体读完 ~3s 会虚假 abort（keep-alive），会误杀子进程。
+        // 中止语义由显式 cancel 端点负责（见 /runs/:runId/cancel）。
+        reply = await adapter.run(task, { cwd: repoRoot() });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         chatRepo.append(ws.id, agentId, 'assistant', `（对话失败: ${msg.slice(0, 500)}）`);
@@ -90,7 +92,6 @@ export function createWorkspaceAgentsRouter(): Router {
         task,
         adapter,
         cwd: repoRoot(),
-        signal: req.signal,
       });
       res.json({ reply });
     } catch (err) {
