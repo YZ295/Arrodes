@@ -48,14 +48,14 @@ export class WorkspaceMemoryHub {
       sourceAgent: input.sourceAgent || 'arrodes',
       type: input.type || 'note',
       createdAt: new Date().toISOString(),
+      workspaceId: input.workspaceId || 'default',
     };
-    const workspaceId = input.workspaceId || 'default';
     if (!record.content) throw new Error('内容不能为空');
     if (record.content.length > 2000) throw new Error('内容过长（最大 2000 字）');
     db.prepare(`
       INSERT INTO workspace_memories (id, content, source_agent, type, workspace_id, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(record.id, record.content, record.sourceAgent, record.type, workspaceId, record.createdAt);
+    `).run(record.id, record.content, record.sourceAgent, record.type, record.workspaceId, record.createdAt);
     return record;
   }
 

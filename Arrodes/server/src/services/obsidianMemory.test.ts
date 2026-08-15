@@ -37,6 +37,15 @@ describe('obsidianMemory 统一格式导出', () => {
     expect(idx).toContain('mem-def456');
   });
 
+  it('重复同步幂等：不产生重复文件', () => {
+    const first = writeMemoryNotes(tmp, memories);
+    const second = writeMemoryNotes(tmp, memories);
+    const files = fs.readdirSync(path.join(tmp, 'Knowledge', '知识库', 'workspace-memories'));
+    expect(first.count).toBe(2);
+    expect(second.count).toBe(2);
+    expect(files.length).toBe(3); // 2 条记忆 + 1 索引
+  });
+
   afterAll(() => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });

@@ -12,6 +12,7 @@ import { workspaceRepo } from '../db/workspace-repo.js';
 import { AgentChatRepository } from '../db/agent-chat-repo.js';
 import { agentAdapters } from '../services/agentAdapters.js';
 import { dispatchAgentTask } from '../services/agentTasks.js';
+import { recordAgentMemory } from '../services/agentMemories.js';
 import { resolve } from 'node:path';
 
 const chatRepo = new AgentChatRepository();
@@ -167,6 +168,30 @@ export function createWorkspacesRouter(): Router {
       const msg = err instanceof Error ? err.message : '派发任务失败';
       console.error('[AgentTask] 派发失败:', msg);
       res.status(500).json({ error: msg });
+    }
+  });
+
+  // 外部智能体写共享记忆（经 Arrodes 中转，统一格式）
+  router.post('/:id/agents/:agentId/memories', (req, res) => {
+    try {
+      const ws = workspaceRepo.get(req.params.id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      const agentId = req.params.agentId;
+      const connected = workspaceRepo.listMembers(ws.id).some(
+        (m) => m.memberType === 'agent' && m.memberId === agentId,
+      );
+      if (!connected) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
+      const content = String(req.body?.content ?? '').trim();
+      if (!content) { res.status(400).json({ error: '内容不能为空' }); return; }
+      const memory = recordAgentMemory({
+        workspaceId: ws.id,
+        agentId,
+        content,
+        type: req.body?.type,
+      });
+      res.status(201).json({ memory });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : '写入记忆失败' });
     }
   });
 

@@ -211,6 +211,22 @@ export default function WorkspacePanel() {
     taskAbortRef.current?.abort();
   }, []);
 
+  const saveMemory = useCallback(async (content: string) => {
+    if (!chatAgent) return;
+    try {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${chatAgent}/memories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSyncMsg('✓ 已记入共享记忆');
+      setTimeout(() => setSyncMsg(''), 2000);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : '写入记忆失败');
+    }
+  }, [activeWorkspaceId, chatAgent]);
+
   return (
     <div className="p-5 space-y-6">
       {/* 工作区切换器 */}
@@ -269,6 +285,14 @@ export default function WorkspacePanel() {
                 }`}>
                   {m.content}
                 </span>
+                {m.role === 'assistant' && (
+                  <button
+                    onClick={() => saveMemory(m.content)}
+                    className="block mt-1 text-[16px] text-white/30 hover:text-blue-300 transition-colors"
+                  >
+                    记入共享记忆
+                  </button>
+                )}
               </div>
             ))}
             {chatLoading && <div className="text-sm text-white/30">智能体思考中…</div>}
