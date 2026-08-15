@@ -1,11 +1,32 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { getCommandProvider } from './commandProvider.js';
+import { getCommandProvider, type AsyncCommandOutcome } from './commandProvider.js';
+
+/** Agent 调用超时（可配；默认 8 分钟，避免 15 分钟静默被杀） */
+const AGENT_TIMEOUT_MS = Number(process.env.ARRODES_AGENT_TIMEOUT_MS || 8 * 60 * 1000);
 
 /** cmd.exe 双引号参数内仍会展开 %VAR%，^ 是转义符，! 在延迟展开时特殊——统一转义 */
 function escapeCmdArg(s: string): string {
   return s.replace(/\^/g, '^^').replace(/%/g, '^%').replace(/!/g, '^!');
+}
+
+/** 统一结果汇总：优先 -o 输出文件，其次 stdout；超时/中止显式报告；无输出时透出 stderr 诊断 */
+function summarizeOutcome(
+  outcome: AsyncCommandOutcome,
+  summary: string,
+  label: string,
+): string {
+  if (summary) return summary;
+  const stderrTail = (outcome.stderr || '').trim().slice(-500);
+  const stdout = (outcome.stdout || '').trim();
+  if (outcome.timedOut || outcome.aborted || outcome.exitCode === null) {
+    const why = outcome.timedOut ? '超时' : outcome.aborted ? '被中止' : '异常退出';
+    return `${label} 执行${why}（exit=${outcome.exitCode}）${stderrTail ? `\n诊断信息: ${stderrTail}` : ''}`;
+  }
+  if (stdout) return stdout;
+  if (stderrTail) return `${label} 无输出，诊断信息:\n${stderrTail}`;
+  return `${label} 无输出（exit=${outcome.exitCode}）`;
 }
 
 export interface AgentChatAdapter {
@@ -36,9 +57,9 @@ export class CodexCliAdapter implements AgentChatAdapter {
     const cmd = `codex exec --ephemeral -C "${opts.cwd}" -s ${sandbox} --color never -o "${outFile}" - < "${taskFile}"`;
     const provider = getCommandProvider();
     const outcome = provider.runAsync
-      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: 15 * 60 * 1000, maxBuffer: 20 * 1024 * 1024, signal: opts.signal })
+      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024, signal: opts.signal })
       : {
-          ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: 15 * 60 * 1000, maxBuffer: 20 * 1024 * 1024 }),
+          ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }),
           timedOut: false,
         };
     let summary = '';
@@ -47,7 +68,7 @@ export class CodexCliAdapter implements AgentChatAdapter {
     } catch {
       // ignore
     }
-    return summary || (outcome.stdout || '').trim() || `（codex 无输出，exit=${outcome.exitCode}）`;
+    return summarizeOutcome(outcome, summary, 'codex');
   }
 }
 
@@ -57,12 +78,12 @@ export class HermesCliAdapter implements AgentChatAdapter {
     const cmd = `hermes -z "${escapeCmdArg(safeTask)}"`;
     const provider = getCommandProvider();
     const outcome = provider.runAsync
-      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: 10 * 60 * 1000, maxBuffer: 10 * 1024 * 1024, signal: opts.signal })
+      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024, signal: opts.signal })
       : {
-          ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: 10 * 60 * 1000, maxBuffer: 10 * 1024 * 1024 }),
+          ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }),
           timedOut: false,
         };
-    return (outcome.stdout || '').trim() || (outcome.stderr || '').trim().slice(-500) || `（hermes 无输出，exit=${outcome.exitCode}）`;
+    return summarizeOutcome(outcome, '', 'hermes');
   }
 }
 

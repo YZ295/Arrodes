@@ -74,4 +74,40 @@ describe('AgentAdapterRegistry（T-02 对话适配）', () => {
       setCommandProvider(new LocalCommandProvider());
     }
   });
+
+  it('超时/中止时显式报告，而不是「无输出 exit=null」', async () => {
+    let captured = '';
+    const fake: CommandProvider = {
+      run: () => ({ stdout: '', stderr: '', exitCode: 0 }),
+      runAsync: async (command) => {
+        captured = command;
+        return { stdout: '', stderr: 'git sync 卡住', exitCode: null, timedOut: true };
+      },
+    };
+    setCommandProvider(fake);
+    try {
+      const adapter = new CodexCliAdapter();
+      const reply = await adapter.run('改一下 README', { cwd: 'E:/x' });
+      expect(reply).toContain('超时');
+      expect(reply).toContain('git sync 卡住');
+      expect(captured).toContain('codex exec');
+    } finally {
+      setCommandProvider(new LocalCommandProvider());
+    }
+  });
+
+  it('无 stdout 但 stderr 有内容时透出诊断信息', async () => {
+    const fake: CommandProvider = {
+      run: () => ({ stdout: '', stderr: '', exitCode: 0 }),
+      runAsync: async () => ({ stdout: '', stderr: 'MCP github 未配置', exitCode: 1, timedOut: false }),
+    };
+    setCommandProvider(fake);
+    try {
+      const adapter = new HermesCliAdapter();
+      const reply = await adapter.run('hi', { cwd: 'E:/x' });
+      expect(reply).toContain('MCP github 未配置');
+    } finally {
+      setCommandProvider(new LocalCommandProvider());
+    }
+  });
 });
