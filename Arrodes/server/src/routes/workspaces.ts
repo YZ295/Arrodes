@@ -33,11 +33,16 @@ export function createWorkspacesRouter(): Router {
 
   router.post('/', (req, res) => {
     try {
-      const { name, kind, icon } = req.body ?? {};
+      const { name, kind, icon, projectDir } = req.body ?? {};
       if (!name || !String(name).trim()) {
         res.status(400).json({ error: 'name 必填' }); return;
       }
-      const ws = workspaceRepo.create({ name: String(name), kind: kind ? String(kind) : undefined, icon: icon ? String(icon) : undefined });
+      const ws = workspaceRepo.create({
+        name: String(name),
+        kind: kind ? String(kind) : undefined,
+        icon: icon ? String(icon) : undefined,
+        projectDir: projectDir !== undefined ? String(projectDir) : undefined,
+      });
       res.status(201).json({ workspace: ws });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : '创建失败' });
@@ -64,12 +69,13 @@ export function createWorkspacesRouter(): Router {
 
   router.patch('/:id', (req, res) => {
     try {
-      const { name, icon, status, config } = req.body ?? {};
+      const { name, icon, status, config, projectDir } = req.body ?? {};
       const ws = workspaceRepo.update(req.params.id, {
         name: name !== undefined ? String(name) : undefined,
         icon: icon !== undefined ? String(icon) : undefined,
         status,
         config,
+        projectDir: projectDir !== undefined ? String(projectDir) : undefined,
       });
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
       res.json({ workspace: ws });

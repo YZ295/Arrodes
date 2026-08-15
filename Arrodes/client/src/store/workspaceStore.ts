@@ -13,6 +13,7 @@ export interface WorkspaceInfo {
   kind: string;
   icon: string;
   status: 'active' | 'archived';
+  config?: { projectDir?: string };
   stats?: { sessions: number; memories: number; wsMemories: number };
 }
 

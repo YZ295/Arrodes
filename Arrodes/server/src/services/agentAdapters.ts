@@ -54,7 +54,7 @@ export class CodexCliAdapter implements AgentChatAdapter {
     const taskFile = join(tmpdir(), `arrodes-agent-chat-task-${Date.now()}.txt`);
     const outFile = join(tmpdir(), `arrodes-agent-chat-out-${Date.now()}.txt`);
     writeFileSync(taskFile, task, 'utf-8');
-    const cmd = `codex exec --ephemeral -C "${opts.cwd}" -s ${sandbox} --color never -o "${outFile}" - < "${taskFile}"`;
+    const cmd = `codex exec --ephemeral --skip-git-repo-check -C "${opts.cwd}" -s ${sandbox} --color never -o "${outFile}" - < "${taskFile}"`;
     const provider = getCommandProvider();
     const outcome = provider.runAsync
       ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024, signal: opts.signal })

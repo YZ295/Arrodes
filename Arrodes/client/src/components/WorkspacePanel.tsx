@@ -45,6 +45,7 @@ export default function WorkspacePanel() {
   const [error, setError] = useState('');
   const [syncMsg, setSyncMsg] = useState('');
   const [chatAgent, setChatAgent] = useState<string | null>(null);
+  const [projectDir, setProjectDir] = useState('');
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -77,6 +78,11 @@ export default function WorkspacePanel() {
   useEffect(() => {
     setChatAgent(null);
   }, [activeWorkspaceId]);
+
+  // 激活工作区变化时同步项目目录输入
+  useEffect(() => {
+    setProjectDir(active?.config?.projectDir || '');
+  }, [active?.id, active?.config?.projectDir]);
 
   const addMemory = useCallback(async () => {
     if (!note.trim()) return;
@@ -146,6 +152,22 @@ export default function WorkspacePanel() {
     setTimeout(() => setSyncMsg(''), 2000);
   }, [activeWorkspaceId, load]);
 
+  const saveProjectDir = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectDir }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSyncMsg('✓ 项目目录已保存');
+      setTimeout(() => setSyncMsg(''), 2000);
+      await loadWorkspaces();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败');
+    }
+  }, [activeWorkspaceId, projectDir, loadWorkspaces]);
+
   return (
     <div className="p-5 space-y-6">
       {/* 工作区切换器 */}
@@ -170,6 +192,18 @@ export default function WorkspacePanel() {
             </span>
             <button onClick={() => setShowNew((p) => !p)} className="text-cyan-400/80 hover:text-cyan-400">
               {showNew ? '取消' : '+ 新建'}
+            </button>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <input
+              value={projectDir}
+              onChange={(e) => setProjectDir(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && saveProjectDir()}
+              placeholder="项目目录（agent 工作目录，如 E:/project/Crow5/Arrodes）"
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[16px] text-white/80 placeholder-white/25 focus:outline-none focus:border-cyan-400/30"
+            />
+            <button onClick={saveProjectDir} className="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 text-[16px] hover:bg-cyan-500/30">
+              保存
             </button>
           </div>
           {showNew && (

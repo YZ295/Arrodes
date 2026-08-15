@@ -99,21 +99,22 @@ export class WorkspaceRepository {
     return row ? toWorkspace(row) : null;
   }
 
-  create(input: { name: string; kind?: string; icon?: string }): Workspace {
+  create(input: { name: string; kind?: string; icon?: string; projectDir?: string }): Workspace {
     const db = getDb();
     const now = new Date().toISOString();
     const id = randomUUID();
+    const projectDir = input.projectDir && input.projectDir.trim() ? input.projectDir.trim() : undefined;
     const ws: Workspace = {
       id, name: input.name.trim(), kind: input.kind || 'default',
-      icon: input.icon || '🪐', config: {}, status: 'active',
+      icon: input.icon || '🪐', config: projectDir ? { projectDir } : {}, status: 'active',
       createdAt: now, updatedAt: now,
     };
     if (!ws.name) throw new Error('工作区名称不能为空');
     db.transaction(() => {
       db.prepare(`
         INSERT INTO workspaces (id, name, kind, icon, config_json, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, '{}', 'active', ?, ?)
-      `).run(ws.id, ws.name, ws.kind, ws.icon, now, now);
+        VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+      `).run(ws.id, ws.name, ws.kind, ws.icon, JSON.stringify(ws.config), now, now);
       db.prepare(`
         INSERT INTO workspace_members (workspace_id, member_type, member_id, role, joined_at)
         VALUES (?, 'user', 'local-user', 'owner', ?)
@@ -122,11 +123,17 @@ export class WorkspaceRepository {
     return ws;
   }
 
-  update(id: string, patch: { name?: string; icon?: string; status?: 'active' | 'archived'; config?: Record<string, unknown> }): Workspace | null {
+  update(id: string, patch: { name?: string; icon?: string; status?: 'active' | 'archived'; config?: Record<string, unknown>; projectDir?: string }): Workspace | null {
     const db = getDb();
     const cur = this.get(id);
     if (!cur) return null;
     const now = new Date().toISOString();
+    const nextConfig = { ...cur.config };
+    if (patch.projectDir !== undefined) {
+      const pd = String(patch.projectDir).trim();
+      if (pd) nextConfig.projectDir = pd;
+      else delete nextConfig.projectDir;
+    }
     db.prepare(`
       UPDATE workspaces
       SET name = ?, icon = ?, status = ?, config_json = ?, updated_at = ?
@@ -135,7 +142,7 @@ export class WorkspaceRepository {
       patch.name ?? cur.name,
       patch.icon ?? cur.icon,
       patch.status ?? cur.status,
-      JSON.stringify(patch.config ?? cur.config),
+      JSON.stringify(patch.config ?? nextConfig),
       now, id,
     );
     return this.get(id);
