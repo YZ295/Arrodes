@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { getCommandProvider } from './commandProvider.js';
 
 export interface AgentChatAdapter {
-  run(task: string, opts: { cwd: string }): Promise<string>;
+  run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string>;
 }
 
 export class AgentAdapterRegistry {
@@ -23,7 +23,7 @@ export class AgentAdapterRegistry {
 }
 
 export class CodexCliAdapter implements AgentChatAdapter {
-  async run(task: string, opts: { cwd: string }): Promise<string> {
+  async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
     const sandbox = process.env.SELF_MODIFY_SANDBOX || 'danger-full-access';
     const taskFile = join(tmpdir(), `arrodes-agent-chat-task-${Date.now()}.txt`);
     const outFile = join(tmpdir(), `arrodes-agent-chat-out-${Date.now()}.txt`);
@@ -31,7 +31,7 @@ export class CodexCliAdapter implements AgentChatAdapter {
     const cmd = `codex exec --ephemeral -C "${opts.cwd}" -s ${sandbox} --color never -o "${outFile}" - < "${taskFile}"`;
     const provider = getCommandProvider();
     const outcome = provider.runAsync
-      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: 15 * 60 * 1000, maxBuffer: 20 * 1024 * 1024 })
+      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: 15 * 60 * 1000, maxBuffer: 20 * 1024 * 1024, signal: opts.signal })
       : {
           ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: 15 * 60 * 1000, maxBuffer: 20 * 1024 * 1024 }),
           timedOut: false,
@@ -47,12 +47,12 @@ export class CodexCliAdapter implements AgentChatAdapter {
 }
 
 export class HermesCliAdapter implements AgentChatAdapter {
-  async run(task: string, opts: { cwd: string }): Promise<string> {
+  async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
     const safeTask = task.replace(/[\r\n]+/g, ' ').replace(/"/g, "'").slice(0, 4000);
     const cmd = `hermes -z "${safeTask}"`;
     const provider = getCommandProvider();
     const outcome = provider.runAsync
-      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: 10 * 60 * 1000, maxBuffer: 10 * 1024 * 1024 })
+      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: 10 * 60 * 1000, maxBuffer: 10 * 1024 * 1024, signal: opts.signal })
       : {
           ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: 10 * 60 * 1000, maxBuffer: 10 * 1024 * 1024 }),
           timedOut: false,

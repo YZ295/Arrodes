@@ -21,7 +21,7 @@ export interface CommandProvider {
   /** 异步执行（不阻塞事件循环），用于长任务 */
   runAsync?(
     command: string,
-    opts: { cwd: string; timeoutMs: number; maxBuffer: number },
+    opts: { cwd: string; timeoutMs: number; maxBuffer: number; signal?: AbortSignal },
   ): Promise<AsyncCommandOutcome>;
 }
 
@@ -30,6 +30,7 @@ export interface AsyncCommandOutcome {
   stderr: string;
   exitCode: number | null;
   timedOut: boolean;
+  aborted?: boolean;
 }
 
 export class LocalCommandProvider implements CommandProvider {
@@ -54,7 +55,7 @@ export class LocalCommandProvider implements CommandProvider {
 
   async runAsync(
     command: string,
-    opts: { cwd: string; timeoutMs: number; maxBuffer: number },
+    opts: { cwd: string; timeoutMs: number; maxBuffer: number; signal?: AbortSignal },
   ): Promise<AsyncCommandOutcome> {
     return new Promise((resolvePromise) => {
       const child = spawn(command, [], {
@@ -73,6 +74,14 @@ export class LocalCommandProvider implements CommandProvider {
           // ignore
         }
       }, opts.timeoutMs);
+      const onAbort = () => {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // ignore
+        }
+      };
+      opts.signal?.addEventListener('abort', onAbort, { once: true });
       child.stdout?.on('data', (d: Buffer) => {
         stdout += d.toString();
       });
@@ -81,11 +90,13 @@ export class LocalCommandProvider implements CommandProvider {
       });
       child.on('error', (err) => {
         clearTimeout(timer);
+        opts.signal?.removeEventListener('abort', onAbort);
         resolvePromise({ stdout, stderr: stderr || err.message, exitCode: -1, timedOut });
       });
       child.on('close', (code) => {
         clearTimeout(timer);
-        resolvePromise({ stdout, stderr, exitCode: code, timedOut });
+        opts.signal?.removeEventListener('abort', onAbort);
+        resolvePromise({ stdout, stderr, exitCode: code, timedOut, aborted: opts.signal?.aborted ?? false });
       });
     });
   }

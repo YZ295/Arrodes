@@ -4,7 +4,7 @@
  * 顶部：工作区切换器（切换/新建，localStorage 持久化）
  * 主体：Agent 连接器 + 共享记忆（按激活工作区隔离）
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
 
 interface AgentConnector {
@@ -47,6 +47,10 @@ export default function WorkspacePanel() {
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
+  const [taskInput, setTaskInput] = useState('');
+  const [taskConfirm, setTaskConfirm] = useState('');
+  const [taskLoading, setTaskLoading] = useState(false);
+  const taskAbortRef = useRef<AbortController | null>(null);
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -173,6 +177,40 @@ export default function WorkspacePanel() {
     }
   }, [activeWorkspaceId, chatAgent, chatInput, chatLoading]);
 
+  const runTask = useCallback(async () => {
+    if (!taskConfirm || !chatAgent || taskLoading) return;
+    setTaskLoading(true);
+    setChatError('');
+    setChatMessages((prev) => [...prev, { role: 'user', content: `【任务】${taskConfirm}` }]);
+    const controller = new AbortController();
+    taskAbortRef.current = controller;
+    try {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${chatAgent}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: taskConfirm }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: `【任务结果】${data.reply}` }]);
+      setTaskConfirm('');
+    } catch (err) {
+      if (controller.signal.aborted) {
+        setChatMessages((prev) => [...prev, { role: 'assistant', content: '【任务已中止】' }]);
+      } else {
+        setChatError(err instanceof Error ? err.message : '派发失败');
+      }
+    } finally {
+      setTaskLoading(false);
+      taskAbortRef.current = null;
+    }
+  }, [activeWorkspaceId, chatAgent, taskConfirm, taskLoading]);
+
+  const abortTask = useCallback(() => {
+    taskAbortRef.current?.abort();
+  }, []);
+
   return (
     <div className="p-5 space-y-6">
       {/* 工作区切换器 */}
@@ -255,6 +293,59 @@ export default function WorkspacePanel() {
               发送
             </button>
           </div>
+          {/* 派发任务 */}
+          {taskConfirm ? (
+            <div className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-2 space-y-2">
+              <div className="text-sm text-amber-200/90 break-words">向 {chatAgent} 派发任务：{taskConfirm}</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTaskConfirm('')}
+                  disabled={taskLoading}
+                  className="px-3 py-1.5 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 disabled:opacity-40"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={runTask}
+                  disabled={taskLoading}
+                  className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 disabled:opacity-40"
+                >
+                  确认执行
+                </button>
+              </div>
+            </div>
+          ) : taskLoading ? (
+            <div className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
+              <span className="text-sm text-white/50">任务执行中…</span>
+              <button onClick={abortTask} className="text-sm text-red-400/80 hover:text-red-300">中止</button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                value={taskInput}
+                onChange={(e) => setTaskInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && taskInput.trim()) {
+                    setTaskConfirm(taskInput.trim());
+                    setTaskInput('');
+                  }
+                }}
+                placeholder="派发任务，如：把登录页改成深色主题…"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/25 focus:outline-none focus:border-blue-400/40"
+              />
+              <button
+                onClick={() => {
+                  if (taskInput.trim()) {
+                    setTaskConfirm(taskInput.trim());
+                    setTaskInput('');
+                  }
+                }}
+                className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm text-white/80 transition-colors"
+              >
+                派发任务
+              </button>
+            </div>
+          )}
         </div>
       )}
 
