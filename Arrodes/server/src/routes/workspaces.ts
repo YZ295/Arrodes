@@ -42,9 +42,43 @@ export function createWorkspacesRouter(): Router {
     try {
       const ws = workspaceRepo.get(req.params.id);
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
-      res.json({ workspace: ws, stats: workspaceRepo.stats(ws.id) });
+      res.json({
+        workspace: ws,
+        stats: workspaceRepo.stats(ws.id),
+        members: workspaceRepo.listMembers(ws.id),
+      });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : '查询失败' });
+    }
+  });
+
+  // 接入智能体（连线）：memberType 默认 agent
+  router.post('/:id/members', (req, res) => {
+    try {
+      const ws = workspaceRepo.get(req.params.id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      const { memberType, memberId, role } = req.body ?? {};
+      const type: 'user' | 'agent' = memberType === 'user' ? 'user' : 'agent';
+      if (!memberId || !String(memberId).trim()) {
+        res.status(400).json({ error: 'memberId 必填' }); return;
+      }
+      const member = workspaceRepo.addMember(ws.id, type, String(memberId), role);
+      res.status(201).json({ member });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : '接入失败' });
+    }
+  });
+
+  // 断开智能体
+  router.delete('/:id/members/:memberId', (req, res) => {
+    try {
+      const ws = workspaceRepo.get(req.params.id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      const removed = workspaceRepo.removeMember(ws.id, 'agent', req.params.memberId);
+      if (!removed) { res.status(404).json({ error: '该智能体未接入此工作区' }); return; }
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : '断开失败' });
     }
   });
 

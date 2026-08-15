@@ -42,6 +42,51 @@ function toWorkspace(r: Row): Workspace {
 }
 
 export class WorkspaceRepository {
+  listMembers(workspaceId: string): WorkspaceMember[] {
+    const db = getDb();
+    return db.prepare(`
+      SELECT workspace_id AS workspaceId, member_type AS memberType,
+             member_id AS memberId, role, joined_at AS joinedAt
+      FROM workspace_members
+      WHERE workspace_id = ?
+      ORDER BY joined_at ASC
+    `).all(workspaceId) as WorkspaceMember[];
+  }
+
+  addMember(
+    workspaceId: string,
+    memberType: 'user' | 'agent',
+    memberId: string,
+    role: WorkspaceMember['role'] = 'member',
+  ): WorkspaceMember {
+    const existing = this.listMembers(workspaceId).find(
+      (m) => m.memberType === memberType && m.memberId === memberId,
+    );
+    if (existing) return existing;
+    const db = getDb();
+    const member: WorkspaceMember = {
+      workspaceId,
+      memberType,
+      memberId,
+      role,
+      joinedAt: new Date().toISOString(),
+    };
+    db.prepare(`
+      INSERT INTO workspace_members (workspace_id, member_type, member_id, role, joined_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(workspaceId, memberType, memberId, role, member.joinedAt);
+    return member;
+  }
+
+  removeMember(workspaceId: string, memberType: 'user' | 'agent', memberId: string): boolean {
+    const db = getDb();
+    const info = db.prepare(`
+      DELETE FROM workspace_members
+      WHERE workspace_id = ? AND member_type = ? AND member_id = ?
+    `).run(workspaceId, memberType, memberId);
+    return info.changes > 0;
+  }
+
   list(): Workspace[] {
     const db = getDb();
     const rows = db.prepare(

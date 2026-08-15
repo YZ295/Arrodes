@@ -33,6 +33,7 @@ const TYPE_LABEL: Record<string, string> = {
 export default function WorkspacePanel() {
   const { workspaces, workspacesLoading, activeWorkspaceId, loadWorkspaces, setActiveWorkspace, createWorkspace } = useWorkspaceStore();
   const [agents, setAgents] = useState<AgentConnector[]>([]);
+  const [connected, setConnected] = useState<string[]>([]);
   const [memories, setMemories] = useState<WorkspaceMemory[]>([]);
   const [memoryStats, setMemoryStats] = useState<{ total: number; byAgent: Record<string, number> }>({ total: 0, byAgent: {} });
   const [note, setNote] = useState('');
@@ -50,6 +51,7 @@ export default function WorkspacePanel() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setAgents(data.agents || []);
+      setConnected(data.connected || []);
       setMemories(data.memories?.recent || []);
       setMemoryStats(data.memories?.stats || { total: 0, byAgent: {} });
     } catch (err) {
@@ -111,6 +113,24 @@ export default function WorkspacePanel() {
       setSyncMsg(`同步失败: ${err instanceof Error ? err.message : '未知错误'}`);
     }
   }, [activeWorkspaceId]);
+
+  const toggleMember = useCallback(async (agentId: string) => {
+    const isConnected = connected.includes(agentId);
+    const url = isConnected
+      ? `/api/v1/workspaces/${activeWorkspaceId}/members/${agentId}`
+      : `/api/v1/workspaces/${activeWorkspaceId}/members`;
+    try {
+      const res = await fetch(url, {
+        method: isConnected ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: isConnected ? undefined : JSON.stringify({ memberType: 'agent', memberId: agentId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await load(activeWorkspaceId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '接入/断开失败');
+    }
+  }, [connected, activeWorkspaceId, load]);
 
   return (
     <div className="p-5 space-y-6">
@@ -174,9 +194,22 @@ export default function WorkspacePanel() {
                   <span className="text-sm font-medium text-white/80">{a.name}</span>
                   <span className="text-[16px] px-1.5 py-0.5 rounded bg-white/5 text-white/40">{TYPE_LABEL[a.type]}</span>
                 </div>
-                <span className={`text-[16px] ${a.available ? 'text-emerald-400/80' : 'text-white/25'}`}>
-                  {a.available ? '已接入' : '未检测到'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[16px] ${a.available ? 'text-emerald-400/80' : 'text-white/25'}`}>
+                    {a.available ? '可用' : '未检测到'}
+                  </span>
+                  <button
+                    onClick={() => toggleMember(a.id)}
+                    disabled={!a.available}
+                    className={`text-[16px] px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-40 ${
+                      connected.includes(a.id)
+                        ? 'bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30'
+                        : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/80'
+                    }`}
+                  >
+                    {!a.available ? '不可接入' : connected.includes(a.id) ? '断开' : '接入'}
+                  </button>
+                </div>
               </div>
               <div className="text-[16px] text-white/35 mt-1">{a.detail}</div>
               {a.capabilities.length > 0 && (

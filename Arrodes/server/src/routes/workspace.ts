@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { detectConnectors } from '../workspace/connectors.js';
 import { workspaceMemoryHub } from '../workspace/memory-hub.js';
+import { workspaceRepo } from '../db/workspace-repo.js';
 import { syncWorkspaceMemoriesToObsidian } from '../services/obsidianMemory.js';
 
 export function createWorkspaceRouter(): Router {
@@ -20,9 +21,12 @@ export function createWorkspaceRouter(): Router {
     try {
       const ws = typeof req.query.ws === 'string' && req.query.ws ? String(req.query.ws) : 'default';
       const agents = await detectConnectors();
+      const connected = workspaceRepo.listMembers(ws)
+        .filter((m) => m.memberType === 'agent')
+        .map((m) => m.memberId);
       const stats = workspaceMemoryHub.stats(ws);
       const recent = workspaceMemoryHub.search(undefined, 10, ws);
-      res.json({ agents, memories: { stats, recent } });
+      res.json({ agents, connected, memories: { stats, recent } });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : '工作区查询失败' });
     }
