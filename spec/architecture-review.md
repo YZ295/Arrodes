@@ -136,8 +136,8 @@ client/WorkspacePanel.tsx（~450 行：切换器/Agent 卡/聊天/任务/记忆/
 
 | 级别 | 问题 | 证据 | 状态 |
 |---|---|---|---|
-| P2 | routes/workspaces.ts 上帝路由：CRUD + 成员 + 聊天 + 任务 + 记忆 五类职责混在一个文件 | routes/workspaces.ts ~250 行 | 待办 S2 |
-| P2 | WorkspacePanel 上帝组件：切换器/Agent 卡/聊天/任务/记忆/Obsidian/语音全在一个组件 | WorkspacePanel.tsx ~450 行 | 待办 S3 |
+| P2 | routes/workspaces.ts 上帝路由：CRUD + 成员 + 聊天 + 任务 + 记忆 五类职责混在一个文件 | routes/workspaces.ts ~250 行 | 已修（S2：拆 workspaceMembers / workspaceAgents） |
+| P2 | WorkspacePanel 上帝组件：切换器/Agent 卡/聊天/任务/记忆/Obsidian/语音全在一个组件 | WorkspacePanel.tsx ~450 行 | 已修（S3：拆 AgentChatPanel） |
 | P3 | 已接入校验重复 3 次（chat/tasks/memories） | workspaces.ts | 已修（抽 isConnectedAgent） |
 | P3 | repoRoot() 在 selfModify 与 workspaces 重复 | skills/selfModify.ts、routes/workspaces.ts | 已修（抽 services/repoRoot.ts） |
 | P3 | 路由层无契约测试（supertest 未引入），核心逻辑靠 service/仓库层测试覆盖 | routes/* | 待办 S4 |
@@ -145,8 +145,8 @@ client/WorkspacePanel.tsx（~450 行：切换器/Agent 卡/聊天/任务/记忆/
 ## 目标与重构步骤（按风险升序）
 
 - S1（已做）：抽 `services/repoRoot.ts`、抽 `isConnectedAgent` helper——行为不变，测试通过。
-- S2（结构性，需批准）：把 workspaces.ts 按职责拆为 `routes/workspaceMembers.ts`、`routes/workspaceAgents.ts`（聊天/任务/记忆），母路由挂载。
-- S3（结构性，需批准）：把 WorkspacePanel 拆出 `AgentChatPanel.tsx`（聊天+任务+语音+记忆保存），面板只留切换器/Agent 卡/记忆。
+- S2（已完成，`fc4aefb`）：workspaces.ts 拆为 workspaceMembers / workspaceAgents 子路由。
+- S3（已完成，`db8c649`）：WorkspacePanel 拆出 AgentChatPanel（聊天+任务+语音+记忆保存）。
 - S4（低风险）：引入 supertest 给成员/聊天/任务/记忆路由补契约测试。
 
 ## 验证
