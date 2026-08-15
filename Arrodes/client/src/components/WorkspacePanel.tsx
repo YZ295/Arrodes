@@ -6,6 +6,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
+import { useAudioRecorder } from '../voice/hooks/useAudioRecorder';
 
 interface AgentConnector {
   id: string;
@@ -51,6 +52,10 @@ export default function WorkspacePanel() {
   const [taskConfirm, setTaskConfirm] = useState('');
   const [taskLoading, setTaskLoading] = useState(false);
   const taskAbortRef = useRef<AbortController | null>(null);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const micHoldingRef = useRef(false);
+  const recorder = useAudioRecorder();
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -161,8 +166,36 @@ export default function WorkspacePanel() {
     }
   }, [activeWorkspaceId]);
 
-  const sendChat = useCallback(async () => {
-    const text = chatInput.trim();
+  const transcribe = useCallback(async (blob: Blob): Promise<string> => {
+    const form = new FormData();
+    form.append('audio', blob, 'audio.webm');
+    const res = await fetch('/api/v1/stt/transcribe', { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`语音识别失败 (${res.status})`);
+    const data = await res.json();
+    return (data.text || '').trim();
+  }, []);
+
+  const speak = useCallback(async (text: string) => {
+    if (!voiceOn || !text) return;
+    try {
+      const res = await fetch('/api/v1/tts/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.slice(0, 2000) }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.audioBase64) {
+        const audio = new Audio(`data:${data.contentType || 'audio/wav'};base64,${data.audioBase64}`);
+        audio.play().catch(() => {});
+      }
+    } catch {
+      // 朗读失败静默降级
+    }
+  }, [voiceOn]);
+
+  const sendChat = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? chatInput).trim();
     if (!text || chatLoading || !chatAgent) return;
     setChatInput('');
     setChatError('');
@@ -177,12 +210,30 @@ export default function WorkspacePanel() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+      speak(data.reply);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : '发送失败');
     } finally {
       setChatLoading(false);
     }
-  }, [activeWorkspaceId, chatAgent, chatInput, chatLoading]);
+  }, [activeWorkspaceId, chatAgent, chatInput, chatLoading, speak]);
+
+  const stopAndTranscribe = useCallback(() => {
+    if (!micHoldingRef.current) return;
+    micHoldingRef.current = false;
+    recorder.stopRecording().then(async (blob) => {
+      if (!blob || blob.size === 0) return;
+      setVoiceBusy(true);
+      try {
+        const text = await transcribe(blob);
+        if (text) sendChat(text);
+      } catch (err) {
+        setChatError(err instanceof Error ? err.message : '识别失败');
+      } finally {
+        setVoiceBusy(false);
+      }
+    });
+  }, [recorder, transcribe, sendChat]);
 
   const runTask = useCallback(async () => {
     if (!taskConfirm || !chatAgent || taskLoading) return;
@@ -202,6 +253,7 @@ export default function WorkspacePanel() {
       const data = await res.json();
       setChatMessages((prev) => [...prev, { role: 'assistant', content: `【任务结果】${data.reply}` }]);
       setTaskConfirm('');
+      speak(`任务完成：${data.reply}`);
     } catch (err) {
       if (controller.signal.aborted) {
         setChatMessages((prev) => [...prev, { role: 'assistant', content: '【任务已中止】' }]);
@@ -212,7 +264,7 @@ export default function WorkspacePanel() {
       setTaskLoading(false);
       taskAbortRef.current = null;
     }
-  }, [activeWorkspaceId, chatAgent, taskConfirm, taskLoading]);
+  }, [activeWorkspaceId, chatAgent, taskConfirm, taskLoading, speak]);
 
   const abortTask = useCallback(() => {
     taskAbortRef.current?.abort();
@@ -282,7 +334,16 @@ export default function WorkspacePanel() {
         <div className="rounded-xl border border-blue-500/25 bg-white/3 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-white/85">与 {chatAgent} 对话</h3>
-            <button onClick={() => setChatAgent(null)} className="text-[16px] text-white/40 hover:text-white/70">✕ 关闭</button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setVoiceOn((v) => !v)}
+                title={voiceOn ? '关闭语音朗读' : '开启语音朗读'}
+                className={`text-[16px] ${voiceOn ? 'text-blue-300/80' : 'text-white/30'} hover:text-blue-200 transition-colors`}
+              >
+                {voiceOn ? '🔊' : '🔇'}
+              </button>
+              <button onClick={() => setChatAgent(null)} className="text-[16px] text-white/40 hover:text-white/70">✕ 关闭</button>
+            </div>
           </div>
           <div className="max-h-64 overflow-y-auto space-y-2 [scrollbar-width:thin]">
             {chatMessages.map((m, i) => (
@@ -309,6 +370,33 @@ export default function WorkspacePanel() {
           </div>
           {chatError && <div className="text-sm text-red-400/80">{chatError}</div>}
           <div className="flex gap-2">
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                micHoldingRef.current = true;
+                recorder.startRecording().catch(() => {
+                  micHoldingRef.current = false;
+                });
+              }}
+              onMouseUp={stopAndTranscribe}
+              onMouseLeave={stopAndTranscribe}
+              disabled={voiceBusy || !chatAgent}
+              title={recorder.isRecording ? '松开发送语音' : '按住说话'}
+              className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center border transition-colors disabled:opacity-40 ${
+                recorder.isRecording
+                  ? 'bg-red-500/25 border-red-400/40 text-red-300'
+                  : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80'
+              }`}
+            >
+              {recorder.isRecording ? (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="6" width="10" height="12" rx="1.5" /></svg>
+              ) : (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
             <input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
@@ -317,7 +405,7 @@ export default function WorkspacePanel() {
               className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/25 focus:outline-none focus:border-blue-400/40"
             />
             <button
-              onClick={sendChat}
+              onClick={() => sendChat()}
               disabled={chatLoading}
               className="px-3 py-2 rounded-lg bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 disabled:opacity-40 transition-colors"
             >
