@@ -75,7 +75,8 @@ export class CodexCliAdapter implements AgentChatAdapter {
 export class HermesCliAdapter implements AgentChatAdapter {
   async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
     const safeTask = task.replace(/[\r\n]+/g, ' ').replace(/"/g, "'").slice(0, 4000);
-    const cmd = `hermes -z "${escapeCmdArg(safeTask)}"`;
+    // hermes chat -q 是非交互单次查询；-Q 静默模式只输出最终回复（-z 不可靠）
+    const cmd = `hermes chat -q "${escapeCmdArg(safeTask)}" -Q`;
     const provider = getCommandProvider();
     const outcome = provider.runAsync
       ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024, signal: opts.signal })

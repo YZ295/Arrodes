@@ -34,7 +34,7 @@ describe('AgentAdapterRegistry（T-02 对话适配）', () => {
     }
   });
 
-  it('HermesCliAdapter 组装 hermes -z 命令并返回回复', async () => {
+  it('HermesCliAdapter 组装 hermes chat -q -Q 命令并返回回复', async () => {
     let captured = '';
     const fake: CommandProvider = {
       run: () => ({ stdout: '', stderr: '', exitCode: 0 }),
@@ -47,7 +47,8 @@ describe('AgentAdapterRegistry（T-02 对话适配）', () => {
     try {
       const adapter = new HermesCliAdapter();
       const reply = await adapter.run('总结一下', { cwd: 'E:/x' });
-      expect(captured).toContain('hermes -z');
+      expect(captured).toContain('hermes chat -q');
+      expect(captured).toContain('-Q');
       expect(reply).toContain('hermes reply');
     } finally {
       setCommandProvider(new LocalCommandProvider());
