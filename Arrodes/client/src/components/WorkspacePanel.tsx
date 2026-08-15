@@ -1,12 +1,13 @@
 /**
  * 工作区面板（Agent 大宇宙）· workspace-v2
  *
- * 顶部：工作区切换器（切换/新建，localStorage 持久化）
- * 主体：Agent 连接器 + 共享记忆（按激活工作区隔离）
+ * 顶部：工作区切换器（切换/新建）
+ * 主体：Agent 连接器卡片 + 共享记忆（按激活工作区隔离）
+ * 对话/任务/语音拆到 AgentChatPanel（职责单一）
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import { useAudioRecorder } from '../voice/hooks/useAudioRecorder';
+import AgentChatPanel from './AgentChatPanel';
 
 interface AgentConnector {
   id: string;
@@ -44,18 +45,6 @@ export default function WorkspacePanel() {
   const [error, setError] = useState('');
   const [syncMsg, setSyncMsg] = useState('');
   const [chatAgent, setChatAgent] = useState<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState('');
-  const [taskInput, setTaskInput] = useState('');
-  const [taskConfirm, setTaskConfirm] = useState('');
-  const [taskLoading, setTaskLoading] = useState(false);
-  const taskAbortRef = useRef<AbortController | null>(null);
-  const [voiceOn, setVoiceOn] = useState(true);
-  const [voiceBusy, setVoiceBusy] = useState(false);
-  const micHoldingRef = useRef(false);
-  const recorder = useAudioRecorder();
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -84,11 +73,9 @@ export default function WorkspacePanel() {
     load(activeWorkspaceId);
   }, [activeWorkspaceId, load]);
 
-  // 切换工作区时重置聊天窗，避免残留上一工作区上下文
+  // 切换工作区时关闭聊天窗，避免残留上一工作区上下文
   useEffect(() => {
     setChatAgent(null);
-    setChatMessages([]);
-    setTaskConfirm('');
   }, [activeWorkspaceId]);
 
   const addMemory = useCallback(async () => {
@@ -153,138 +140,11 @@ export default function WorkspacePanel() {
     }
   }, [connected, activeWorkspaceId, load]);
 
-  const openChat = useCallback(async (agentId: string) => {
-    setChatAgent(agentId);
-    setChatError('');
-    try {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${agentId}/messages`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setChatMessages((data.messages || []).map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content })));
-    } catch (err) {
-      setChatError(err instanceof Error ? err.message : '加载对话失败');
-    }
-  }, [activeWorkspaceId]);
-
-  const transcribe = useCallback(async (blob: Blob): Promise<string> => {
-    const form = new FormData();
-    form.append('audio', blob, 'audio.webm');
-    const res = await fetch('/api/v1/stt/transcribe', { method: 'POST', body: form });
-    if (!res.ok) throw new Error(`语音识别失败 (${res.status})`);
-    const data = await res.json();
-    return (data.text || '').trim();
-  }, []);
-
-  const speak = useCallback(async (text: string) => {
-    if (!voiceOn || !text) return;
-    try {
-      const res = await fetch('/api/v1/tts/synthesize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.slice(0, 2000) }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.audioBase64) {
-        const audio = new Audio(`data:${data.contentType || 'audio/wav'};base64,${data.audioBase64}`);
-        audio.play().catch(() => {});
-      }
-    } catch {
-      // 朗读失败静默降级
-    }
-  }, [voiceOn]);
-
-  const sendChat = useCallback(async (overrideText?: string) => {
-    const text = (overrideText ?? chatInput).trim();
-    if (!text || chatLoading || !chatAgent) return;
-    setChatInput('');
-    setChatError('');
-    setChatMessages((prev) => [...prev, { role: 'user', content: text }]);
-    setChatLoading(true);
-    try {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${chatAgent}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
-      speak(data.reply);
-    } catch (err) {
-      setChatError(err instanceof Error ? err.message : '发送失败');
-    } finally {
-      setChatLoading(false);
-    }
-  }, [activeWorkspaceId, chatAgent, chatInput, chatLoading, speak]);
-
-  const stopAndTranscribe = useCallback(() => {
-    if (!micHoldingRef.current) return;
-    micHoldingRef.current = false;
-    recorder.stopRecording().then(async (blob) => {
-      if (!blob || blob.size === 0) return;
-      setVoiceBusy(true);
-      try {
-        const text = await transcribe(blob);
-        if (text) sendChat(text);
-      } catch (err) {
-        setChatError(err instanceof Error ? err.message : '识别失败');
-      } finally {
-        setVoiceBusy(false);
-      }
-    });
-  }, [recorder, transcribe, sendChat]);
-
-  const runTask = useCallback(async () => {
-    if (!taskConfirm || !chatAgent || taskLoading) return;
-    setTaskLoading(true);
-    setChatError('');
-    setChatMessages((prev) => [...prev, { role: 'user', content: `【任务】${taskConfirm}` }]);
-    const controller = new AbortController();
-    taskAbortRef.current = controller;
-    try {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${chatAgent}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: taskConfirm }),
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: `【任务结果】${data.reply}` }]);
-      setTaskConfirm('');
-      speak(`任务完成：${data.reply}`);
-    } catch (err) {
-      if (controller.signal.aborted) {
-        setChatMessages((prev) => [...prev, { role: 'assistant', content: '【任务已中止】' }]);
-      } else {
-        setChatError(err instanceof Error ? err.message : '派发失败');
-      }
-    } finally {
-      setTaskLoading(false);
-      taskAbortRef.current = null;
-    }
-  }, [activeWorkspaceId, chatAgent, taskConfirm, taskLoading, speak]);
-
-  const abortTask = useCallback(() => {
-    taskAbortRef.current?.abort();
-  }, []);
-
-  const saveMemory = useCallback(async (content: string) => {
-    if (!chatAgent) return;
-    try {
-      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${chatAgent}/memories`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setSyncMsg('✓ 已记入共享记忆');
-      setTimeout(() => setSyncMsg(''), 2000);
-    } catch (err) {
-      setChatError(err instanceof Error ? err.message : '写入记忆失败');
-    }
-  }, [activeWorkspaceId, chatAgent]);
+  const onMemorySaved = useCallback(async () => {
+    await load(activeWorkspaceId);
+    setSyncMsg('✓ 已记入共享记忆');
+    setTimeout(() => setSyncMsg(''), 2000);
+  }, [activeWorkspaceId, load]);
 
   return (
     <div className="p-5 space-y-6">
@@ -329,143 +189,14 @@ export default function WorkspacePanel() {
         </div>
       </div>
 
-      {/* 与智能体对话窗 */}
+      {/* 与智能体对话（拆出的独立面板） */}
       {chatAgent && (
-        <div className="rounded-xl border border-blue-500/25 bg-white/3 p-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-white/85">与 {chatAgent} 对话</h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setVoiceOn((v) => !v)}
-                title={voiceOn ? '关闭语音朗读' : '开启语音朗读'}
-                className={`text-[16px] ${voiceOn ? 'text-blue-300/80' : 'text-white/30'} hover:text-blue-200 transition-colors`}
-              >
-                {voiceOn ? '🔊' : '🔇'}
-              </button>
-              <button onClick={() => setChatAgent(null)} className="text-[16px] text-white/40 hover:text-white/70">✕ 关闭</button>
-            </div>
-          </div>
-          <div className="max-h-64 overflow-y-auto space-y-2 [scrollbar-width:thin]">
-            {chatMessages.map((m, i) => (
-              <div key={i} className={`text-sm ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`inline-block max-w-[85%] px-3 py-1.5 rounded-lg whitespace-pre-wrap break-words ${
-                  m.role === 'user' ? 'bg-blue-500/20 text-blue-100' : 'bg-white/5 text-white/80'
-                }`}>
-                  {m.content}
-                </span>
-                {m.role === 'assistant' && (
-                  <button
-                    onClick={() => saveMemory(m.content)}
-                    className="block mt-1 text-[16px] text-white/30 hover:text-blue-300 transition-colors"
-                  >
-                    记入共享记忆
-                  </button>
-                )}
-              </div>
-            ))}
-            {chatLoading && <div className="text-sm text-white/30">智能体思考中…</div>}
-            {chatMessages.length === 0 && !chatLoading && (
-              <div className="text-sm text-white/25 text-center py-2">开始对话吧</div>
-            )}
-          </div>
-          {chatError && <div className="text-sm text-red-400/80">{chatError}</div>}
-          <div className="flex gap-2">
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                micHoldingRef.current = true;
-                recorder.startRecording().catch(() => {
-                  micHoldingRef.current = false;
-                });
-              }}
-              onMouseUp={stopAndTranscribe}
-              onMouseLeave={stopAndTranscribe}
-              disabled={voiceBusy || !chatAgent}
-              title={recorder.isRecording ? '松开发送语音' : '按住说话'}
-              className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center border transition-colors disabled:opacity-40 ${
-                recorder.isRecording
-                  ? 'bg-red-500/25 border-red-400/40 text-red-300'
-                  : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80'
-              }`}
-            >
-              {recorder.isRecording ? (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="6" width="10" height="12" rx="1.5" /></svg>
-              ) : (
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </button>
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendChat()}
-              placeholder="输入消息…"
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/25 focus:outline-none focus:border-blue-400/40"
-            />
-            <button
-              onClick={() => sendChat()}
-              disabled={chatLoading}
-              className="px-3 py-2 rounded-lg bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 disabled:opacity-40 transition-colors"
-            >
-              发送
-            </button>
-          </div>
-          {/* 派发任务 */}
-          {taskConfirm ? (
-            <div className="rounded-lg border border-blue-400/25 bg-blue-400/5 px-3 py-2 space-y-2">
-              <div className="text-sm text-blue-200/90 break-words">向 {chatAgent} 派发任务：{taskConfirm}</div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setTaskConfirm('')}
-                  disabled={taskLoading}
-                  className="px-3 py-1.5 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 disabled:opacity-40"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={runTask}
-                  disabled={taskLoading}
-                  className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 disabled:opacity-40"
-                >
-                  确认执行
-                </button>
-              </div>
-            </div>
-          ) : taskLoading ? (
-            <div className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
-              <span className="text-sm text-white/50">任务执行中…</span>
-              <button onClick={abortTask} className="text-sm text-red-400/80 hover:text-red-300">中止</button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <input
-                value={taskInput}
-                onChange={(e) => setTaskInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && taskInput.trim()) {
-                    setTaskConfirm(taskInput.trim());
-                    setTaskInput('');
-                  }
-                }}
-                placeholder="派发任务，如：把登录页改成深色主题…"
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/25 focus:outline-none focus:border-blue-400/40"
-              />
-              <button
-                onClick={() => {
-                  if (taskInput.trim()) {
-                    setTaskConfirm(taskInput.trim());
-                    setTaskInput('');
-                  }
-                }}
-                className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm text-white/80 transition-colors"
-              >
-                派发任务
-              </button>
-            </div>
-          )}
-        </div>
+        <AgentChatPanel
+          workspaceId={activeWorkspaceId}
+          agentId={chatAgent}
+          onClose={() => setChatAgent(null)}
+          onMemorySaved={onMemorySaved}
+        />
       )}
 
       {/* 连接器（agent） */}
@@ -503,7 +234,7 @@ export default function WorkspacePanel() {
                     {!a.available ? '不可接入' : connected.includes(a.id) ? '断开' : '接入'}
                   </button>
                   <button
-                    onClick={() => openChat(a.id)}
+                    onClick={() => setChatAgent(a.id)}
                     disabled={!a.available || !connected.includes(a.id)}
                     className="text-[16px] px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors disabled:opacity-40"
                   >
