@@ -36,4 +36,25 @@ describe('dispatchAgentTask（T-03 派发任务）', () => {
     expect(seen).toBe('改 README');
     expect(chatRepo.list('ws1', 'codex').map((m) => m.content)).toEqual(['【任务】改 README', '【任务结果】完成']);
   });
+
+  it('适配器失败时写入失败结果，历史不悬空', async () => {
+    const adapter: AgentChatAdapter = {
+      run: async () => {
+        throw new Error('boom');
+      },
+    };
+
+    await expect(
+      dispatchAgentTask({
+        workspaceId: 'ws1',
+        agentId: 'codex',
+        task: 'x',
+        adapter,
+        cwd: 'E:/x',
+        chatRepo,
+      }),
+    ).rejects.toThrow('boom');
+
+    expect(chatRepo.list('ws1', 'codex').map((m) => m.content)).toEqual(['【任务】x', '【任务结果】失败: boom']);
+  });
 });

@@ -118,7 +118,14 @@ export function createWorkspacesRouter(): Router {
         ? `以下是你们之前的对话（按时间顺序）：\n${historyText}\n\n请继续对话，回答用户最新消息。`
         : content;
 
-      const reply = await adapter.run(task, { cwd: repoRoot() });
+      let reply: string;
+      try {
+        reply = await adapter.run(task, { cwd: repoRoot(), signal: req.signal });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        chatRepo.append(ws.id, agentId, 'assistant', `（对话失败: ${msg.slice(0, 500)}）`);
+        throw err;
+      }
       chatRepo.append(ws.id, agentId, 'assistant', reply);
       res.json({ reply });
     } catch (err) {

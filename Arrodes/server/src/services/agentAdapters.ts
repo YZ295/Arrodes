@@ -3,6 +3,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getCommandProvider } from './commandProvider.js';
 
+/** cmd.exe 双引号参数内仍会展开 %VAR%，^ 是转义符，! 在延迟展开时特殊——统一转义 */
+function escapeCmdArg(s: string): string {
+  return s.replace(/\^/g, '^^').replace(/%/g, '^%').replace(/!/g, '^!');
+}
+
 export interface AgentChatAdapter {
   run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string>;
 }
@@ -49,7 +54,7 @@ export class CodexCliAdapter implements AgentChatAdapter {
 export class HermesCliAdapter implements AgentChatAdapter {
   async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
     const safeTask = task.replace(/[\r\n]+/g, ' ').replace(/"/g, "'").slice(0, 4000);
-    const cmd = `hermes -z "${safeTask}"`;
+    const cmd = `hermes -z "${escapeCmdArg(safeTask)}"`;
     const provider = getCommandProvider();
     const outcome = provider.runAsync
       ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: 10 * 60 * 1000, maxBuffer: 10 * 1024 * 1024, signal: opts.signal })

@@ -79,6 +79,13 @@ export default function WorkspacePanel() {
     load(activeWorkspaceId);
   }, [activeWorkspaceId, load]);
 
+  // 切换工作区时重置聊天窗，避免残留上一工作区上下文
+  useEffect(() => {
+    setChatAgent(null);
+    setChatMessages([]);
+    setTaskConfirm('');
+  }, [activeWorkspaceId]);
+
   const addMemory = useCallback(async () => {
     if (!note.trim()) return;
     try {
@@ -319,8 +326,8 @@ export default function WorkspacePanel() {
           </div>
           {/* 派发任务 */}
           {taskConfirm ? (
-            <div className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-2 space-y-2">
-              <div className="text-sm text-amber-200/90 break-words">向 {chatAgent} 派发任务：{taskConfirm}</div>
+            <div className="rounded-lg border border-blue-400/25 bg-blue-400/5 px-3 py-2 space-y-2">
+              <div className="text-sm text-blue-200/90 break-words">向 {chatAgent} 派发任务：{taskConfirm}</div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setTaskConfirm('')}

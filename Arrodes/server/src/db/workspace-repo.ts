@@ -59,10 +59,6 @@ export class WorkspaceRepository {
     memberId: string,
     role: WorkspaceMember['role'] = 'member',
   ): WorkspaceMember {
-    const existing = this.listMembers(workspaceId).find(
-      (m) => m.memberType === memberType && m.memberId === memberId,
-    );
-    if (existing) return existing;
     const db = getDb();
     const member: WorkspaceMember = {
       workspaceId,
@@ -72,10 +68,12 @@ export class WorkspaceRepository {
       joinedAt: new Date().toISOString(),
     };
     db.prepare(`
-      INSERT INTO workspace_members (workspace_id, member_type, member_id, role, joined_at)
+      INSERT OR IGNORE INTO workspace_members (workspace_id, member_type, member_id, role, joined_at)
       VALUES (?, ?, ?, ?, ?)
     `).run(workspaceId, memberType, memberId, role, member.joinedAt);
-    return member;
+    return this.listMembers(workspaceId).find(
+      (m) => m.memberType === memberType && m.memberId === memberId,
+    ) ?? member;
   }
 
   removeMember(workspaceId: string, memberType: 'user' | 'agent', memberId: string): boolean {

@@ -53,4 +53,25 @@ describe('AgentAdapterRegistry（T-02 对话适配）', () => {
       setCommandProvider(new LocalCommandProvider());
     }
   });
+
+  it('HermesCliAdapter 转义 cmd 特殊字符（% ! ^）', async () => {
+    let captured = '';
+    const fake: CommandProvider = {
+      run: () => ({ stdout: '', stderr: '', exitCode: 0 }),
+      runAsync: async (command) => {
+        captured = command;
+        return { stdout: 'ok', stderr: '', exitCode: 0, timedOut: false };
+      },
+    };
+    setCommandProvider(fake);
+    try {
+      const adapter = new HermesCliAdapter();
+      await adapter.run('进度 50% 且 !注意^', { cwd: 'E:/x' });
+      expect(captured).toContain('50^%');
+      expect(captured).toContain('^!');
+      expect(captured).toContain('^^');
+    } finally {
+      setCommandProvider(new LocalCommandProvider());
+    }
+  });
 });
