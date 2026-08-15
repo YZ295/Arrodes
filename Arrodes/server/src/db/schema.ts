@@ -74,6 +74,18 @@ CREATE TABLE IF NOT EXISTS workspace_members (
   PRIMARY KEY (workspace_id, member_type, member_id),
   FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS workspace_agent_messages (
+  id           TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  agent_id     TEXT NOT NULL,
+  role         TEXT NOT NULL CHECK(role IN ('user','assistant')),
+  content      TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_messages_ws_agent
+  ON workspace_agent_messages(workspace_id, agent_id, created_at);
 `;
 
 /** 幂等迁移：为存量表补充 workspace_id 列（workspace-v2） */

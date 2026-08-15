@@ -9,6 +9,15 @@
  */
 import { Router } from 'express';
 import { workspaceRepo } from '../db/workspace-repo.js';
+import { AgentChatRepository } from '../db/agent-chat-repo.js';
+import { agentAdapters } from '../services/agentAdapters.js';
+import { resolve } from 'node:path';
+
+const chatRepo = new AgentChatRepository();
+
+function repoRoot(): string {
+  return process.env.ARRODES_REPO_ROOT || resolve(process.cwd(), '..', '..');
+}
 
 export function createWorkspacesRouter(): Router {
   const router = Router();
@@ -79,6 +88,52 @@ export function createWorkspacesRouter(): Router {
       res.json({ ok: true });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : '断开失败' });
+    }
+  });
+
+  // 与已接入智能体对话（一次性委派，历史拼入任务）
+  router.post('/:id/agents/:agentId/chat', async (req, res) => {
+    try {
+      const ws = workspaceRepo.get(req.params.id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      const agentId = req.params.agentId;
+      const connected = workspaceRepo.listMembers(ws.id).some(
+        (m) => m.memberType === 'agent' && m.memberId === agentId,
+      );
+      if (!connected) { res.status(400).json({ error: '该智能体未接入此工作区' }); return; }
+      const adapter = agentAdapters.get(agentId);
+      if (!adapter) { res.status(400).json({ error: '该智能体暂不支持工作区对话' }); return; }
+
+      const content = String(req.body?.content ?? '').trim();
+      if (!content) { res.status(400).json({ error: '消息不能为空' }); return; }
+
+      chatRepo.append(ws.id, agentId, 'user', content);
+      const history = chatRepo.list(ws.id, agentId, 12);
+      const historyText = history
+        .map((m) => `${m.role === 'user' ? '用户' : agentId}: ${m.content}`)
+        .join('\n');
+      const task = history.length > 1
+        ? `以下是你们之前的对话（按时间顺序）：\n${historyText}\n\n请继续对话，回答用户最新消息。`
+        : content;
+
+      const reply = await adapter.run(task, { cwd: repoRoot() });
+      chatRepo.append(ws.id, agentId, 'assistant', reply);
+      res.json({ reply });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '对话失败';
+      console.error('[AgentChat] 对话失败:', msg);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  // 读取与某智能体的历史对话
+  router.get('/:id/agents/:agentId/messages', (req, res) => {
+    try {
+      const ws = workspaceRepo.get(req.params.id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      res.json({ messages: chatRepo.list(ws.id, req.params.agentId) });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : '查询失败' });
     }
   });
 

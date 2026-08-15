@@ -42,6 +42,11 @@ export default function WorkspacePanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [syncMsg, setSyncMsg] = useState('');
+  const [chatAgent, setChatAgent] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState('');
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -132,6 +137,42 @@ export default function WorkspacePanel() {
     }
   }, [connected, activeWorkspaceId, load]);
 
+  const openChat = useCallback(async (agentId: string) => {
+    setChatAgent(agentId);
+    setChatError('');
+    try {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${agentId}/messages`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setChatMessages((data.messages || []).map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content })));
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : '加载对话失败');
+    }
+  }, [activeWorkspaceId]);
+
+  const sendChat = useCallback(async () => {
+    const text = chatInput.trim();
+    if (!text || chatLoading || !chatAgent) return;
+    setChatInput('');
+    setChatError('');
+    setChatMessages((prev) => [...prev, { role: 'user', content: text }]);
+    setChatLoading(true);
+    try {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/agents/${chatAgent}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : '发送失败');
+    } finally {
+      setChatLoading(false);
+    }
+  }, [activeWorkspaceId, chatAgent, chatInput, chatLoading]);
+
   return (
     <div className="p-5 space-y-6">
       {/* 工作区切换器 */}
@@ -175,6 +216,48 @@ export default function WorkspacePanel() {
         </div>
       </div>
 
+      {/* 与智能体对话窗 */}
+      {chatAgent && (
+        <div className="rounded-xl border border-blue-500/25 bg-white/3 p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-white/85">与 {chatAgent} 对话</h3>
+            <button onClick={() => setChatAgent(null)} className="text-[16px] text-white/40 hover:text-white/70">✕ 关闭</button>
+          </div>
+          <div className="max-h-64 overflow-y-auto space-y-2 [scrollbar-width:thin]">
+            {chatMessages.map((m, i) => (
+              <div key={i} className={`text-sm ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
+                <span className={`inline-block max-w-[85%] px-3 py-1.5 rounded-lg whitespace-pre-wrap break-words ${
+                  m.role === 'user' ? 'bg-blue-500/20 text-blue-100' : 'bg-white/5 text-white/80'
+                }`}>
+                  {m.content}
+                </span>
+              </div>
+            ))}
+            {chatLoading && <div className="text-sm text-white/30">智能体思考中…</div>}
+            {chatMessages.length === 0 && !chatLoading && (
+              <div className="text-sm text-white/25 text-center py-2">开始对话吧</div>
+            )}
+          </div>
+          {chatError && <div className="text-sm text-red-400/80">{chatError}</div>}
+          <div className="flex gap-2">
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendChat()}
+              placeholder="输入消息…"
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 placeholder-white/25 focus:outline-none focus:border-blue-400/40"
+            />
+            <button
+              onClick={sendChat}
+              disabled={chatLoading}
+              className="px-3 py-2 rounded-lg bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 disabled:opacity-40 transition-colors"
+            >
+              发送
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 连接器（agent） */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -208,6 +291,13 @@ export default function WorkspacePanel() {
                     }`}
                   >
                     {!a.available ? '不可接入' : connected.includes(a.id) ? '断开' : '接入'}
+                  </button>
+                  <button
+                    onClick={() => openChat(a.id)}
+                    disabled={!a.available || !connected.includes(a.id)}
+                    className="text-[16px] px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors disabled:opacity-40"
+                  >
+                    对话
                   </button>
                 </div>
               </div>
