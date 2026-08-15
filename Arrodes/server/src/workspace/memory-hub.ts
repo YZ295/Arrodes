@@ -17,6 +17,7 @@ export interface WorkspaceMemory {
   sourceAgent: string;
   type: WorkspaceMemoryType;
   createdAt: string;
+  workspaceId?: string;
 }
 
 /** 确保表存在（幂等） */
@@ -78,6 +79,20 @@ export class WorkspaceMemoryHub {
           LIMIT ?
         `).all(workspaceId, limit);
     return rows as WorkspaceMemory[];
+  }
+
+  /** 列出工作区全部共享记忆（同步到 Obsidian 用，全部而非部分） */
+  listAll(workspaceId = 'default'): WorkspaceMemory[] {
+    initWorkspaceMemoriesTable();
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT id, content, source_agent AS sourceAgent, type, created_at AS createdAt,
+             workspace_id AS workspaceId
+      FROM workspace_memories
+      WHERE workspace_id = ?
+      ORDER BY created_at ASC
+    `).all(workspaceId) as WorkspaceMemory[];
+    return rows;
   }
 
   /** 统计（按来源 agent，限定工作区） */

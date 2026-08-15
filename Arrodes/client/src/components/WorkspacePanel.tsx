@@ -40,6 +40,7 @@ export default function WorkspacePanel() {
   const [showNew, setShowNew] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [syncMsg, setSyncMsg] = useState('');
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -94,6 +95,22 @@ export default function WorkspacePanel() {
       setError('创建工作区失败');
     }
   };
+
+  const syncObsidian = useCallback(async () => {
+    setSyncMsg('同步中…');
+    try {
+      const res = await fetch('/api/v1/workspace/memories/sync-obsidian', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSyncMsg(`✓ 已同步 ${data.count} 条记忆 → Obsidian`);
+    } catch (err) {
+      setSyncMsg(`同步失败: ${err instanceof Error ? err.message : '未知错误'}`);
+    }
+  }, [activeWorkspaceId]);
 
   return (
     <div className="p-5 space-y-6">
@@ -177,8 +194,18 @@ export default function WorkspacePanel() {
       {/* 共享记忆 */}
       <div className="border-t border-white/5 pt-5">
         <h3 className="text-[16px] text-white/30 uppercase tracking-wider mb-3">
-          共享记忆 <span className="text-white/20">（{active?.name || ''} · 共 {memoryStats.total} 条）</span>
+          共享记忆 <span className="text-white/20">（{active?.name || ''} · 共 {memoryStats.total} 条 · 全部共享）</span>
         </h3>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <p className="text-[16px] text-white/25">统一格式全量写入 Obsidian 知识库，供所有接入 Agent 共享。</p>
+          <button
+            onClick={syncObsidian}
+            className="shrink-0 text-[16px] px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/20 hover:bg-blue-500/25 transition-colors"
+          >
+            同步到 Obsidian
+          </button>
+        </div>
+        {syncMsg && <p className="text-[16px] text-blue-300/80 mb-2">{syncMsg}</p>}
         <div className="flex gap-2 mb-3">
           <input
             value={note}

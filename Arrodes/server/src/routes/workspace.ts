@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { detectConnectors } from '../workspace/connectors.js';
 import { workspaceMemoryHub } from '../workspace/memory-hub.js';
+import { syncWorkspaceMemoriesToObsidian } from '../services/obsidianMemory.js';
 
 export function createWorkspaceRouter(): Router {
   const router = Router();
@@ -50,6 +51,20 @@ export function createWorkspaceRouter(): Router {
       res.status(201).json({ memory: record });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : '写入失败' });
+    }
+  });
+
+  // 全量同步工作区记忆到 Obsidian（统一格式，全部而非部分）
+  router.post('/memories/sync-obsidian', (req, res) => {
+    try {
+      const workspaceId = typeof req.body?.workspaceId === 'string' && req.body.workspaceId
+        ? req.body.workspaceId
+        : 'default';
+      const memories = workspaceMemoryHub.listAll(workspaceId);
+      const result = syncWorkspaceMemoriesToObsidian(memories);
+      res.json({ ok: true, count: result.count, dir: result.dir });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : '同步失败' });
     }
   });
 
