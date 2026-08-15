@@ -22,7 +22,6 @@ import { initSttRegistry } from './modules/voice/SttEngineRegistry';
 import Sidebar, { type SidebarView } from './components/Sidebar';
 import ChatOverlay from './components/ChatOverlay';
 import PanelView from './components/PanelView';
-import Universe from './universe/Universe';
 import Subtitle from './components/Subtitle';
 import ConfirmDialog from './components/ConfirmDialog';
 import { useVoiceChat } from './voice/hooks/useVoiceChat';
@@ -117,9 +116,6 @@ const App = memo(function App() {
 
       {/* 主区域：3D 背景 + 覆盖层 */}
       <div className="relative flex-1 overflow-hidden">
-        {/* 3D 宇宙背景 */}
-        <Universe />
-
         {/* 唤醒监听状态提示 */}
         {wake.isSupported && wake.isListening && !voice.isRecording && (
           <div className="absolute top-3 right-4 z-40 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[12px] text-white/40 pointer-events-none">

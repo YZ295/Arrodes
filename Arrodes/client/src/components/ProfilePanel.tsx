@@ -39,6 +39,33 @@ export default function ProfilePanel({ onNavigate }: ProfilePanelProps) {
   const [persons, setPersons] = useState<Array<{ name: string; count: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState('');
+
+  // 更换头像：读入图片存为 data URL（localStorage），Avatar 组件自动生效
+  const changeAvatar = useCallback((file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        localStorage.setItem('arrodes.avatar', String(reader.result));
+        setAvatarMsg('✓ 头像已更新');
+        setTimeout(() => setAvatarMsg(''), 2000);
+      } catch {
+        setAvatarMsg('保存失败（图片过大？）');
+      }
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const resetAvatar = useCallback(() => {
+    try {
+      localStorage.removeItem('arrodes.avatar');
+    } catch {
+      // ignore
+    }
+    setAvatarMsg('已恢复默认头像');
+    setTimeout(() => setAvatarMsg(''), 2000);
+  }, []);
 
   // 加载记忆中的人物（persons 由后端 extractPersonEntities 识别，count 由前端统计出现次数）
   const loadPersons = useCallback(async () => {
@@ -92,6 +119,19 @@ export default function ProfilePanel({ onNavigate }: ProfilePanelProps) {
         <Avatar size={96} showHalo glow />
         <h2 className="mt-3 text-xl font-semibold text-white/90">阿罗德斯</h2>
         <p className="text-sm text-white/30 mt-1">虚空之镜 · 命运之音 · 守灯人</p>
+        <div className="flex items-center gap-2 mt-2.5">
+          <label className="text-[16px] px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/20 cursor-pointer hover:bg-blue-500/25 transition-colors">
+            更换头像
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => changeAvatar(e.target.files?.[0])} />
+          </label>
+          <button
+            onClick={resetAvatar}
+            className="text-[16px] px-2.5 py-1 rounded-lg bg-white/5 text-white/50 hover:bg-white/10 transition-colors"
+          >
+            重置
+          </button>
+        </div>
+        {avatarMsg && <p className="mt-1.5 text-[16px] text-blue-300/80">{avatarMsg}</p>}
       </div>
 
       <div className="space-y-3">
@@ -117,16 +157,16 @@ export default function ProfilePanel({ onNavigate }: ProfilePanelProps) {
           </button>
         </div>
 
-        <div className="rounded-xl border border-amber-400/15 bg-amber-400/3 overflow-hidden">
-          <div className="px-4 py-2 bg-amber-400/8 border-b border-amber-400/10 text-sm text-amber-300/90 flex items-center gap-1.5">
+        <div className="rounded-xl border border-blue-400/15 bg-blue-400/3 overflow-hidden">
+          <div className="px-4 py-2 bg-blue-400/8 border-b border-blue-400/10 text-sm text-blue-300/90 flex items-center gap-1.5">
             <span className="text-[16px]">⚜️</span>
             {BEHAVIOR_GUIDELINES_TITLE}
-            <span className="ml-auto text-[16px] text-amber-300/40">愚者大人设定</span>
+            <span className="ml-auto text-[16px] text-blue-300/40">愚者大人设定</span>
           </div>
           <div className="p-3 space-y-2.5 max-h-72 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
             {BEHAVIOR_GUIDELINES.map((group) => (
               <div key={group.key}>
-                <div className="text-[16px] text-amber-300/70 mb-1">▍{group.title}</div>
+                <div className="text-[16px] text-blue-300/70 mb-1">▍{group.title}</div>
                 <ul className="space-y-1">
                   {group.rules.map((rule, i) => (
                     <li key={i} className="text-sm text-white/55 leading-relaxed pl-3">
@@ -164,7 +204,7 @@ export default function ProfilePanel({ onNavigate }: ProfilePanelProps) {
                   hover:border-[var(--color-home-gold)]/30 hover:bg-white/5 transition-all text-left group"
                 title={`点击搜索与「${p.name}」相关的记忆`}
               >
-                <span className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400/70 to-amber-700/70
+                <span className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400/70 to-blue-700/70
                   flex items-center justify-center text-[16px] font-bold text-white shrink-0">
                   {p.name[0]}
                 </span>
@@ -172,7 +212,7 @@ export default function ProfilePanel({ onNavigate }: ProfilePanelProps) {
                   {p.name}
                 </span>
                 <span className="text-[16px] text-white/30 shrink-0">{p.count} 条记忆</span>
-                <svg className="w-3 h-3 text-white/20 group-hover:text-amber-300/60 shrink-0 transition-colors"
+                <svg className="w-3 h-3 text-white/20 group-hover:text-blue-300/60 shrink-0 transition-colors"
                   viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>

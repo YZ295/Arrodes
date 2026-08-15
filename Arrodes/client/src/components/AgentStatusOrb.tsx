@@ -39,8 +39,8 @@ const ORB_MAP: Record<AgentOrbState, OrbState> = {
 
 /** 状态色（HoloJarvis 反应堆变色理念）：聆听蓝 / 思考金 / 说话青 / 连接紫 */
 const STATE_COLOR: Record<AgentOrbState, string> = {
-  listening: 'rgba(59, 130, 246, 0.35)',   // 蓝（聆听）
-  working: 'rgba(245, 158, 11, 0.35)',    // 金（思考）
+  listening: 'rgba(56, 189, 248, 0.35)',  // 天蓝（聆听）
+  working: 'rgba(59, 130, 246, 0.35)',    // 蓝（思考）
   composing: 'rgba(34, 211, 238, 0.35)',  // 青（说话/输出）
   connecting: 'rgba(168, 85, 247, 0.35)', // 紫（连接）
 };

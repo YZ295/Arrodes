@@ -228,7 +228,7 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
   return (
     <div className={`relative z-40 h-full transition-all duration-300 ${
       collapsed ? 'w-14' : 'w-64'
-    } bg-[#0a0e27]/75 backdrop-blur-2xl border-r border-white/5 flex flex-col`}>
+    } bg-[#0a0d14]/85 backdrop-blur-2xl border-r border-white/5 flex flex-col`}>
       {/* 右侧边框光束（border-beam 效果：光点沿侧边栏右缘周期性扫过） */}
       {!collapsed && <SidebarBeam />}
       {/* 折叠按钮 */}
@@ -246,8 +246,8 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
 
       {/* Logo / 标题 */}
       <div className="px-4 py-5 flex items-center gap-2 overflow-hidden shrink-0">
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-amber-700
-          flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-700
+          flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
           <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2l2.4 6.2L21 10l-6.6 1.8L12 18l-2.4-6.2L3 10l6.6-1.8z" />
           </svg>
@@ -283,10 +283,10 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
               }`}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-amber-400" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-blue-400" />
               )}
               <span className={`w-5 h-5 shrink-0 flex items-center justify-center transition-colors ${
-                active ? 'text-amber-400' : ''
+                active ? 'text-blue-400' : ''
               }`}>
                 <NavIcon id={item.id} />
               </span>
@@ -360,7 +360,7 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
                   }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  currentSessionId === s.id && !showArchived ? 'bg-amber-400' : 'bg-white/15'
+                  currentSessionId === s.id && !showArchived ? 'bg-blue-400' : 'bg-white/15'
                 }`} />
                 <div className="flex-1 min-w-0" onDoubleClick={(e) => startRename(s.id, s.title, e)}>
                   {editingId === s.id ? (
@@ -388,8 +388,8 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
                     onClick={(e) => toggleArchive(s, e)}
                     className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
                       s.archived
-                        ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/40'
-                        : 'hover:bg-white/10 text-gray-400 hover:text-amber-300'
+                        ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/40'
+                        : 'hover:bg-white/10 text-gray-400 hover:text-blue-300'
                     }`}
                     title={s.archived ? '一键恢复（回到会话）' : '归档'}
                   >

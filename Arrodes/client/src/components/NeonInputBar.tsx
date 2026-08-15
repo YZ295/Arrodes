@@ -56,7 +56,7 @@ export default memo(function NeonInputBar({
           borderRadius: 18,
           background: `conic-gradient(
             from var(--neon-angle-${id}),
-            #ff4d6d, #ff9e4d, #ffe14d, #4dff9e, #4dd8ff, #9e6dff, #ff4d6d
+            #3b82f6, #22d3ee, #6366f1, #8b5cf6, #3b82f6
           )`,
           WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
           WebkitMaskComposite: 'xor',

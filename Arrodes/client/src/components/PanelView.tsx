@@ -103,8 +103,8 @@ function AdvancedPanel() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between"><span className="text-white/40">WebSocket</span><span className="text-green-400/60">已连接</span></div>
           <div className="flex justify-between"><span className="text-white/40">Edge TTS</span><span className="text-cyan-400/60">可用</span></div>
-          <div className="flex justify-between"><span className="text-white/40">管道引擎</span><span className="text-amber-400/60">v4.5</span></div>
-          <div className="flex justify-between"><span className="text-white/40">插件系统</span><span className="text-amber-400/60">1 已激活</span></div>
+          <div className="flex justify-between"><span className="text-white/40">管道引擎</span><span className="text-blue-400/70">v4.5</span></div>
+          <div className="flex justify-between"><span className="text-white/40">插件系统</span><span className="text-blue-400/70">1 已激活</span></div>
         </div>
       </div>
     </div>
@@ -167,7 +167,7 @@ function SkillsPanel() {
       <div className="flex items-center justify-between mb-2">
         <span className="text-[16px] text-white/30 uppercase tracking-wider">已注册技能</span>
         <div className="flex items-center gap-2">
-          <span className="text-[16px] text-amber-400/60">{skills.length} 个</span>
+          <span className="text-[16px] text-blue-400/70">{skills.length} 个</span>
           <button
             onClick={() => setShowAdd((p) => !p)}
             className="text-[16px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"

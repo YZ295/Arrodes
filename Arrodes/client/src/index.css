@@ -18,14 +18,17 @@
 }
 
 :root {
-  --color-home-gold: #FFD700;
-  --color-bg-deep: #0a0e27;
-  --color-bg-glass: rgba(10, 14, 39, 0.72);
+  /* 主色：原金色改为蓝色（参照 Codex 桌面端黑+蓝主题） */
+  --color-home-gold: #3b82f6;
+  --color-accent: #3b82f6;
+  --color-accent-cyan: #22d3ee;
+  --color-accent-purple: #8B5CF6;
+  --color-bg-deep: #0a0d14;
+  --color-bg-glass: rgba(10, 13, 20, 0.72);
   --color-text-primary: #f0f0f0;
   --color-text-secondary: #a0a0b0;
   --color-bubble-user: #3B82F6;
   --color-bubble-ai: #374151;
-  --color-accent: #8B5CF6;
 }
 
 * {
@@ -39,11 +42,11 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   background:
-    radial-gradient(1100px 760px at 72% 18%, rgba(139, 92, 246, 0.08), transparent 60%),
-    radial-gradient(900px 680px at 20% 82%, rgba(255, 215, 0, 0.05), transparent 55%),
+    radial-gradient(1100px 760px at 72% 18%, rgba(59, 130, 246, 0.08), transparent 60%),
+    radial-gradient(900px 680px at 20% 82%, rgba(139, 92, 246, 0.06), transparent 55%),
     var(--color-bg-deep);
   color: var(--color-text-primary);
-  font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -123,5 +126,5 @@ input:focus, textarea:focus, button:focus-visible {
   outline: none;
 }
 input:focus, textarea:focus {
-  box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.35), 0 0 18px -6px rgba(255, 215, 0, 0.35);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4), 0 0 18px -6px rgba(59, 130, 246, 0.4);
 }

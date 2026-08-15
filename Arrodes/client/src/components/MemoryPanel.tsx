@@ -215,7 +215,7 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
                     border border-[var(--color-home-gold)]/20 text-[16px] text-[var(--color-home-gold)]"
                   title={`${name} 出现在记忆中`}
                 >
-                  <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-400/60 to-amber-700/60
+                  <span className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400/60 to-blue-700/60
                     flex items-center justify-center text-[16px] font-bold text-white shrink-0">
                     {name[0]}
                   </span>

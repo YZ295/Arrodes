@@ -156,7 +156,7 @@ export default function SessionPanel({ currentSessionId, collapsed = false }: Se
             {/* 选中指示 */}
             <span
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                currentSessionId === s.id ? 'bg-amber-400' : 'bg-white/15'
+                currentSessionId === s.id ? 'bg-blue-400' : 'bg-white/15'
               }`}
             />
 

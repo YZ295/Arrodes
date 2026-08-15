@@ -39,7 +39,7 @@ interface AudioVisualizerProps {
 const DEFAULTS = {
   width: 200,
   height: 40,
-  color: '#FFD700',
+  color: '#3b82f6',
   barCount: 32,
 };
 

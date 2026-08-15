@@ -38,7 +38,7 @@ export default memo(function StatusBar({ isConnected, isSpeaking, ttsError, uiHi
 
         {/* 语音状态 */}
         {isSpeaking && (
-          <span className="flex items-center gap-1.5 text-amber-300/70">
+          <span className="flex items-center gap-1.5 text-cyan-300/80">
             <svg className="w-3 h-3 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
               <path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4z" />
             </svg>
@@ -59,7 +59,7 @@ export default memo(function StatusBar({ isConnected, isSpeaking, ttsError, uiHi
           onClick={onToggleMuted}
           className={`flex items-center gap-1 text-[16px] px-2 py-1 rounded-lg transition-all ${
             isMuted
-              ? 'bg-amber-500/20 text-amber-300/90 hover:bg-amber-500/30'
+              ? 'bg-blue-500/20 text-blue-300/90 hover:bg-blue-500/30'
               : 'bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/80'
           }`}
           title={isMuted ? '开启语音输出' : '关闭语音输出（静音）'}
