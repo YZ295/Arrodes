@@ -61,11 +61,21 @@ export class ActionGate {
   private ttlMs: number;
   private maxPending: number;
   private now: () => number;
+  private autoApprove = false;
 
   constructor(opts: { ttlMs?: number; maxPending?: number; now?: () => number } = {}) {
     this.ttlMs = opts.ttlMs ?? 5 * 60 * 1000;
     this.maxPending = opts.maxPending ?? 20;
     this.now = opts.now ?? (() => Date.now());
+  }
+
+  /** 全部权限：高风险操作自动放行（不生成待确认项） */
+  setAutoApprove(v: boolean): void {
+    this.autoApprove = v;
+  }
+
+  isAutoApprove(): boolean {
+    return this.autoApprove;
   }
 
   request(

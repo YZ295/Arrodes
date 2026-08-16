@@ -44,6 +44,10 @@ interface ChatOverlayProps {
   toggleMuted: () => void;
   /** 完整停止：停语音 + 停 AI 思考 + 停任务 */
   stopAll: () => void;
+  projectDir?: string;
+  permission?: 'default' | 'full';
+  onPickProject: () => void;
+  onTogglePermission: () => void;
 }
 
 export default function ChatOverlay(props: ChatOverlayProps) {
@@ -53,6 +57,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     ttsError, error, showMemoryToast, memoryToastText,
     startRecording, stopRecording, sendTextMessage, replayTTS, stopAll,
     isMuted, toggleMuted,
+    projectDir, permission, onPickProject, onTogglePermission,
   } = props;
 
   const [text, setText] = useState('');
@@ -234,6 +239,10 @@ export default function ChatOverlay(props: ChatOverlayProps) {
           onStop={stopAll}
           onSend={handleSend}
           canSend={!!text.trim() && isConnected}
+          projectDir={projectDir}
+          permission={permission}
+          onPickProject={onPickProject}
+          onTogglePermission={onTogglePermission}
         />
       </div>
     </div>

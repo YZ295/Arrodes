@@ -72,6 +72,7 @@ export function registerToolPostHook(hook: ToolPostHook): () => void {
 registerToolPreHook(async (skill, args) => {
   const risk = skill.risk ?? classifyAction(skill.name);
   if (risk !== 'high') return null;
+  if (actionGate.isAutoApprove()) return null;
   const outcome = actionGate.request(
     skill.name,
     args,

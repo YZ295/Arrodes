@@ -17,6 +17,7 @@ import { createWorkspaceMembersRouter } from './workspaceMembers.js';
 import { createWorkspaceAgentsRouter } from './workspaceAgents.js';
 import { workspaceProjectDir } from '../services/workspaceProjectDir.js';
 import { importWorkbuddyNotes } from '../services/workbuddyMemory.js';
+import { actionGate } from '../services/actionGate.js';
 
 export function createWorkspacesRouter(): Router {
   const router = Router();
@@ -93,6 +94,9 @@ export function createWorkspacesRouter(): Router {
         permission: permission !== undefined ? String(permission) : undefined,
       });
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      if (permission !== undefined) {
+        actionGate.setAutoApprove(String(permission) === 'full');
+      }
       res.json({ workspace: ws });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : '更新失败' });

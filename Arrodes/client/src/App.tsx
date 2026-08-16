@@ -24,18 +24,40 @@ import ChatOverlay from './components/ChatOverlay';
 import PanelView from './components/PanelView';
 import Subtitle from './components/Subtitle';
 import ConfirmDialog from './components/ConfirmDialog';
+import FolderPicker from './components/FolderPicker';
 import { useVoiceChat } from './voice/hooks/useVoiceChat';
 import { useWakeWord } from './voice/hooks/useWakeWord';
+import { useWorkspaceStore } from './store/workspaceStore';
 
 const App = memo(function App() {
   const [sidebarView, setSidebarView] = useState<SidebarView>('conversation');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const voice = useVoiceChat();
   const wake = useWakeWord(() => voice.startRecording());
   const wakeStart = wake.start;
   const wakeStop = wake.stop;
   const spacePttRef = useRef(false);
+
+  const { workspaces, activeWorkspaceId, loadWorkspaces } = useWorkspaceStore();
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const projectDir = activeWorkspace?.config?.projectDir;
+  const permission = activeWorkspace?.config?.permission === 'full' ? 'full' : 'default';
+
+  const updateWorkspaceConfig = async (patch: { projectDir?: string; permission?: string }) => {
+    try {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await loadWorkspaces();
+    } catch {
+      // 静默：设置失败不打断对话
+    }
+  };
 
   useEffect(() => {
     initTtsRegistry();
@@ -146,6 +168,10 @@ const App = memo(function App() {
             stopAll={voice.stopAll}
             isMuted={voice.isMuted}
             toggleMuted={voice.toggleMuted}
+            projectDir={projectDir}
+            permission={permission}
+            onPickProject={() => setPickerOpen(true)}
+            onTogglePermission={() => updateWorkspaceConfig({ permission: permission === 'full' ? 'default' : 'full' })}
           />
         )}
 
@@ -166,6 +192,17 @@ const App = memo(function App() {
 
         {/* 高风险操作确认弹窗 */}
         <ConfirmDialog messages={voice.messages} onAppendAssistant={voice.appendAssistantMessage} />
+
+        {/* 主输入栏的项目文件夹选择器 */}
+        <FolderPicker
+          open={pickerOpen}
+          initialPath={projectDir}
+          onClose={() => setPickerOpen(false)}
+          onSelect={async (p) => {
+            setPickerOpen(false);
+            await updateWorkspaceConfig({ projectDir: p });
+          }}
+        />
       </div>
     </div>
   );

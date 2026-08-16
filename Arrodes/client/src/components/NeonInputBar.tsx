@@ -26,12 +26,17 @@ interface NeonInputBarProps {
   onStop: () => void;
   onSend: () => void;
   canSend: boolean;
+  projectDir?: string;
+  permission?: 'default' | 'full';
+  onPickProject: () => void;
+  onTogglePermission: () => void;
 }
 
 export default memo(function NeonInputBar({
   text, onTextChange, onKeyDown, placeholder, disabled,
   isRecording, isSpeaking, isLoading,
   onMicDown, onMicUp, onMicLeave, onStop, onSend, canSend,
+  projectDir, permission = 'default', onPickProject, onTogglePermission,
 }: NeonInputBarProps) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -73,6 +78,26 @@ export default memo(function NeonInputBar({
         className="relative flex items-center gap-1 px-2 py-1.5"
         style={{ backgroundColor: '#000000', borderRadius: 16, zIndex: 2 }}
       >
+          {/* 项目 + 权限（主输入栏快捷设置） */}
+          <button
+            onClick={onPickProject}
+            title={`项目目录${projectDir ? `：${projectDir}` : '（未设置）'}`}
+            className="shrink-0 px-2 h-10 rounded-xl text-[16px] text-white/60 hover:bg-white/15 hover:text-white/90 transition-all"
+          >
+            📁 项目
+          </button>
+          <button
+            onClick={onTogglePermission}
+            title={permission === 'full' ? '全部权限：高风险操作自动执行' : '默认权限：高风险操作需确认'}
+            className={`shrink-0 px-2 h-10 rounded-xl text-[16px] transition-all ${
+              permission === 'full'
+                ? 'text-red-300/90 hover:bg-red-500/15'
+                : 'text-white/60 hover:bg-white/15 hover:text-white/90'
+            }`}
+          >
+            {permission === 'full' ? '⚡ 全部' : '🛡 默认'}
+          </button>
+
           {/* 语音按钮（内嵌左侧，纯白图标） */}
           <button
             onMouseDown={(e) => { e.preventDefault(); onMicDown(); }}
