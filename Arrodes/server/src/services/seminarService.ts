@@ -22,7 +22,7 @@ export interface SeminarTurn {
 export interface BuildSeminarPromptInput {
   topic: string;
   self: string;
-  other: string;
+  others: string[];
   transcript: SeminarTurn[];
   learnings: string;
 }
@@ -34,8 +34,8 @@ export function buildSeminarPrompt(input: BuildSeminarPromptInput): string {
     : '（还没有发言）';
   return [
     `你在参加一场多智能体研讨会，主题是：${input.topic}`,
-    `你是「${input.self}」，与「${input.other}」围绕主题轮流交换观点。`,
-    '要求：观点直接、有依据；可以同意也可以反驳对方；不要客套，不要重复已说内容。',
+    `你是「${input.self}」，与「${input.others.join('、')}」围绕主题轮流交换观点。`,
+    '要求：观点直接、有依据；可以同意也可以反驳其他参与者；不要客套，不要重复已说内容。',
     input.learnings ? `\n【你们此前研讨会的沉淀】\n${input.learnings}` : '',
     `\n【截至目前的对话】\n${history}`,
     '\n现在轮到你发言，请直接输出你的观点（不要加称呼/前缀）。',
@@ -46,8 +46,7 @@ export interface RunSeminarInput {
   seminarId: string;
   workspaceId: string;
   topic: string;
-  agentA: string;
-  agentB: string;
+  participants: string[];
   rounds: number;
   adapters: Record<string, AgentChatAdapter>;
   cwd: string;
@@ -89,10 +88,11 @@ export function parseLearnings(summary: string): {
   newKnowledge: string;
   disagreement: string;
   actionItems: string;
+  arbitration: string;
 } {
   const pick = (label: string): string => {
     // 兼容：结论： / ## 结论 / **结论**：
-    const re = new RegExp(`(?:##\\s*)?(?:\\*\\*)?${label}(?:\\*\\*)?[：:]\\s*([^\\n]*(?:\\n(?!##|\\*\\*(?:结论|新知识|分歧|行动项)\\*\\*[：:]|(?:结论|新知识|分歧|行动项)[：:]).*)*)`, 'i');
+    const re = new RegExp(`(?:##\\s*)?(?:\\*\\*)?${label}(?:\\*\\*)?[：:]\\s*([^\\n]*(?:\\n(?!##|\\*\\*(?:结论|新知识|分歧|行动项|裁决)\\*\\*[：:]|(?:结论|新知识|分歧|行动项|裁决)[：:]).*)*)`, 'i');
     const m = summary.match(re);
     return m ? m[1].trim().slice(0, 400) : '';
   };
@@ -101,14 +101,14 @@ export function parseLearnings(summary: string): {
     newKnowledge: pick('新知识'),
     disagreement: pick('分歧'),
     actionItems: pick('行动项'),
+    arbitration: pick('裁决'),
   };
 }
 
 /** 研讨会结束后阿罗德斯提炼学习并写入全量共享记忆 */
 export async function summarizeSeminar(input: {
   topic: string;
-  agentA: string;
-  agentB: string;
+  participants: string[];
   transcript: SeminarTurn[];
   workspaceId: string;
   llm: Pick<LlmService, 'summarizeText'>;
@@ -124,9 +124,9 @@ export async function summarizeSeminar(input: {
   // max_tokens 不足时 content 为空。给足预算 + 最多 3 次换措辞重试。
   let summary = '';
   const promptVariants = [
-    '以下是两个 AI 智能体围绕同一主题的研讨会记录。请提炼成可复用的学习小结，按固定四段输出：',
-    '请阅读以下研讨会对话，归纳出学习要点，按以下四段格式输出：',
-    '根据以下多智能体研讨记录，整理一份学习笔记，输出四段：',
+    '以下是多个 AI 智能体围绕同一主题的研讨会记录。请提炼成可复用的学习小结，按固定五段输出：',
+    '请阅读以下研讨会对话，归纳出学习要点，按以下五段格式输出：',
+    '根据以下多智能体研讨记录，整理一份学习笔记，输出五段：',
   ];
   for (let attempt = 0; attempt < 3; attempt++) {
     summary = await input.llm.summarizeText([
@@ -138,18 +138,19 @@ export async function summarizeSeminar(input: {
           '新知识：研讨会中出现的新知识/新方法',
           '分歧：双方未达成一致的分歧点',
           '行动项：后续应该执行的动作',
-          '每段一句话以内，总共不超过 350 字。',
+          '裁决：你是中枢，对分歧给出你的倾向性结论（无分歧则写「无实质分歧」）',
+          '每段一句话以内，总共不超过 450 字。',
           '',
           `主题：${input.topic}`,
-          `参与：${input.agentA} ↔ ${input.agentB}`,
+          `参与：${input.participants.join(' ↔ ')}`,
           '',
           transcriptText,
         ].join('\n'),
       },
     ], {
       systemPrompt: attempt === 0
-        ? '你是阿罗德斯的知识提炼中枢，只输出结构化四段，不输出其他内容。'
-        : '你是会议记录员，负责把讨论提炼成四段式摘要。',
+        ? '你是阿罗德斯的知识提炼中枢，只输出结构化五段，不输出其他内容。'
+        : '你是会议记录员，负责把讨论提炼成五段式摘要（含裁决）。',
       maxTokens: 2048,
       temperature: attempt === 0 ? 0.3 : 0.6,
       thinkingDisabled: true,
@@ -164,12 +165,13 @@ export async function summarizeSeminar(input: {
     parsed.newKnowledge ? `新知识：${parsed.newKnowledge}` : '',
     parsed.disagreement ? `分歧：${parsed.disagreement}` : '',
     parsed.actionItems ? `行动项：${parsed.actionItems}` : '',
+    parsed.arbitration ? `裁决：${parsed.arbitration}` : '',
   ].filter(Boolean).join('\n').slice(0, 2000);
 
   try {
     input.memoryHub.add({
       workspaceId: input.workspaceId,
-      sourceAgent: `seminar:${input.agentA}-${input.agentB}`,
+      sourceAgent: `seminar:${input.participants.join('-')}`,
       type: 'note',
       content: learning || `研讨会（${input.topic}）结束，无结构化提炼结果。`,
     });
@@ -179,7 +181,7 @@ export async function summarizeSeminar(input: {
 
   const full = [
     `主题：${input.topic}`,
-    `参与：${input.agentA} ↔ ${input.agentB}`,
+    `参与：${input.participants.join(' ↔ ')}`,
     '',
     summary.trim(),
   ].join('\n');
@@ -195,19 +197,19 @@ export async function runSeminar(input: RunSeminarInput): Promise<{ status: 'don
   const { repo } = input;
   const adapters = input.adapters;
   const transcript: SeminarTurn[] = [];
-  const speakers = [input.agentA, input.agentB];
+  const speakers = input.participants;
 
   try {
-    const prior = injectLearnings(input.workspaceId, input.agentA, input.memoryHub);
+    const prior = injectLearnings(input.workspaceId, speakers[0], input.memoryHub);
     for (let round = 0; round < input.rounds; round++) {
       for (const self of speakers) {
-        const other = self === input.agentA ? input.agentB : input.agentA;
+        const others = speakers.filter((s) => s !== self);
         const adapter = adapters[self];
         if (!adapter) throw new Error(`智能体 ${self} 没有可用对话适配器`);
         const task = buildSeminarPrompt({
           topic: input.topic,
           self,
-          other,
+          others,
           transcript,
           learnings: prior,
         });
@@ -219,12 +221,11 @@ export async function runSeminar(input: RunSeminarInput): Promise<{ status: 'don
     }
 
     try {
-      await summarizeSeminar({
-        topic: input.topic,
-        agentA: input.agentA,
-        agentB: input.agentB,
-        transcript,
-        workspaceId: input.workspaceId,
+    await summarizeSeminar({
+      topic: input.topic,
+      participants: input.participants,
+      transcript,
+      workspaceId: input.workspaceId,
         llm: input.llm,
         memoryHub: input.memoryHub,
         repo: input.repo,
@@ -240,7 +241,7 @@ export async function runSeminar(input: RunSeminarInput): Promise<{ status: 'don
       try {
         input.memoryHub.add({
           workspaceId: input.workspaceId,
-          sourceAgent: `seminar:${input.agentA}-${input.agentB}`,
+          sourceAgent: `seminar:${input.participants.join('-')}`,
           type: 'note',
           content: fallback,
         });

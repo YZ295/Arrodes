@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS workspace_seminars (
   topic        TEXT NOT NULL,
   agent_a      TEXT NOT NULL,
   agent_b      TEXT NOT NULL,
+  participants TEXT NOT NULL DEFAULT '[]',
   rounds       INTEGER NOT NULL DEFAULT 3,
   status       TEXT NOT NULL DEFAULT 'running'
                CHECK(status IN ('running','done','failed')),
@@ -155,6 +156,7 @@ function ensureWorkspaceColumns(): void {
     { table: 'sessions', col: 'archived' },
     { table: 'memories', col: 'workspace_id' },
     { table: 'workspace_memories', col: 'workspace_id' },
+    { table: 'workspace_seminars', col: 'participants' },
   ];
   for (const { table, col } of targets) {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
@@ -162,7 +164,9 @@ function ensureWorkspaceColumns(): void {
       // archived 用 INTEGER 布尔（0/1），默认 0
       const ddl = col === 'archived'
         ? `ALTER TABLE ${table} ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`
-        : `ALTER TABLE ${table} ADD COLUMN ${col} TEXT NOT NULL DEFAULT 'default'`;
+        : col === 'participants'
+          ? `ALTER TABLE ${table} ADD COLUMN ${col} TEXT NOT NULL DEFAULT '[]'`
+          : `ALTER TABLE ${table} ADD COLUMN ${col} TEXT NOT NULL DEFAULT 'default'`;
       db.prepare(ddl).run();
       console.log(`[Schema] 已迁移: ${table}.${col}`);
     }

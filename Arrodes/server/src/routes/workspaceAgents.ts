@@ -133,15 +133,19 @@ export function createWorkspaceAgentsRouter(): Router {
       const ws = workspaceRepo.get((req.params as Record<string, string>).id);
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
 
-      const agentA = String(req.body?.agentA ?? '');
-      const agentB = String(req.body?.agentB ?? '');
+      const agentsRaw: unknown[] = Array.isArray(req.body?.agents)
+        ? req.body.agents
+        : [req.body?.agentA, req.body?.agentB];
+      const participants = [...new Set(
+        agentsRaw.map((id) => String(id ?? '').trim()).filter((x): x is string => Boolean(x)),
+      )];
       const topic = String(req.body?.topic ?? '').trim();
-      const rounds = Math.min(Math.max(parseInt(String(req.body?.rounds ?? '3'), 10) || 3, 1), 6);
+      const rounds = Math.min(Math.max(parseInt(String(req.body?.rounds ?? '1'), 10) || 1, 1), 3);
       if (!topic) { res.status(400).json({ error: '主题不能为空' }); return; }
-      if (!agentA || !agentB || agentA === agentB) {
-        res.status(400).json({ error: '需要选择两个不同的智能体' }); return;
+      if (participants.length < 2 || participants.length > 5) {
+        res.status(400).json({ error: '需要选择 2-5 个不同的智能体' }); return;
       }
-      for (const id of [agentA, agentB]) {
+      for (const id of participants) {
         if (!isConnectedAgent(ws.id, id)) {
           res.status(400).json({ error: `智能体 ${id} 未接入此工作区` }); return;
         }
@@ -151,7 +155,7 @@ export function createWorkspaceAgentsRouter(): Router {
       }
 
       const seminar = seminarRepo.create({
-        workspaceId: ws.id, topic, agentA, agentB, rounds,
+        workspaceId: ws.id, topic, participants, rounds,
       });
 
       // 异步执行：创建后立刻返回，客户端轮询状态；失败由服务端落库标记
@@ -159,13 +163,11 @@ export function createWorkspaceAgentsRouter(): Router {
         seminarId: seminar.id,
         workspaceId: ws.id,
         topic,
-        agentA,
-        agentB,
+        participants,
         rounds,
-        adapters: {
-          [agentA]: agentAdapters.get(agentA)!,
-          [agentB]: agentAdapters.get(agentB)!,
-        },
+        adapters: Object.fromEntries(
+          participants.map((id: string) => [id, agentAdapters.get(id)!]),
+        ),
         cwd: workspaceProjectDir(ws),
         repo: seminarRepo,
         llm: llmService,
