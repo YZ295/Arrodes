@@ -24,3 +24,7 @@ data-backup-*/
 # Python ����
 __pycache__/
 *.pyc
+
+# 本地运行产物（含凭据，禁止入库）
+.gateway.pid
+start-workbuddy-gateway.cmd
