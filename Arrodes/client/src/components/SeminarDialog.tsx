@@ -39,6 +39,8 @@ interface SeminarDialogProps {
   connected: string[];
   onClose: () => void;
   onMemorySaved?: () => void;
+  /** 研讨会学习小结一键转入开发工作流 */
+  onOpenWorkflow?: (title: string, seminarId: string) => void;
 }
 
 const POLL_MS = 2500;
@@ -49,6 +51,7 @@ export default function SeminarDialog({
   connected,
   onClose,
   onMemorySaved,
+  onOpenWorkflow,
 }: SeminarDialogProps) {
   const candidates = agents.filter((a) => connected.includes(a.id) && a.available && a.id !== 'arrodes');
   const [selected, setSelected] = useState<string[]>(candidates.slice(0, 2).map((a) => a.id));
@@ -289,6 +292,12 @@ export default function SeminarDialog({
                   <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3.5">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-[12px] font-semibold text-emerald-300/90">阿罗德斯 · 学习小结</span>
+                      <button
+                        onClick={() => onOpenWorkflow?.(seminar.topic, seminar.id)}
+                        className="px-2 py-0.5 rounded-md bg-blue-500/15 text-[11px] text-blue-200 hover:bg-blue-500/30 border border-blue-400/25 transition-colors"
+                      >
+                        转入开发工作流
+                      </button>
                       <button
                         onClick={() => void syncObsidian()}
                         disabled={syncing}

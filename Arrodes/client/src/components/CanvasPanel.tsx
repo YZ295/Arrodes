@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import AgentChatPanel from './AgentChatPanel';
 import SeminarDialog from './SeminarDialog';
+import DevWorkflowPanel from './DevWorkflowPanel';
 
 interface AgentConnector {
   id: string;
@@ -115,6 +116,8 @@ function CanvasInner({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
   const [chatAgent, setChatAgent] = useState<string | null>(null);
   const [seminarOpen, setSeminarOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [workflowSeminar, setWorkflowSeminar] = useState<{ title: string; id: string } | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<AgentNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -320,6 +323,13 @@ function CanvasInner({ onBack }: { onBack: () => void }) {
         <span className="text-[12px] text-white/30">共享记忆 {memories.total} 条</span>
         <div className="ml-auto flex items-center gap-2">
           <button
+            onClick={() => setWorkflowOpen(true)}
+            className="px-2.5 py-1 rounded-lg text-[12px] text-blue-200/80 bg-blue-500/15 border border-blue-400/20 hover:bg-blue-500/25 hover:text-blue-100 transition-colors"
+            title="开发工作流：构想 → 规格 → 拆任务 → 实现 → 审查 → 完成"
+          >
+            ⚙ 工作流
+          </button>
+          <button
             onClick={() => setSeminarOpen(true)}
             className="px-2.5 py-1 rounded-lg text-[12px] text-blue-200/80 bg-blue-500/15 border border-blue-400/20 hover:bg-blue-500/25 hover:text-blue-100 transition-colors"
             title="让两个智能体互相对话，阿罗德斯提炼学习并沉淀共享记忆"
@@ -401,6 +411,21 @@ function CanvasInner({ onBack }: { onBack: () => void }) {
           connected={connected}
           onClose={() => setSeminarOpen(false)}
           onMemorySaved={async () => { await load(activeWorkspaceId); }}
+          onOpenWorkflow={(title, id) => {
+            setWorkflowSeminar({ title, id });
+            setSeminarOpen(false);
+            setWorkflowOpen(true);
+          }}
+        />
+      )}
+
+      {/* 开发工作流面板 */}
+      {workflowOpen && (
+        <DevWorkflowPanel
+          workspaceId={activeWorkspaceId}
+          onClose={() => setWorkflowOpen(false)}
+          seminarTitle={workflowSeminar?.title}
+          seminarId={workflowSeminar?.id}
         />
       )}
     </div>
