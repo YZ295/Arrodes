@@ -11,6 +11,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { execCommand } from '../services/computerService.js';
 import { loadCustomAgents, customAgentsFile } from '../services/customAgents.js';
+import { probeWorkbuddyGateway } from '../services/workbuddyAdapter.js';
 
 export interface AgentConnector {
   id: string;
@@ -120,6 +121,10 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
     checkCli('codex'),
     checkCli('code'),
   ]);
+  const workbuddyDir = existsSync(BASE_PATHS.workbuddy);
+  const workbuddyGateway = await probeWorkbuddyGateway();
+  const workbuddyCapabilities = workbuddyDir ? ['file', 'memory'] : [];
+  if (workbuddyGateway) workbuddyCapabilities.push('chat');
   const hermesDetail = hermesInfo.available
     ? (hermesInfo.source === 'desktop'
       ? `Hermes 桌面版 ${hermesInfo.version} 可用（可对话/派任务）`
@@ -163,9 +168,13 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
       id: 'workbuddy',
       name: 'WorkBuddy',
       type: 'file',
-      available: existsSync(BASE_PATHS.workbuddy),
-      detail: existsSync(BASE_PATHS.workbuddy) ? '检测到 .workbuddy 工作目录' : '未检测到 .workbuddy',
-      capabilities: existsSync(BASE_PATHS.workbuddy) ? ['file', 'memory'] : [],
+      available: workbuddyDir,
+      detail: workbuddyDir
+        ? (workbuddyGateway
+          ? '检测到 .workbuddy 工作目录 + 本地网关在线（可对话，需 token）'
+          : '检测到 .workbuddy 工作目录（网关未在线，仅记忆导入）')
+        : '未检测到 .workbuddy',
+      capabilities: workbuddyCapabilities,
     },
     {
       id: 'marvis',

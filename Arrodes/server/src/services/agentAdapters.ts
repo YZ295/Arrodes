@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getCommandProvider, type AsyncCommandOutcome } from './commandProvider.js';
+import { WorkBuddyGatewayAdapter } from './workbuddyAdapter.js';
 
 /** Agent 调用超时（可配；默认 8 分钟，避免 15 分钟静默被杀） */
 const AGENT_TIMEOUT_MS = Number(process.env.ARRODES_AGENT_TIMEOUT_MS || 8 * 60 * 1000);
@@ -133,3 +134,6 @@ if (existsSync(DSH_CMD)) {
     name: 'DeepSeek Harness',
   }));
 }
+
+// WorkBuddy（CodeBuddy）：通过本地网关对话（无 CLI；网关需 token，见 workbuddyAdapter）
+agentAdapters.register('workbuddy', new WorkBuddyGatewayAdapter());
