@@ -6,7 +6,7 @@
  * - 上：透明 textarea（蓝色光标、浅灰占位符、自动增高）
  * - 中间：已附加技能 chip（可逐个移除）
  * - 下：工具行 ——
- *     左：项目 | ＋技能 | 模式（标准/PTC/创造/极简）| 权限（默认/全部）
+ *     左：＋技能（最左）| 项目 | 模式（标准/PTC/创造/极简）| 权限（默认/全部）
  *     右：模型选择 | 停止 | 发送 | 语音（最右）
  */
 import { memo, useRef, useEffect } from 'react';
@@ -112,8 +112,9 @@ export default memo(function NeonInputBar({
 
         {/* 工具行（DSH .row：左工具 + 右操作） */}
         <div className="flex items-center justify-between gap-2 px-2 pb-2 min-w-0 flex-wrap">
-          {/* 左：项目 | ＋技能 | 模式 | 权限 */}
+          {/* 左：＋技能（最左）| 项目 | 模式 | 权限 */}
           <div className="flex items-center gap-1 min-w-0 flex-wrap">
+            <SkillMenu attached={attachedSkills} onToggle={onToggleSkill} disabled={disabled} />
             <button
               type="button"
               onClick={onPickProject}
@@ -124,7 +125,6 @@ export default memo(function NeonInputBar({
               <FolderIcon />
               项目
             </button>
-            <SkillMenu attached={attachedSkills} onToggle={onToggleSkill} disabled={disabled} />
             <ModeSelect disabled={disabled} />
             <PermissionSelect permission={permission} onSetPermission={onSetPermission} disabled={disabled} />
           </div>
