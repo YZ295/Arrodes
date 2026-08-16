@@ -36,9 +36,9 @@
   "verification": {
     "scope": "targeted",
     "passed": true,
-    "verified_at": "2026-08-16T19:27:45+08:00",
-    "fingerprint": "17f8cfbdcee656280d31adade047d0afba862daa624d4b3acae8e9d0425d35ed",
-    "head": "ce3aa070c30dac2dfde0acfaf28da4ef285f4b0b",
+    "verified_at": "2026-08-16T19:28:17+08:00",
+    "fingerprint": "c4ba644e1d7bd4e99eda160212eb825fe7c2fe870b7db6bae96a28ffb195fa39",
+    "head": "b0076df2b99cce27c3735b0d905cf011364fed32",
     "results": [
       {
         "name": "vitest-server",
@@ -51,7 +51,7 @@
         ],
         "exit_code": 0,
         "passed": true,
-        "summary": "> arrodes-server@0.1.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/server\n\n\n Test Files  78 passed (78)\n      Tests  386 passed (386)\n   Start at  19:27:32\n   Duration  6.93s (transform 35.14s, setup 0ms, import 52.68s, tests 3.60s, environment 8ms)\n\n(node:45812) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:45812) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)\n(node:15204) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:15204) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)"
+        "summary": "> arrodes-server@0.1.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/server\n\n\n Test Files  78 passed (78)\n      Tests  386 passed (386)\n   Start at  19:28:04\n   Duration  6.81s (transform 32.20s, setup 0ms, import 50.47s, tests 3.26s, environment 7ms)\n\n(node:45528) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:45528) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)\n(node:41040) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:41040) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)"
       },
       {
         "name": "vitest-client",
@@ -64,7 +64,7 @@
         ],
         "exit_code": 0,
         "passed": true,
-        "summary": "> client@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/client\n\n\n Test Files  4 passed (4)\n      Tests  20 passed (20)\n   Start at  19:27:40\n   Duration  461ms (transform 115ms, setup 0ms, import 178ms, tests 23ms, environment 0ms)"
+        "summary": "> client@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/client\n\n\n Test Files  4 passed (4)\n      Tests  20 passed (20)\n   Start at  19:28:12\n   Duration  468ms (transform 115ms, setup 0ms, import 179ms, tests 21ms, environment 0ms)"
       },
       {
         "name": "tsc-server",
@@ -90,7 +90,7 @@
         ],
         "exit_code": 0,
         "passed": true,
-        "summary": "> client@0.0.0 build\n> tsc -b && vite build\n\nvite v8.1.5 building client environment for production...\n\u001b[2K\ntransforming...✓ 233 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                            0.76 kB │ gzip:   0.43 kB\ndist/assets/arrodes_avatar-BZH2u6cA.jpg  238.38 kB\ndist/assets/index-D87RpjmY.css            92.39 kB │ gzip:  14.06 kB\ndist/assets/index-Crd8o0Pj.js            563.11 kB │ gzip: 173.05 kB\n\n✓ built in 271ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+        "summary": "> client@0.0.0 build\n> tsc -b && vite build\n\nvite v8.1.5 building client environment for production...\n\u001b[2K\ntransforming...✓ 233 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                            0.76 kB │ gzip:   0.43 kB\ndist/assets/arrodes_avatar-BZH2u6cA.jpg  238.38 kB\ndist/assets/index-D87RpjmY.css            92.39 kB │ gzip:  14.06 kB\ndist/assets/index-Crd8o0Pj.js            563.11 kB │ gzip: 173.05 kB\n\n✓ built in 255ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
       }
     ]
   },
