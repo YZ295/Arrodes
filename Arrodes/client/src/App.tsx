@@ -28,6 +28,7 @@ import FolderPicker from './components/FolderPicker';
 import { useVoiceChat } from './voice/hooks/useVoiceChat';
 import { useWakeWord } from './voice/hooks/useWakeWord';
 import { useWorkspaceStore } from './store/workspaceStore';
+import CanvasPanel from './components/CanvasPanel';
 
 const App = memo(function App() {
   const [sidebarView, setSidebarView] = useState<SidebarView>('conversation');
@@ -175,8 +176,13 @@ const App = memo(function App() {
           />
         )}
 
+        {/* 画布（T-06：全屏节点连线视图，节点内可直接对话） */}
+        {sidebarView === 'canvas' && (
+          <CanvasPanel onBack={() => setSidebarView('conversation')} />
+        )}
+
         {/* 面板覆盖层（非 conversation 视图） */}
-        {showPanel && (
+        {showPanel && sidebarView !== 'canvas' && (
           <PanelView
             view={sidebarView}
             ttsConfig={voice.ttsConfig}

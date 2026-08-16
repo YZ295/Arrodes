@@ -26,7 +26,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 import SidebarBeam from './SidebarBeam';
 
 export type SidebarView =
-  | 'conversation' | 'workspace' | 'workflow' | 'profile' | 'memory'
+  | 'conversation' | 'workspace' | 'canvas' | 'workflow' | 'profile' | 'memory'
   | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced';
 
 interface NavItem {
@@ -40,6 +40,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'conversation', label: '对话', icon: 'conversation', available: true },
   { id: 'workspace', label: '工作区', icon: 'workspace', available: true, hint: 'Agent 大宇宙' },
+  { id: 'canvas', label: '画布', icon: 'canvas', available: true, hint: '拖拽连线 · 共享记忆' },
   { id: 'skills', label: '技能', icon: 'skills', available: true },
   { id: 'workflow', label: '工作流', icon: 'workflow', available: false, hint: '即将支持 n8n / Coze' },
   { id: 'profile', label: '画像', icon: 'profile', available: true },
@@ -73,6 +74,15 @@ function NavIcon({ id }: { id: SidebarView }) {
         <svg {...props}>
           <circle cx="12" cy="12" r="4" />
           <ellipse cx="12" cy="12" rx="9" ry="3.6" transform="rotate(-22 12 12)" />
+        </svg>
+      );
+    case 'canvas':
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
         </svg>
       );
     case 'skills':

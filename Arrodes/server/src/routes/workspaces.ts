@@ -84,12 +84,18 @@ export function createWorkspacesRouter(): Router {
 
   router.patch('/:id', (req, res) => {
     try {
-      const { name, icon, status, config, projectDir, permission } = req.body ?? {};
+      const { name, icon, status, config, projectDir, permission, canvas } = req.body ?? {};
+      // 画布位置：与现有 config 合并（projectDir/permission 走专门字段，避免整体替换丢配置）
+      let mergedConfig = config;
+      if (canvas !== undefined) {
+        const cur = workspaceRepo.get(req.params.id);
+        mergedConfig = { ...(cur?.config ?? {}), canvas };
+      }
       const ws = workspaceRepo.update(req.params.id, {
         name: name !== undefined ? String(name) : undefined,
         icon: icon !== undefined ? String(icon) : undefined,
         status,
-        config,
+        config: mergedConfig,
         projectDir: projectDir !== undefined ? String(projectDir) : undefined,
         permission: permission !== undefined ? String(permission) : undefined,
       });
