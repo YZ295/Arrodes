@@ -313,7 +313,7 @@ export default function WorkspacePanel() {
                   >
                     {!a.available ? '不可接入' : connected.includes(a.id) ? '断开' : '接入'}
                   </button>
-                  {a.type === 'cli' && (
+                  {a.type !== 'native' && a.capabilities.includes('chat') && (
                     <button
                       onClick={() => setChatAgent(a.id)}
                       disabled={!a.available || !connected.includes(a.id)}
