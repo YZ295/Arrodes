@@ -50,7 +50,7 @@ export default memo(function NeonInputBar({
   }, [text]);
 
   return (
-    <div className="relative w-full max-w-2xl" style={{ borderRadius: 18 }}>
+    <div className="relative w-full max-w-3xl" style={{ borderRadius: 18 }}>
       {/* 霓虹彩灯边框层（absolute 覆盖，mask xor 只露边框环；不裁剪内容层） */}
       <div
         data-neon={id}
@@ -75,29 +75,38 @@ export default memo(function NeonInputBar({
 
       {/* 内容层（独立于 mask，纯黑底 + 按钮 + 输入框） */}
       <div
-        className="relative flex items-center gap-1 px-2 py-1.5"
+        className="relative flex flex-col gap-1.5 px-2 py-1.5"
         style={{ backgroundColor: '#000000', borderRadius: 16, zIndex: 2 }}
       >
-          {/* 项目 + 权限（主输入栏快捷设置） */}
+        {/* 顶部工具行：项目 + 权限 + 当前项目目录 */}
+        <div className="flex items-center gap-1.5 px-1 pt-0.5">
           <button
             onClick={onPickProject}
             title={`项目目录${projectDir ? `：${projectDir}` : '（未设置）'}`}
-            className="shrink-0 px-2 h-10 rounded-xl text-[16px] text-white/60 hover:bg-white/15 hover:text-white/90 transition-all"
+            className="shrink-0 px-2.5 h-8 rounded-lg text-[16px] text-white/60 bg-white/5 hover:bg-white/15 hover:text-white/90 transition-all"
           >
             📁 项目
           </button>
           <button
             onClick={onTogglePermission}
             title={permission === 'full' ? '全部权限：高风险操作自动执行' : '默认权限：高风险操作需确认'}
-            className={`shrink-0 px-2 h-10 rounded-xl text-[16px] transition-all ${
+            className={`shrink-0 px-2.5 h-8 rounded-lg text-[16px] transition-all ${
               permission === 'full'
-                ? 'text-red-300/90 hover:bg-red-500/15'
-                : 'text-white/60 hover:bg-white/15 hover:text-white/90'
+                ? 'text-red-300/90 bg-red-500/10 hover:bg-red-500/20'
+                : 'text-white/60 bg-white/5 hover:bg-white/15 hover:text-white/90'
             }`}
           >
-            {permission === 'full' ? '⚡ 全部' : '🛡 默认'}
+            {permission === 'full' ? '⚡ 全部权限' : '🛡 默认权限'}
           </button>
+          {projectDir && (
+            <span className="ml-auto text-[16px] text-white/25 truncate max-w-[45%]" title={projectDir}>
+              {projectDir}
+            </span>
+          )}
+        </div>
 
+        {/* 主输入行：麦克风 + 输入框 + 停止 + 发送 */}
+        <div className="flex items-end gap-1">
           {/* 语音按钮（内嵌左侧，纯白图标） */}
           <button
             onMouseDown={(e) => { e.preventDefault(); onMicDown(); }}
@@ -130,10 +139,10 @@ export default memo(function NeonInputBar({
             onKeyDown={onKeyDown}
             placeholder={placeholder || '输入消息…'}
             disabled={disabled}
-            rows={1}
+            rows={2}
             className="flex-1 bg-transparent px-1 py-2.5 text-[16px] leading-[22px] caret-white
-              outline-none resize-none max-h-[220px] overflow-y-auto disabled:opacity-30 min-w-0"
-            style={{ color: '#ffffff', backgroundColor: 'transparent', minHeight: '44px' }}
+              outline-none resize-none max-h-[240px] overflow-y-auto disabled:opacity-30 min-w-0"
+            style={{ color: '#ffffff', backgroundColor: 'transparent', minHeight: '56px' }}
           />
 
           {/* 停止按钮（内嵌，运行时红色高亮，默认纯白） */}
@@ -166,6 +175,7 @@ export default memo(function NeonInputBar({
             </svg>
           </button>
         </div>
+      </div>
 
       {/* 彩灯旋转动画（多色平滑过渡） */}
       <style>{`
