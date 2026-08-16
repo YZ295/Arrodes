@@ -123,6 +123,7 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
   ]);
   const workbuddyDir = existsSync(BASE_PATHS.workbuddy);
   const workbuddyGateway = await probeWorkbuddyGateway();
+  const workbuddyTokenConfigured = Boolean(process.env.WORKBUDDY_GATEWAY_TOKEN);
   const workbuddyCapabilities = workbuddyDir ? ['file', 'memory'] : [];
   if (workbuddyGateway) workbuddyCapabilities.push('chat');
   const hermesDetail = hermesInfo.available
@@ -171,7 +172,9 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
       available: workbuddyDir,
       detail: workbuddyDir
         ? (workbuddyGateway
-          ? '检测到 .workbuddy 工作目录 + 本地网关在线（可对话，需 token）'
+          ? (workbuddyTokenConfigured
+            ? '检测到 .workbuddy 工作目录 + 本地网关在线（可对话）'
+            : '检测到 .workbuddy 工作目录 + 本地网关在线（可对话，需 token）')
           : '检测到 .workbuddy 工作目录（网关未在线，仅记忆导入）')
         : '未检测到 .workbuddy',
       capabilities: workbuddyCapabilities,
