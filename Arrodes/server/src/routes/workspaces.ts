@@ -83,13 +83,14 @@ export function createWorkspacesRouter(): Router {
 
   router.patch('/:id', (req, res) => {
     try {
-      const { name, icon, status, config, projectDir } = req.body ?? {};
+      const { name, icon, status, config, projectDir, permission } = req.body ?? {};
       const ws = workspaceRepo.update(req.params.id, {
         name: name !== undefined ? String(name) : undefined,
         icon: icon !== undefined ? String(icon) : undefined,
         status,
         config,
         projectDir: projectDir !== undefined ? String(projectDir) : undefined,
+        permission: permission !== undefined ? String(permission) : undefined,
       });
       if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
       res.json({ workspace: ws });

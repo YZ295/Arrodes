@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAudioRecorder } from '../voice/hooks/useAudioRecorder';
+import FolderPicker from './FolderPicker';
 
 interface AgentChatPanelProps {
   workspaceId: string;
@@ -11,9 +12,20 @@ interface AgentChatPanelProps {
   onClose: () => void;
   /** 记忆写入成功后回调（父面板刷新记忆列表） */
   onMemorySaved?: () => void;
+  projectDir?: string;
+  permission?: 'default' | 'full';
+  onUpdateWorkspace?: (patch: { projectDir?: string; permission?: string }) => Promise<void> | void;
 }
 
-export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemorySaved }: AgentChatPanelProps) {
+export default function AgentChatPanel({
+  workspaceId,
+  agentId,
+  onClose,
+  onMemorySaved,
+  projectDir,
+  permission = 'default',
+  onUpdateWorkspace,
+}: AgentChatPanelProps) {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,6 +38,7 @@ export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemory
   const [voiceBusy, setVoiceBusy] = useState(false);
   const micHoldingRef = useRef(false);
   const recorder = useAudioRecorder();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // 打开时加载历史对话
   useEffect(() => {
@@ -110,18 +123,19 @@ export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemory
     });
   }, [recorder, transcribe, sendChat]);
 
-  const runTask = useCallback(async () => {
-    if (!taskConfirm || taskLoading) return;
+  const runTask = useCallback(async (taskArg?: string) => {
+    const task = taskArg ?? taskConfirm;
+    if (!task || taskLoading) return;
     setTaskLoading(true);
     setError('');
-    setMessages((prev) => [...prev, { role: 'user', content: `【任务】${taskConfirm}` }]);
+    setMessages((prev) => [...prev, { role: 'user', content: `【任务】${task}` }]);
     const controller = new AbortController();
     taskAbortRef.current = controller;
     try {
       const res = await fetch(`/api/v1/workspaces/${workspaceId}/agents/${agentId}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: taskConfirm }),
+        body: JSON.stringify({ task }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -160,10 +174,28 @@ export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemory
   }, [workspaceId, agentId, onMemorySaved]);
 
   return (
-    <div className="rounded-xl border border-blue-500/25 bg-white/3 p-3 space-y-3">
+    <div className="rounded-xl border border-blue-500/25 bg-white/3 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-white/85">与 {agentId} 对话</h3>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPickerOpen(true)}
+            title="选择项目文件夹"
+            className="text-[16px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80 transition-colors"
+          >
+            项目
+          </button>
+          <button
+            onClick={() => onUpdateWorkspace?.({ permission: permission === 'full' ? 'default' : 'full' })}
+            title={permission === 'full' ? '全部权限：任务自动执行，不确认' : '默认权限：高风险任务需确认'}
+            className={`text-[16px] px-2 py-1 rounded-lg border transition-colors ${
+              permission === 'full'
+                ? 'bg-red-500/15 border-red-400/30 text-red-300 hover:bg-red-500/25'
+                : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80'
+            }`}
+          >
+            {permission === 'full' ? '全部权限' : '默认权限'}
+          </button>
           <button
             onClick={() => setVoiceOn((v) => !v)}
             title={voiceOn ? '关闭语音朗读' : '开启语音朗读'}
@@ -174,7 +206,7 @@ export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemory
           <button onClick={onClose} className="text-[16px] text-white/40 hover:text-white/70">✕ 关闭</button>
         </div>
       </div>
-      <div className="max-h-64 overflow-y-auto space-y-2 [scrollbar-width:thin]">
+      <div className="max-h-96 overflow-y-auto space-y-2 [scrollbar-width:thin]">
         {messages.map((m, i) => (
           <div key={i} className={`text-sm ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
             <span className={`inline-block max-w-[85%] px-3 py-1.5 rounded-lg whitespace-pre-wrap break-words ${
@@ -254,7 +286,7 @@ export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemory
               取消
             </button>
             <button
-              onClick={runTask}
+              onClick={() => runTask()}
               disabled={taskLoading}
               className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 disabled:opacity-40"
             >
@@ -283,9 +315,13 @@ export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemory
           />
           <button
             onClick={() => {
-              if (taskInput.trim()) {
-                setTaskConfirm(taskInput.trim());
-                setTaskInput('');
+              if (!taskInput.trim()) return;
+              const t = taskInput.trim();
+              setTaskInput('');
+              if (permission === 'full') {
+                runTask(t);
+              } else {
+                setTaskConfirm(t);
               }
             }}
             className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm text-white/80 transition-colors"
@@ -294,6 +330,15 @@ export default function AgentChatPanel({ workspaceId, agentId, onClose, onMemory
           </button>
         </div>
       )}
+      <FolderPicker
+        open={pickerOpen}
+        initialPath={projectDir}
+        onClose={() => setPickerOpen(false)}
+        onSelect={async (p) => {
+          setPickerOpen(false);
+          await onUpdateWorkspace?.({ projectDir: p });
+        }}
+      />
     </div>
   );
 }

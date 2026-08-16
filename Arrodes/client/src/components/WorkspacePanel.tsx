@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import AgentChatPanel from './AgentChatPanel';
+import FolderPicker from './FolderPicker';
 
 interface AgentConnector {
   id: string;
@@ -47,11 +48,6 @@ export default function WorkspacePanel() {
   const [chatAgent, setChatAgent] = useState<string | null>(null);
   const [projectDir, setProjectDir] = useState('');
   const [browseOpen, setBrowseOpen] = useState(false);
-  const [browsePath, setBrowsePath] = useState('');
-  const [browseParent, setBrowseParent] = useState<string | null>(null);
-  const [browseDirs, setBrowseDirs] = useState<string[]>([]);
-  const [browseError, setBrowseError] = useState('');
-  const [browseLoading, setBrowseLoading] = useState(false);
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
 
@@ -187,42 +183,27 @@ export default function WorkspacePanel() {
     }
   }, [activeWorkspaceId, projectDir, loadWorkspaces]);
 
-  const openBrowse = useCallback(async (pathArg?: string) => {
-    setBrowseOpen(true);
-    setBrowseError('');
-    setBrowseLoading(true);
-    const p = pathArg || projectDir || 'E:/';
-    try {
-      const res = await fetch(`/api/v1/workspace/browse?path=${encodeURIComponent(p)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setBrowsePath(data.path);
-      setBrowseParent(data.parent);
-      setBrowseDirs(data.dirs || []);
-    } catch (err) {
-      setBrowseError(err instanceof Error ? err.message : '浏览失败');
-    } finally {
-      setBrowseLoading(false);
-    }
-  }, [projectDir]);
-
-  const chooseProjectDir = useCallback(async (p: string) => {
+  const updateWorkspaceConfig = useCallback(async (patch: { projectDir?: string; permission?: string }) => {
     try {
       const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectDir: p }),
+        body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setProjectDir(p);
-      setBrowseOpen(false);
-      setSyncMsg('✓ 项目目录已更新');
-      setTimeout(() => setSyncMsg(''), 2000);
       await loadWorkspaces();
+      setSyncMsg('✓ 工作区设置已更新');
+      setTimeout(() => setSyncMsg(''), 2000);
     } catch (err) {
-      setBrowseError(err instanceof Error ? err.message : '保存失败');
+      setError(err instanceof Error ? err.message : '保存失败');
     }
   }, [activeWorkspaceId, loadWorkspaces]);
+
+  const chooseProjectDir = useCallback(async (p: string) => {
+    setProjectDir(p);
+    setBrowseOpen(false);
+    await updateWorkspaceConfig({ projectDir: p });
+  }, [updateWorkspaceConfig]);
 
   return (
     <div className="p-5 space-y-6">
@@ -262,7 +243,7 @@ export default function WorkspacePanel() {
               保存
             </button>
             <button
-              onClick={() => openBrowse()}
+              onClick={() => setBrowseOpen(true)}
               className="px-2.5 py-1.5 rounded-lg bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white/80 text-[16px]"
             >
               浏览…
@@ -292,6 +273,9 @@ export default function WorkspacePanel() {
           agentId={chatAgent}
           onClose={() => setChatAgent(null)}
           onMemorySaved={onMemorySaved}
+          projectDir={active?.config?.projectDir}
+          permission={active?.config?.permission === 'full' ? 'full' : 'default'}
+          onUpdateWorkspace={updateWorkspaceConfig}
         />
       )}
 
@@ -417,58 +401,13 @@ export default function WorkspacePanel() {
         </div>
       </div>
 
-      {/* 项目文件夹选择器 */}
-      {browseOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#02040a]/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-md rounded-2xl border border-blue-400/25 bg-[#0b1022]/95 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-white/85">选择项目文件夹</h3>
-              <button onClick={() => setBrowseOpen(false)} className="text-[16px] text-white/40 hover:text-white/70">✕</button>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                value={browsePath}
-                readOnly
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-[16px] text-white/70"
-              />
-              {browseParent && (
-                <button
-                  onClick={() => openBrowse(browseParent)}
-                  className="px-2 py-1.5 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 text-[16px]"
-                >
-                  ↑ 上级
-                </button>
-              )}
-            </div>
-            {browseLoading && <div className="text-sm text-white/30">加载中…</div>}
-            {browseError && <div className="text-sm text-red-400/80">{browseError}</div>}
-            <div className="max-h-60 overflow-y-auto space-y-1 [scrollbar-width:thin]">
-              {browseDirs.map((d) => (
-                <button
-                  key={d}
-                  onClick={() => openBrowse(`${browsePath.replace(/[\\/]+$/, '')}/${d}`)}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/3 hover:bg-white/8 text-sm text-white/75 transition-colors"
-                >
-                  📁 {d}
-                </button>
-              ))}
-              {!browseLoading && browseDirs.length === 0 && (
-                <div className="text-sm text-white/25 text-center py-3">此目录下没有子文件夹</div>
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setBrowseOpen(false)} className="px-3 py-1.5 rounded-lg bg-white/5 text-white/60 hover:bg-white/10">取消</button>
-              <button
-                onClick={() => chooseProjectDir(browsePath)}
-                disabled={!browsePath}
-                className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-200 hover:bg-blue-500/30 disabled:opacity-40"
-              >
-                选择此文件夹
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 项目文件夹选择器（复用组件） */}
+      <FolderPicker
+        open={browseOpen}
+        initialPath={projectDir}
+        onClose={() => setBrowseOpen(false)}
+        onSelect={chooseProjectDir}
+      />
     </div>
   );
 }

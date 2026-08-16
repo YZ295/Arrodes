@@ -123,7 +123,7 @@ export class WorkspaceRepository {
     return ws;
   }
 
-  update(id: string, patch: { name?: string; icon?: string; status?: 'active' | 'archived'; config?: Record<string, unknown>; projectDir?: string }): Workspace | null {
+  update(id: string, patch: { name?: string; icon?: string; status?: 'active' | 'archived'; config?: Record<string, unknown>; projectDir?: string; permission?: string }): Workspace | null {
     const db = getDb();
     const cur = this.get(id);
     if (!cur) return null;
@@ -133,6 +133,10 @@ export class WorkspaceRepository {
       const pd = String(patch.projectDir).trim();
       if (pd) nextConfig.projectDir = pd;
       else delete nextConfig.projectDir;
+    }
+    if (patch.permission !== undefined) {
+      const perm = String(patch.permission);
+      if (perm === 'default' || perm === 'full') nextConfig.permission = perm;
     }
     db.prepare(`
       UPDATE workspaces
