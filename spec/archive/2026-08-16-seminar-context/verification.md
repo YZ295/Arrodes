@@ -33,3 +33,11 @@
 
 - 无偏差（实现与计划一致）
 - 风险：摘要本身是 LLM 有损压缩——冒烟研讨会中 agents 提出改进方向（状态标签/depends_on 依赖边/硬约束），已记录为后续方向
+
+### 自动验证 2026-08-16T21:30:42+08:00
+
+- 范围：`targeted`
+- `vitest-server`：exit `0`，通过
+- `vitest-client`：exit `0`，通过
+- `tsc-server`：exit `0`，通过
+- `build-client`：exit `0`，通过
