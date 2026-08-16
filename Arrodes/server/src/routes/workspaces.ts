@@ -15,6 +15,8 @@ import { Router } from 'express';
 import { workspaceRepo } from '../db/workspace-repo.js';
 import { createWorkspaceMembersRouter } from './workspaceMembers.js';
 import { createWorkspaceAgentsRouter } from './workspaceAgents.js';
+import { workspaceProjectDir } from '../services/workspaceProjectDir.js';
+import { importWorkbuddyNotes } from '../services/workbuddyMemory.js';
 
 export function createWorkspacesRouter(): Router {
   const router = Router();
@@ -66,6 +68,18 @@ export function createWorkspacesRouter(): Router {
   // 成员与 Agent 交互子路由
   router.use('/:id/members', createWorkspaceMembersRouter());
   router.use('/:id/agents', createWorkspaceAgentsRouter());
+
+  // 导入 WorkBuddy 记忆（.workbuddy/memory/*.md → 统一共享记忆）
+  router.post('/:id/workbuddy/import', (req, res) => {
+    try {
+      const ws = workspaceRepo.get(req.params.id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      const result = importWorkbuddyNotes(workspaceProjectDir(ws), ws.id);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : '导入失败' });
+    }
+  });
 
   router.patch('/:id', (req, res) => {
     try {

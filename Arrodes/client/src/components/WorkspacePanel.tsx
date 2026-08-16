@@ -152,6 +152,19 @@ export default function WorkspacePanel() {
     setTimeout(() => setSyncMsg(''), 2000);
   }, [activeWorkspaceId, load]);
 
+  const importWorkbuddy = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}/workbuddy/import`, { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setSyncMsg(`✓ 已导入 WorkBuddy 记忆（新增 ${data.imported} 条）`);
+      setTimeout(() => setSyncMsg(''), 2500);
+      await load(activeWorkspaceId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '导入失败');
+    }
+  }, [activeWorkspaceId, load]);
+
   const saveProjectDir = useCallback(async () => {
     try {
       const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
@@ -267,14 +280,34 @@ export default function WorkspacePanel() {
                   >
                     {!a.available ? '不可接入' : connected.includes(a.id) ? '断开' : '接入'}
                   </button>
-                  <button
-                    onClick={() => setChatAgent(a.id)}
-                    disabled={!a.available || !connected.includes(a.id) || a.type === 'native'}
-                    title={a.type === 'native' ? '阿罗德斯本体请在主对话中聊天' : '进入对话'}
-                    className="text-[16px] px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors disabled:opacity-40"
-                  >
-                    {a.type === 'native' ? '本体' : '对话'}
-                  </button>
+                  {a.type === 'cli' && (
+                    <button
+                      onClick={() => setChatAgent(a.id)}
+                      disabled={!a.available || !connected.includes(a.id)}
+                      title="进入对话"
+                      className="text-[16px] px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80 transition-colors disabled:opacity-40"
+                    >
+                      对话
+                    </button>
+                  )}
+                  {a.type === 'native' && (
+                    <button
+                      disabled
+                      title="阿罗德斯本体请在主对话中聊天"
+                      className="text-[16px] px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-white/30 opacity-50"
+                    >
+                      本体
+                    </button>
+                  )}
+                  {a.type === 'file' && a.id === 'workbuddy' && (
+                    <button
+                      onClick={importWorkbuddy}
+                      disabled={!a.available || !connected.includes(a.id)}
+                      className="text-[16px] px-2.5 py-1 rounded-lg border border-cyan-400/25 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-40"
+                    >
+                      导入记忆
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="text-[16px] text-white/35 mt-1">{a.detail}</div>

@@ -8,7 +8,7 @@ import { AgentChatRepository } from '../db/agent-chat-repo.js';
 import { agentAdapters } from '../services/agentAdapters.js';
 import { dispatchAgentTask } from '../services/agentTasks.js';
 import { recordAgentMemory } from '../services/agentMemories.js';
-import { resolve } from 'node:path';
+import { workspaceProjectDir } from '../services/workspaceProjectDir.js';
 
 const chatRepo = new AgentChatRepository();
 
@@ -16,13 +16,6 @@ function isConnectedAgent(workspaceId: string, agentId: string): boolean {
   return workspaceRepo.listMembers(workspaceId).some(
     (m) => m.memberType === 'agent' && m.memberId === agentId,
   );
-}
-
-/** Agent 工作目录：优先工作区配置的 projectDir，其次 ARRODES_REPO_ROOT，最后当前仓库 */
-function projectDirOf(ws: { config: Record<string, unknown> }): string {
-  const p = ws.config?.projectDir;
-  if (typeof p === 'string' && p.trim()) return p;
-  return process.env.ARRODES_REPO_ROOT || resolve(process.cwd(), '..', '..');
 }
 
 export function createWorkspaceAgentsRouter(): Router {
@@ -54,7 +47,7 @@ export function createWorkspaceAgentsRouter(): Router {
       try {
         // 不用 req.signal：POST 长任务下请求体读完 ~3s 会虚假 abort（keep-alive），会误杀子进程。
         // 中止语义由显式 cancel 端点负责（见 /runs/:runId/cancel）。
-        reply = await adapter.run(task, { cwd: projectDirOf(ws) });
+        reply = await adapter.run(task, { cwd: workspaceProjectDir(ws) });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         chatRepo.append(ws.id, agentId, 'assistant', `（对话失败: ${msg.slice(0, 500)}）`);
@@ -98,7 +91,7 @@ export function createWorkspaceAgentsRouter(): Router {
         agentId,
         task,
         adapter,
-        cwd: projectDirOf(ws),
+        cwd: workspaceProjectDir(ws),
       });
       res.json({ reply });
     } catch (err) {
