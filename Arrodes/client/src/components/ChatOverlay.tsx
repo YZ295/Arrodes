@@ -222,7 +222,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         </div>
       )}
 
-      {/* 底部输入栏（NeonInputBar：黑色主题 + 环绕彩灯 + 按钮内嵌；始终显示不被隐藏，水平居中） */}
+      {/* 底部输入栏（NeonInputBar：参照 Codex / DeepSeek Harness 输入框风格；始终显示，水平居中） */}
       <div className="flex justify-center px-4 pb-5 pt-2 pointer-events-auto">
         <NeonInputBar
           text={text}
