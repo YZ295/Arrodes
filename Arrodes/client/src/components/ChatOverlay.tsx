@@ -19,6 +19,7 @@ import StatusBar from './StatusBar';
 import BorderBeam from './BorderBeam';
 import AgentStatusOrb from './AgentStatusOrb';
 import NeonInputBar from './NeonInputBar';
+import type { PermissionLevel } from './composer/PermissionSelect';
 import type { Message } from '@shared/types';
 
 interface ChatOverlayProps {
@@ -45,9 +46,9 @@ interface ChatOverlayProps {
   /** 完整停止：停语音 + 停 AI 思考 + 停任务 */
   stopAll: () => void;
   projectDir?: string;
-  permission?: 'default' | 'full';
+  permission: PermissionLevel;
   onPickProject: () => void;
-  onTogglePermission: () => void;
+  onSetPermission: (p: PermissionLevel) => void;
 }
 
 export default function ChatOverlay(props: ChatOverlayProps) {
@@ -57,10 +58,11 @@ export default function ChatOverlay(props: ChatOverlayProps) {
     ttsError, error, showMemoryToast, memoryToastText,
     startRecording, stopRecording, sendTextMessage, replayTTS, stopAll,
     isMuted, toggleMuted,
-    projectDir, permission, onPickProject, onTogglePermission,
+    projectDir, permission, onPickProject, onSetPermission,
   } = props;
 
   const [text, setText] = useState('');
+  const [attachedSkills, setAttachedSkills] = useState<string[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   // 对话界面隐藏状态（persist：用户偏好）
   const [uiHidden, setUiHidden] = useState<boolean>(() => {
@@ -89,9 +91,19 @@ export default function ChatOverlay(props: ChatOverlayProps) {
   const handleSend = () => {
     const t = text.trim();
     if (t && isConnected) {
-      sendTextMessage(t);
+      const skillHint = attachedSkills.length > 0
+        ? `\n\n【指定技能】请优先使用以下技能完成本任务：${attachedSkills.join('、')}。`
+        : '';
+      sendTextMessage(t + skillHint);
       setText('');
+      setAttachedSkills([]);
     }
+  };
+
+  const toggleSkill = (name: string) => {
+    setAttachedSkills((prev) =>
+      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name],
+    );
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -242,7 +254,9 @@ export default function ChatOverlay(props: ChatOverlayProps) {
           projectDir={projectDir}
           permission={permission}
           onPickProject={onPickProject}
-          onTogglePermission={onTogglePermission}
+          onSetPermission={onSetPermission}
+          attachedSkills={attachedSkills}
+          onToggleSkill={toggleSkill}
         />
       </div>
     </div>

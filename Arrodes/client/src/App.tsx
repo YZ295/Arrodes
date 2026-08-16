@@ -171,7 +171,7 @@ const App = memo(function App() {
             projectDir={projectDir}
             permission={permission}
             onPickProject={() => setPickerOpen(true)}
-            onTogglePermission={() => updateWorkspaceConfig({ permission: permission === 'full' ? 'default' : 'full' })}
+            onSetPermission={(p) => updateWorkspaceConfig({ permission: p })}
           />
         )}
 

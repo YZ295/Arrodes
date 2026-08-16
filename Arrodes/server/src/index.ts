@@ -26,9 +26,11 @@ import { createWorkspacesRouter } from './routes/workspaces.js';
 import { createPetRouter } from './routes/pet.js';
 import { createPromptShellRouter } from './routes/promptShell.js';
 import { createActionsRouter } from './routes/actions.js';
+import { createModesRouter } from './routes/modes.js';
 import { harness } from './harness/harness.js';
 import { classifyAction } from './services/actionGate.js';
 import { applySkillProfile } from './services/skillProfile.js';
+import { loadPersistedMode, setSkillMode } from './services/skillMode.js';
 import { registerCustomAgents } from './services/agentAdapters.js';
 import { loadCustomAgents, customAgentsFile } from './services/customAgents.js';
 // 加载内置技能
@@ -59,6 +61,8 @@ import { getAllSkills, registerSkill, unregisterSkill, isSkillEnabled } from './
 
 // 启动时按配置裁剪技能（profile 组合）
 applySkillProfile();
+// 技能模式：启动时恢复上次持久化的模式（即时应用技能组合）
+setSkillMode(loadPersistedMode());
 // 注册配置驱动的自定义智能体（后续接新 CLI agent：改 data/custom-agents.json 即可）
 registerCustomAgents(loadCustomAgents(customAgentsFile()));
 import { startMainloop } from './services/mainloop.js';
@@ -93,6 +97,7 @@ app.use('/api/v1/pet', createPetRouter());
 app.use('/api/v1/prompt-shell', createPromptShellRouter());
 app.use('/api/v1/workspaces', createWorkspacesRouter());
 app.use('/api/v1/actions', createActionsRouter());
+app.use('/api/v1/modes', createModesRouter());
 
 // ---- 多 Agent 展示（Harness）----
 app.get('/api/v1/agents', (_req, res) => {
