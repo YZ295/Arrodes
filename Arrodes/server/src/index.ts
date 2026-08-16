@@ -29,6 +29,8 @@ import { createActionsRouter } from './routes/actions.js';
 import { harness } from './harness/harness.js';
 import { classifyAction } from './services/actionGate.js';
 import { applySkillProfile } from './services/skillProfile.js';
+import { registerCustomAgents } from './services/agentAdapters.js';
+import { loadCustomAgents, customAgentsFile } from './services/customAgents.js';
 // 加载内置技能
 import './skills/memory.js';
 import './skills/command.js';
@@ -57,6 +59,8 @@ import { getAllSkills, registerSkill, unregisterSkill, isSkillEnabled } from './
 
 // 启动时按配置裁剪技能（profile 组合）
 applySkillProfile();
+// 注册配置驱动的自定义智能体（后续接新 CLI agent：改 data/custom-agents.json 即可）
+registerCustomAgents(loadCustomAgents(customAgentsFile()));
 import { startMainloop } from './services/mainloop.js';
 
 const app = express();

@@ -88,7 +88,48 @@ export class HermesCliAdapter implements AgentChatAdapter {
   }
 }
 
+/** 配置驱动的通用 CLI 适配器：command [args...] "<task>"，用于后续任意 CLI 智能体 */
+export class ConfigCliAdapter implements AgentChatAdapter {
+  constructor(private entry: { command: string; args?: string[]; name?: string }) {}
+
+  async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
+    const safeTask = task.replace(/[\r\n]+/g, ' ').replace(/"/g, "'").slice(0, 4000);
+    const argStr = (this.entry.args || []).join(' ');
+    const cmd = `"${this.entry.command}" ${argStr} "${escapeCmdArg(safeTask)}"`;
+    const provider = getCommandProvider();
+    const outcome = provider.runAsync
+      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024, signal: opts.signal })
+      : {
+          ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }),
+          timedOut: false,
+        };
+    return summarizeOutcome(outcome, '', this.entry.name || 'agent');
+  }
+}
+
 /** 全局适配器注册表（codex / hermes，未来 agent 在此追加） */
 export const agentAdapters = new AgentAdapterRegistry();
 agentAdapters.register('codex', new CodexCliAdapter());
 agentAdapters.register('hermes', new HermesCliAdapter());
+
+/** 注册配置驱动的自定义智能体（幂等：已存在同名则不覆盖） */
+export function registerCustomAgents(
+  configs: Array<{ id: string; name: string; command: string; args?: string[] }>,
+): void {
+  for (const c of configs) {
+    if (!agentAdapters.get(c.id)) {
+      agentAdapters.register(c.id, new ConfigCliAdapter(c));
+    }
+  }
+}
+
+// DeepSeek Harness（dsh）：本机安装目录可被 DEEPSEEK_HARNESS_DIR 覆盖
+const DSH_DIR = process.env.DEEPSEEK_HARNESS_DIR || 'E:/AI/Deep Seek Harness';
+const DSH_CMD = `${DSH_DIR}/node_modules/.bin/dsh.cmd`;
+if (existsSync(DSH_CMD)) {
+  agentAdapters.register('deepseekHarness', new ConfigCliAdapter({
+    command: DSH_CMD,
+    args: ['--profile', 'headless'],
+    name: 'DeepSeek Harness',
+  }));
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AgentAdapterRegistry, CodexCliAdapter, HermesCliAdapter } from './agentAdapters.js';
+import { AgentAdapterRegistry, CodexCliAdapter, HermesCliAdapter, ConfigCliAdapter } from './agentAdapters.js';
 import { setCommandProvider, LocalCommandProvider, type CommandProvider } from './commandProvider.js';
 
 describe('AgentAdapterRegistry（T-02 对话适配）', () => {
@@ -107,6 +107,28 @@ describe('AgentAdapterRegistry（T-02 对话适配）', () => {
       const adapter = new HermesCliAdapter();
       const reply = await adapter.run('hi', { cwd: 'E:/x' });
       expect(reply).toContain('MCP github 未配置');
+    } finally {
+      setCommandProvider(new LocalCommandProvider());
+    }
+  });
+
+  it('ConfigCliAdapter 组装 command args "<task>" 并返回回复', async () => {
+    let captured = '';
+    const fake: CommandProvider = {
+      run: () => ({ stdout: '', stderr: '', exitCode: 0 }),
+      runAsync: async (command) => {
+        captured = command;
+        return { stdout: 'dsh reply', stderr: '', exitCode: 0, timedOut: false };
+      },
+    };
+    setCommandProvider(fake);
+    try {
+      const adapter = new ConfigCliAdapter({ command: 'E:/AI/Deep Seek Harness/node_modules/.bin/dsh.cmd', args: ['--profile', 'headless'], name: 'DeepSeek Harness' });
+      const reply = await adapter.run('总结一下', { cwd: 'E:/x' });
+      expect(captured).toContain('dsh.cmd');
+      expect(captured).toContain('--profile headless');
+      expect(captured).toContain('总结一下');
+      expect(reply).toContain('dsh reply');
     } finally {
       setCommandProvider(new LocalCommandProvider());
     }

@@ -10,6 +10,7 @@
  */
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { execCommand } from '../services/computerService.js';
+import { loadCustomAgents, customAgentsFile } from '../services/customAgents.js';
 
 export interface AgentConnector {
   id: string;
@@ -29,6 +30,10 @@ const BASE_PATHS = {
   marvis: process.env.MARVIS_KB_PATH || 'E:/AI/Marvis/Knowledgebase',
   crow5: process.env.CROW5_ROOT || 'E:/project/Crow5',
 };
+
+/** DeepSeek Harness（dsh）CLI 路径（本机安装目录可被 DEEPSEEK_HARNESS_DIR 覆盖） */
+const DSH_DIR = process.env.DEEPSEEK_HARNESS_DIR || 'E:/AI/Deep Seek Harness';
+const DSH_CMD = `${DSH_DIR}/node_modules/.bin/dsh.cmd`;
 
 /** 桌面版 Hermes runtime 根目录（versions 下按时间取最新） */
 const HERMES_VERSIONS_DIR = process.env.HERMES_VERSIONS_DIR || 'E:/AI/Hermes/Hermes Agent CN Desktop/data/versions';
@@ -63,6 +68,16 @@ async function checkCli(command: string): Promise<boolean> {
   try {
     const r = await execCommand(`${command} --version`, { timeoutMs: 2000 });
     return r.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+/** 探测自定义 CLI：命令 + 探测参数，退出码 0 或 stdout 非空视为可用 */
+async function probeCli(command: string, args: string[]): Promise<boolean> {
+  try {
+    const r = await execCommand(`"${command}" ${args.join(' ')}`, { timeoutMs: 5000 });
+    return r.exitCode === 0 || (r.stdout || '').trim().length > 0;
   } catch {
     return false;
   }
@@ -109,7 +124,7 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
       : `Hermes CLI v${hermesInfo.version} 可用（可对话/派任务）`)
     : '未检测到 Hermes（桌面版 runtime 或 hermes 命令均不可用）';
 
-  return [
+  const base: AgentConnector[] = [
     {
       id: 'arrodes',
       name: '阿罗德斯',
@@ -166,5 +181,35 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
       detail: existsSync(BASE_PATHS.crow5) ? '检测到 Crow5 项目/技能库' : '未检测到 Crow5 项目',
       capabilities: existsSync(BASE_PATHS.crow5) ? ['skills', 'file'] : [],
     },
+  ];
+
+  // DeepSeek Harness（deepseekHarness）
+  const dshAvailable = existsSync(DSH_CMD) && await probeCli(DSH_CMD, ['--version']);
+
+  // 配置驱动的自定义 CLI 智能体（data/custom-agents.json）
+  const customConfigs = loadCustomAgents(customAgentsFile());
+  const custom = await Promise.all(customConfigs.map(async (c) => ({
+    c,
+    available: await probeCli(c.command, c.probeArgs || ['--version']),
+  })));
+
+  return [
+    ...base,
+    {
+      id: 'deepseekHarness',
+      name: 'DeepSeek Harness',
+      type: 'cli' as const,
+      available: dshAvailable,
+      detail: dshAvailable ? 'DeepSeek Harness CLI 可用（可对话/派任务，需 DEEPSEEK_API_KEY）' : '未检测到 DeepSeek Harness CLI',
+      capabilities: dshAvailable ? ['chat', 'code', 'exec_command'] : [],
+    },
+    ...custom.map(({ c, available }) => ({
+      id: c.id,
+      name: c.name,
+      type: 'cli' as const,
+      available,
+      detail: available ? `${c.name} CLI 可用（可对话/派任务）` : `未检测到 ${c.name}`,
+      capabilities: available ? (c.capabilities || ['chat']) : [],
+    })),
   ];
 }
