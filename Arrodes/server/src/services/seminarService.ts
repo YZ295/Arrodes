@@ -14,6 +14,9 @@ import type { SeminarRepository } from '../db/seminar-repo.js';
 import type { WorkspaceMemory, WorkspaceMemoryHub } from '../workspace/memory-hub.js';
 import { workspaceMemoryHub } from '../workspace/memory-hub.js';
 
+/** 滚动摘要触发阈值：历史文本超过该字符数后，早期轮次压缩为摘要（环境变量可覆盖） */
+const SEMINAR_SUMMARY_THRESHOLD = Number(process.env.SEMINAR_SUMMARY_THRESHOLD || 3000);
+
 export interface SeminarTurn {
   speaker: string;
   content: string;
@@ -25,6 +28,8 @@ export interface BuildSeminarPromptInput {
   others: string[];
   transcript: SeminarTurn[];
   learnings: string;
+  /** 早期轮次的滚动摘要（长历史时替代早期原文） */
+  phaseSummary?: string;
 }
 
 /** 给单个 agent 的发言任务：主题 + 身份 + 完整已发生对话 + 过往学习 */
@@ -37,7 +42,8 @@ export function buildSeminarPrompt(input: BuildSeminarPromptInput): string {
     `你是「${input.self}」，与「${input.others.join('、')}」围绕主题轮流交换观点。`,
     '要求：观点直接、有依据；可以同意也可以反驳其他参与者；不要客套，不要重复已说内容。',
     input.learnings ? `\n【你们此前研讨会的沉淀】\n${input.learnings}` : '',
-    `\n【截至目前的对话】\n${history}`,
+    input.phaseSummary ? `\n【早期对话摘要】\n${input.phaseSummary}` : '',
+    `\n【最近对话】\n${history}`,
     '\n现在轮到你发言，请直接输出你的观点（不要加称呼/前缀）。',
   ].filter(Boolean).join('\n');
 }
@@ -53,6 +59,8 @@ export interface RunSeminarInput {
   repo: SeminarRepository;
   llm: Pick<LlmService, 'summarizeText'>;
   memoryHub: Pick<WorkspaceMemoryHub, 'searchBySource' | 'search' | 'add'>;
+  /** 滚动摘要触发阈值（字符数；默认 3000） */
+  summaryThreshold?: number;
 }
 
 /** 按来源 agent 前缀过滤研讨会沉淀（sourceAgent: seminar:xxx） */
@@ -198,10 +206,14 @@ export async function runSeminar(input: RunSeminarInput): Promise<{ status: 'don
   const adapters = input.adapters;
   const transcript: SeminarTurn[] = [];
   const speakers = input.participants;
+  const summaryThreshold = input.summaryThreshold ?? SEMINAR_SUMMARY_THRESHOLD;
+  let phaseSummary = '';
 
   try {
     const prior = injectLearnings(input.workspaceId, speakers[0], input.memoryHub);
     for (let round = 0; round < input.rounds; round++) {
+      // 历史只带最近一轮原文；更早的轮次由 phaseSummary 承载（有界上下文）
+      const recent = round === 0 ? [] : transcript.slice(-speakers.length);
       for (const self of speakers) {
         const others = speakers.filter((s) => s !== self);
         const adapter = adapters[self];
@@ -210,13 +222,45 @@ export async function runSeminar(input: RunSeminarInput): Promise<{ status: 'don
           topic: input.topic,
           self,
           others,
-          transcript,
+          transcript: recent,
           learnings: prior,
+          phaseSummary,
         });
         const reply = await adapter.run(task, { cwd: input.cwd });
         const content = (reply || '').trim() || `${self} 无输出`;
         transcript.push({ speaker: self, content });
         repo.appendMessage(input.seminarId, self, content);
+      }
+
+      // 本轮结束：历史超阈值且还有后续轮次 → 生成/更新滚动摘要（AutoGen carryover）
+      if (round + 1 < input.rounds) {
+        const fullText = transcript.map((t) => `${t.speaker}：${t.content}`).join('\n');
+        if (fullText.length > summaryThreshold) {
+          const early = transcript.slice(0, -speakers.length);
+          if (early.length > 0) {
+            try {
+              phaseSummary = await input.llm.summarizeText([
+                {
+                  role: 'user',
+                  content: [
+                    '以下是多智能体研讨会早前轮次的对话记录。请压缩成 1-2 句阶段摘要，',
+                    '只保留影响后续讨论的关键观点、分歧与结论，不要客套。',
+                    '',
+                    early.map((t) => `${t.speaker}：${t.content}`).join('\n').slice(0, 6000),
+                  ].join('\n'),
+                },
+              ], {
+                systemPrompt: '你是研讨会记录员，只输出一句阶段摘要。',
+                maxTokens: 300,
+                temperature: 0.3,
+                thinkingDisabled: true,
+              });
+            } catch (err) {
+              // 摘要失败保留旧摘要（或留空），不中断研讨会
+              console.warn('[Seminar] 滚动摘要失败:', err instanceof Error ? err.message : err);
+            }
+          }
+        }
       }
     }
 
