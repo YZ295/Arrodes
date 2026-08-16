@@ -14,3 +14,4 @@
 
 - [2026-08-13-desktop-shell](archive/2026-08-13-desktop-shell/)
 - [2026-08-16-agent-seminar](archive/2026-08-16-agent-seminar/)
+- [2026-08-16-seminar-multi](archive/2026-08-16-seminar-multi/)

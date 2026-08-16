@@ -17,6 +17,7 @@ export interface Seminar {
   topic: string;
   agentA: string;
   agentB: string;
+  participants: string[];
   rounds: number;
   status: SeminarStatus;
   summary: string;
@@ -39,6 +40,7 @@ interface SeminarRow {
   topic: string;
   agent_a: string;
   agent_b: string;
+  participants: string;
   rounds: number;
   status: SeminarStatus;
   summary: string;
@@ -48,12 +50,26 @@ interface SeminarRow {
 }
 
 function toSeminar(r: SeminarRow): Seminar {
+  let participants: string[] = [];
+  try {
+    const parsed = JSON.parse(r.participants || '[]');
+    if (Array.isArray(parsed) && parsed.length >= 2) {
+      participants = parsed.map(String);
+    }
+  } catch {
+    // 坏 JSON 忽略
+  }
+  // 存量兼容：participants 为空时回退 [agentA, agentB]
+  if (participants.length === 0) {
+    participants = [r.agent_a, r.agent_b].filter(Boolean);
+  }
   return {
     id: r.id,
     workspaceId: r.workspace_id,
     topic: r.topic,
     agentA: r.agent_a,
     agentB: r.agent_b,
+    participants,
     rounds: r.rounds,
     status: r.status,
     summary: r.summary,
@@ -67,18 +83,22 @@ export class SeminarRepository {
   create(input: {
     workspaceId: string;
     topic: string;
-    agentA: string;
-    agentB: string;
+    participants: string[];
     rounds: number;
   }): Seminar {
     const db = getDb();
     const now = new Date().toISOString();
+    const participants = [...new Set(input.participants.map((p) => String(p).trim()).filter(Boolean))];
+    if (participants.length < 2 || participants.length > 5) {
+      throw new Error('研讨会需要 2-5 个不同的智能体');
+    }
     const seminar: Seminar = {
       id: randomUUID(),
       workspaceId: input.workspaceId,
       topic: input.topic,
-      agentA: input.agentA,
-      agentB: input.agentB,
+      agentA: participants[0],
+      agentB: participants[1],
+      participants,
       rounds: input.rounds,
       status: 'running',
       summary: '',
@@ -88,11 +108,12 @@ export class SeminarRepository {
     };
     db.prepare(`
       INSERT INTO workspace_seminars
-        (id, workspace_id, topic, agent_a, agent_b, rounds, status, summary, error, created_at, completed_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'running', '', '', ?, NULL)
+        (id, workspace_id, topic, agent_a, agent_b, participants, rounds, status, summary, error, created_at, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'running', '', '', ?, NULL)
     `).run(
       seminar.id, seminar.workspaceId, seminar.topic,
-      seminar.agentA, seminar.agentB, seminar.rounds, seminar.createdAt,
+      seminar.agentA, seminar.agentB, JSON.stringify(participants),
+      seminar.rounds, seminar.createdAt,
     );
     return seminar;
   }
@@ -100,7 +121,7 @@ export class SeminarRepository {
   get(id: string): Seminar | null {
     const db = getDb();
     const row = db.prepare(`
-      SELECT id, workspace_id, topic, agent_a, agent_b, rounds, status, summary, error,
+      SELECT id, workspace_id, topic, agent_a, agent_b, participants, rounds, status, summary, error,
              created_at, completed_at
       FROM workspace_seminars WHERE id = ?
     `).get(id) as SeminarRow | undefined;
@@ -110,7 +131,7 @@ export class SeminarRepository {
   list(workspaceId: string, limit = 20): Seminar[] {
     const db = getDb();
     const rows = db.prepare(`
-      SELECT id, workspace_id, topic, agent_a, agent_b, rounds, status, summary, error,
+      SELECT id, workspace_id, topic, agent_a, agent_b, participants, rounds, status, summary, error,
              created_at, completed_at
       FROM workspace_seminars
       WHERE workspace_id = ?

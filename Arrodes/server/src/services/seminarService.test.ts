@@ -14,7 +14,7 @@ describe('buildSeminarPrompt', () => {
     const prompt = buildSeminarPrompt({
       topic: '画布架构',
       self: 'codex',
-      other: 'hermes',
+      others: ['hermes'],
       transcript: [
         { speaker: 'codex', content: '我认为节点即状态' },
       ],
@@ -40,6 +40,11 @@ describe('parseLearnings', () => {
     const parsed = parseLearnings('结论：A\n新知识：B\n分歧：C\n行动项：D');
     expect(parsed.conclusion).toBe('A');
     expect(parsed.actionItems).toBe('D');
+  });
+
+  it('解析第五段「裁决」', () => {
+    const parsed = parseLearnings('结论：A\n新知识：B\n分歧：C\n行动项：D\n裁决：倾向于 A');
+    expect(parsed.arbitration).toBe('倾向于 A');
   });
 });
 
@@ -68,15 +73,14 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
     const repo = new SeminarRepository();
     const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
     const seminar = repo.create({
-      workspaceId: ws.id, topic: '画布架构', agentA: 'codex', agentB: 'hermes', rounds: 2,
+      workspaceId: ws.id, topic: '画布架构', participants: ['codex', 'hermes'], rounds: 2,
     });
 
     const result = await runSeminar({
       seminarId: seminar.id,
       workspaceId: ws.id,
       topic: '画布架构',
-      agentA: 'codex',
-      agentB: 'hermes',
+      participants: ['codex', 'hermes'],
       rounds: 2,
       adapters: { codex: adapter('codex'), hermes: adapter('hermes') },
       cwd: 'E:/x',
@@ -111,7 +115,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
     const repo = new SeminarRepository();
     const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
     const seminar = repo.create({
-      workspaceId: ws.id, topic: 'x', agentA: 'codex', agentB: 'hermes', rounds: 1,
+      workspaceId: ws.id, topic: 'x', participants: ['codex', 'hermes'], rounds: 1,
     });
     const broken: AgentChatAdapter = {
       run: async () => { throw new Error('agent down'); },
@@ -121,8 +125,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
       seminarId: seminar.id,
       workspaceId: ws.id,
       topic: 'x',
-      agentA: 'codex',
-      agentB: 'hermes',
+      participants: ['codex', 'hermes'],
       rounds: 1,
       adapters: { codex: broken, hermes: adapter('hermes') },
       cwd: 'E:/x',
@@ -140,7 +143,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
     const repo = new SeminarRepository();
     const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
     const seminar = repo.create({
-      workspaceId: ws.id, topic: 'x', agentA: 'codex', agentB: 'hermes', rounds: 1,
+      workspaceId: ws.id, topic: 'x', participants: ['codex', 'hermes'], rounds: 1,
     });
     const failingLlm: Pick<LlmService, 'summarizeText'> = {
       summarizeText: async () => { throw new Error('llm down'); },
@@ -150,8 +153,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
       seminarId: seminar.id,
       workspaceId: ws.id,
       topic: 'x',
-      agentA: 'codex',
-      agentB: 'hermes',
+      participants: ['codex', 'hermes'],
       rounds: 1,
       adapters: { codex: adapter('codex'), hermes: adapter('hermes') },
       cwd: 'E:/x',
@@ -171,7 +173,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
     const repo = new SeminarRepository();
     const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
     const seminar = repo.create({
-      workspaceId: ws.id, topic: 'x', agentA: 'codex', agentB: 'hermes', rounds: 1,
+      workspaceId: ws.id, topic: 'x', participants: ['codex', 'hermes'], rounds: 1,
     });
     let calls = 0;
     const flakyLlm: Pick<LlmService, 'summarizeText'> = {
@@ -185,8 +187,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
       seminarId: seminar.id,
       workspaceId: ws.id,
       topic: 'x',
-      agentA: 'codex',
-      agentB: 'hermes',
+      participants: ['codex', 'hermes'],
       rounds: 1,
       adapters: { codex: adapter('codex'), hermes: adapter('hermes') },
       cwd: 'E:/x',
@@ -204,7 +205,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
     const repo = new SeminarRepository();
     const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
     const seminar = repo.create({
-      workspaceId: ws.id, topic: 'x', agentA: 'codex', agentB: 'hermes', rounds: 1,
+      workspaceId: ws.id, topic: 'x', participants: ['codex', 'hermes'], rounds: 1,
     });
     let seenOpts: unknown = null;
     const spyLlm: Pick<LlmService, 'summarizeText'> = {
@@ -218,8 +219,7 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
       seminarId: seminar.id,
       workspaceId: ws.id,
       topic: 'x',
-      agentA: 'codex',
-      agentB: 'hermes',
+      participants: ['codex', 'hermes'],
       rounds: 1,
       adapters: { codex: adapter('codex'), hermes: adapter('hermes') },
       cwd: 'E:/x',
@@ -230,6 +230,71 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
 
     expect((seenOpts as { thinkingDisabled?: boolean })?.thinkingDisabled).toBe(true);
     expect((seenOpts as { maxTokens?: number })?.maxTokens).toBeGreaterThanOrEqual(1024);
+  });
+
+  it('三方研讨会：3 个 agent 按序轮流发言且每轮携带历史', async () => {
+    const repo = new SeminarRepository();
+    const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
+    const seminar = repo.create({
+      workspaceId: ws.id, topic: '多方', participants: ['codex', 'hermes', 'deepseekHarness'], rounds: 2,
+    });
+
+    const result = await runSeminar({
+      seminarId: seminar.id,
+      workspaceId: ws.id,
+      topic: '多方',
+      participants: ['codex', 'hermes', 'deepseekHarness'],
+      rounds: 2,
+      adapters: {
+        codex: adapter('codex'),
+        hermes: adapter('hermes'),
+        deepseekHarness: adapter('deepseekHarness'),
+      },
+      cwd: 'E:/x',
+      repo,
+      llm,
+      memoryHub: workspaceMemoryHub,
+    });
+
+    // 2 轮 × 3 人 = 6 次调用，顺序 codex→hermes→deepseekHarness 循环
+    expect(calls).toHaveLength(6);
+    expect(calls.map((c) => c.id)).toEqual([
+      'codex', 'hermes', 'deepseekHarness',
+      'codex', 'hermes', 'deepseekHarness',
+    ]);
+    // 第二轮 codex 的 prompt 应携带第一轮全部三方发言
+    expect(calls[3].task).toContain('deepseekHarness 的回应 #1');
+    expect(repo.messages(seminar.id)).toHaveLength(6);
+    expect(repo.get(seminar.id)?.status).toBe('done');
+  });
+
+  it('提炼输出含裁决段并写入共享记忆', async () => {
+    const repo = new SeminarRepository();
+    const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
+    const seminar = repo.create({
+      workspaceId: ws.id, topic: '分歧主题', participants: ['codex', 'hermes'], rounds: 1,
+    });
+    const arbLlm: Pick<LlmService, 'summarizeText'> = {
+      summarizeText: async () => '结论：A\n新知识：B\n分歧：C\n行动项：D\n裁决：倾向 A',
+    };
+
+    const result = await runSeminar({
+      seminarId: seminar.id,
+      workspaceId: ws.id,
+      topic: '分歧主题',
+      participants: ['codex', 'hermes'],
+      rounds: 1,
+      adapters: { codex: adapter('codex'), hermes: adapter('hermes') },
+      cwd: 'E:/x',
+      repo,
+      llm: arbLlm,
+      memoryHub: workspaceMemoryHub,
+    });
+
+    expect(result.status).toBe('done');
+    expect(repo.get(seminar.id)?.summary).toContain('裁决');
+    const memories = workspaceMemoryHub.search('裁决', 10, ws.id);
+    expect(memories.length).toBeGreaterThan(0);
   });
 });
 

@@ -20,6 +20,7 @@ interface Seminar {
   topic: string;
   agentA: string;
   agentB: string;
+  participants?: string[];
   rounds: number;
   status: 'running' | 'done' | 'failed';
   summary: string;
@@ -50,8 +51,7 @@ export default function SeminarDialog({
   onMemorySaved,
 }: SeminarDialogProps) {
   const candidates = agents.filter((a) => connected.includes(a.id) && a.available && a.id !== 'arrodes');
-  const [agentA, setAgentA] = useState(candidates[0]?.id ?? '');
-  const [agentB, setAgentB] = useState(candidates[1]?.id ?? '');
+  const [selected, setSelected] = useState<string[]>(candidates.slice(0, 2).map((a) => a.id));
   const [topic, setTopic] = useState('');
   const [rounds, setRounds] = useState(3);
   const [seminar, setSeminar] = useState<Seminar | null>(null);
@@ -106,8 +106,8 @@ export default function SeminarDialog({
   }, [activeId, loadSeminar]);
 
   const start = useCallback(async () => {
-    if (!agentA || !agentB || agentA === agentB) {
-      setError('请选择两个不同的智能体');
+    if (selected.length < 2) {
+      setError('请至少选择两个智能体');
       return;
     }
     if (!topic.trim()) {
@@ -119,7 +119,7 @@ export default function SeminarDialog({
       const res = await fetch(`/api/v1/workspaces/${workspaceId}/agents/seminars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentA, agentB, topic: topic.trim(), rounds }),
+        body: JSON.stringify({ agents: selected, topic: topic.trim(), rounds }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -134,7 +134,19 @@ export default function SeminarDialog({
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建研讨会失败');
     }
-  }, [agentA, agentB, topic, rounds, workspaceId, loadHistory]);
+  }, [selected, topic, rounds, workspaceId, loadHistory]);
+
+  const toggleAgent = useCallback((id: string) => {
+    setSelected((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 5) {
+        setError('最多选择 5 个智能体');
+        return prev;
+      }
+      setError('');
+      return [...prev, id];
+    });
+  }, []);
 
   const syncObsidian = useCallback(async () => {
     setSyncing(true);
@@ -175,25 +187,23 @@ export default function SeminarDialog({
         <div className="px-5 py-3 border-b border-white/8 bg-[#0c0f15]/80">
           <div className="flex items-end gap-3 flex-wrap">
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] text-white/40">智能体 A</span>
-              <select
-                value={agentA}
-                onChange={(e) => setAgentA(e.target.value)}
-                className="bg-[#14171d] border border-white/10 rounded-lg px-2.5 py-1.5 text-[12px] text-white/80 outline-none [&>option]:bg-[#14171d]"
-              >
-                {candidates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-            <span className="text-white/30 text-[14px] pb-1.5">↔</span>
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] text-white/40">智能体 B</span>
-              <select
-                value={agentB}
-                onChange={(e) => setAgentB(e.target.value)}
-                className="bg-[#14171d] border border-white/10 rounded-lg px-2.5 py-1.5 text-[12px] text-white/80 outline-none [&>option]:bg-[#14171d]"
-              >
-                {candidates.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <span className="text-[11px] text-white/40">参与者（2-5 个）</span>
+              <div className="flex flex-wrap gap-1.5 max-w-[300px]">
+                {candidates.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => toggleAgent(a.id)}
+                    className={`px-2 py-1 rounded-lg text-[11px] border transition-colors ${
+                      selected.includes(a.id)
+                        ? 'bg-blue-500/25 border-blue-400/40 text-blue-100'
+                        : 'bg-white/4 border-white/10 text-white/55 hover:bg-white/10'
+                    }`}
+                  >
+                    {a.name}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
               <span className="text-[11px] text-white/40">研讨主题</span>
@@ -242,7 +252,8 @@ export default function SeminarDialog({
               <div className="flex-1 min-h-0 overflow-y-auto px-5 py-3 space-y-3 [scrollbar-width:thin]">
                 <div className="flex items-center gap-2 text-[12px] text-white/50">
                   <span className="px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-200 border border-blue-400/20">
-                    {nameOf(seminar.agentA)} ↔ {nameOf(seminar.agentB)}
+                    {(seminar.participants?.length ? seminar.participants : [seminar.agentA, seminar.agentB])
+                      .map(nameOf).join(' ↔ ')}
                   </span>
                   <span>{seminar.topic}</span>
                   <span className="ml-auto flex items-center gap-1.5">
@@ -322,7 +333,8 @@ export default function SeminarDialog({
                 >
                   <div className="text-[12px] text-white/80 truncate">{h.topic}</div>
                   <div className="text-[10px] text-white/35 mt-0.5">
-                    {nameOf(h.agentA)} ↔ {nameOf(h.agentB)} · {h.rounds} 轮
+                    {(h.participants?.length ? h.participants : [h.agentA, h.agentB])
+                      .map(nameOf).join(' ↔ ')} · {h.rounds} 轮
                   </div>
                   <div className="text-[10px] mt-1">
                     {h.status === 'done'
