@@ -75,22 +75,22 @@ export default memo(function NeonInputBar({
 
       {/* 内容层（独立于 mask，纯黑底 + 按钮 + 输入框） */}
       <div
-        className="relative flex flex-col gap-1.5 px-2 py-1.5"
+        className="relative flex items-end gap-1 px-2 py-1.5"
         style={{ backgroundColor: '#000000', borderRadius: 16, zIndex: 2 }}
       >
-        {/* 顶部工具行：项目 + 权限 + 当前项目目录 */}
-        <div className="flex items-center gap-1.5 px-1 pt-0.5">
+        {/* 左下角：项目 + 权限 */}
+        <div className="flex flex-col gap-1 pb-1 shrink-0">
           <button
             onClick={onPickProject}
             title={`项目目录${projectDir ? `：${projectDir}` : '（未设置）'}`}
-            className="shrink-0 px-2.5 h-8 rounded-lg text-[16px] text-white/60 bg-white/5 hover:bg-white/15 hover:text-white/90 transition-all"
+            className="px-2 h-9 rounded-lg text-[16px] text-white/60 bg-white/5 hover:bg-white/15 hover:text-white/90 transition-all"
           >
             📁 项目
           </button>
           <button
             onClick={onTogglePermission}
             title={permission === 'full' ? '全部权限：高风险操作自动执行' : '默认权限：高风险操作需确认'}
-            className={`shrink-0 px-2.5 h-8 rounded-lg text-[16px] transition-all ${
+            className={`px-2 h-9 rounded-lg text-[16px] transition-all ${
               permission === 'full'
                 ? 'text-red-300/90 bg-red-500/10 hover:bg-red-500/20'
                 : 'text-white/60 bg-white/5 hover:bg-white/15 hover:text-white/90'
@@ -98,83 +98,75 @@ export default memo(function NeonInputBar({
           >
             {permission === 'full' ? '⚡ 全部权限' : '🛡 默认权限'}
           </button>
-          {projectDir && (
-            <span className="ml-auto text-[16px] text-white/25 truncate max-w-[45%]" title={projectDir}>
-              {projectDir}
-            </span>
+        </div>
+
+        {/* 输入框（更宽更高） */}
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => onTextChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder={placeholder || '输入消息…'}
+          disabled={disabled}
+          rows={2}
+          className="flex-1 bg-transparent px-1 py-2.5 text-[16px] leading-[22px] caret-white
+            outline-none resize-none max-h-[240px] overflow-y-auto disabled:opacity-30 min-w-0"
+          style={{ color: '#ffffff', backgroundColor: 'transparent', minHeight: '72px' }}
+        />
+
+        {/* 停止按钮 */}
+        <button
+          onClick={onStop}
+          disabled={!isSpeaking && !isLoading}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-30 ${
+            isSpeaking || isLoading ? 'hover:bg-red-500/15' : 'hover:bg-white/15'
+          }`}
+          style={{ color: isSpeaking || isLoading ? '#ff6b6b' : '#ffffff' }}
+          title="停止（语音 + 思考）"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <rect x="6" y="6" width="12" height="12" rx="1.5" />
+          </svg>
+        </button>
+
+        {/* 发送按钮 */}
+        <button
+          onClick={onSend}
+          disabled={!canSend}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-30 ${
+            canSend ? 'bg-gradient-to-br from-cyan-500 to-cyan-700 hover:from-cyan-400 hover:to-cyan-600' : 'hover:bg-white/15'
+          }`}
+          style={{ color: '#ffffff' }}
+          title="发送"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+          </svg>
+        </button>
+
+        {/* 语音按钮（最右） */}
+        <button
+          onMouseDown={(e) => { e.preventDefault(); onMicDown(); }}
+          onMouseUp={onMicUp}
+          onMouseLeave={onMicLeave}
+          disabled={disabled}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+            isRecording ? 'bg-red-600 scale-105 shadow-lg shadow-red-500/50' : 'hover:bg-white/15'
+          } disabled:opacity-30`}
+          style={{ color: '#ffffff' }}
+          title={isRecording ? '松开发送' : '按住说话'}
+        >
+          {isRecording ? (
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="5" width="4" height="14" rx="1" />
+              <rect x="14" y="5" width="4" height="14" rx="1" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-14 0M12 18v3M9 21h6" />
+            </svg>
           )}
-        </div>
-
-        {/* 主输入行：麦克风 + 输入框 + 停止 + 发送 */}
-        <div className="flex items-end gap-1">
-          {/* 语音按钮（内嵌左侧，纯白图标） */}
-          <button
-            onMouseDown={(e) => { e.preventDefault(); onMicDown(); }}
-            onMouseUp={onMicUp}
-            onMouseLeave={onMicLeave}
-            disabled={disabled}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
-              isRecording ? 'bg-red-600 scale-105 shadow-lg shadow-red-500/50' : 'hover:bg-white/15'
-            } disabled:opacity-30`}
-            style={{ color: '#ffffff' }}
-            title={isRecording ? '松开发送' : '按住说话'}
-          >
-            {isRecording ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="5" width="4" height="14" rx="1" />
-                <rect x="14" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-14 0M12 18v3M9 21h6" />
-              </svg>
-            )}
-          </button>
-
-          {/* 文字输入（纯黑背景，纯白文字；最多 10 行，超出滚动） */}
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => onTextChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder={placeholder || '输入消息…'}
-            disabled={disabled}
-            rows={2}
-            className="flex-1 bg-transparent px-1 py-2.5 text-[16px] leading-[22px] caret-white
-              outline-none resize-none max-h-[240px] overflow-y-auto disabled:opacity-30 min-w-0"
-            style={{ color: '#ffffff', backgroundColor: 'transparent', minHeight: '56px' }}
-          />
-
-          {/* 停止按钮（内嵌，运行时红色高亮，默认纯白） */}
-          <button
-            onClick={onStop}
-            disabled={!isSpeaking && !isLoading}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-30 ${
-              isSpeaking || isLoading ? 'hover:bg-red-500/15' : 'hover:bg-white/15'
-            }`}
-            style={{ color: isSpeaking || isLoading ? '#ff6b6b' : '#ffffff' }}
-            title="停止（语音 + 思考）"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <rect x="6" y="6" width="12" height="12" rx="1.5" />
-            </svg>
-          </button>
-
-          {/* 发送按钮（内嵌右侧，纯白图标；可发送时青底白图） */}
-          <button
-            onClick={onSend}
-            disabled={!canSend}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-30 ${
-              canSend ? 'bg-gradient-to-br from-cyan-500 to-cyan-700 hover:from-cyan-400 hover:to-cyan-600' : 'hover:bg-white/15'
-            }`}
-            style={{ color: '#ffffff' }}
-            title="发送"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-            </svg>
-          </button>
-        </div>
+        </button>
       </div>
 
       {/* 彩灯旋转动画（多色平滑过渡） */}
