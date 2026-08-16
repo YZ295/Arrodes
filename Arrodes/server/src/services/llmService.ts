@@ -20,6 +20,10 @@ interface LlmRequestOptions {
   stream: boolean;
   maxTokens: number;
   temperature: number;
+  /** 思考强度（deepseek-v4 系；none 关闭思考，用于提炼等轻任务） */
+  reasoningEffort?: string;
+  /** 显式关闭思考模式（thinking: {type:"disabled"}，比 reasoning_effort 更可靠） */
+  thinkingDisabled?: boolean;
   /** 取消信号：触发时中断流式读取（服务端停止 LLM 推理） */
   signal?: AbortSignal;
 }
@@ -86,14 +90,35 @@ export class LlmService {
   async chatSimple(
     messages: LlmMessage[],
     callbacks: LlmStreamCallbacks,
+    opts?: { systemPrompt?: string; maxTokens?: number; temperature?: number; reasoningEffort?: string; thinkingDisabled?: boolean },
   ): Promise<void> {
     await this.requestLlm(messages, {
-      systemPrompt: '你是一个 AI 助手。请简洁回复，不要多余的话。',
+      systemPrompt: opts?.systemPrompt ?? '你是一个 AI 助手。请简洁回复，不要多余的话。',
       sliceLast: 4,
       stream: false,
-      maxTokens: 512,
-      temperature: 0.3,
+      maxTokens: opts?.maxTokens ?? 512,
+      temperature: opts?.temperature ?? 0.3,
+      reasoningEffort: opts?.reasoningEffort,
+      thinkingDisabled: opts?.thinkingDisabled,
     }, callbacks);
+  }
+
+  /**
+   * 非流式文本提炼（研讨会学习小结 / 记忆分析用）
+   * 返回完整文本；LLM 失败时抛错，由调用方决定降级策略。
+   */
+  async summarizeText(
+    messages: LlmMessage[],
+    opts?: { systemPrompt?: string; maxTokens?: number; temperature?: number; reasoningEffort?: string; thinkingDisabled?: boolean },
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      let full = '';
+      this.chatSimple(messages, {
+        onChunk: (text) => { full += text; },
+        onComplete: () => resolve(full.trim()),
+        onError: (error) => reject(new Error(error || 'LLM 提炼失败')),
+      }, opts);
+    });
   }
 
   /**
@@ -199,6 +224,9 @@ export class LlmService {
     }
   }
 }
+
+/** 全局单例（研讨会/记忆分析等非对话场景共用） */
+export const llmService = new LlmService();
 
 /** 粗略 token 估算：中文约 1 token/字符，英文约 4 字符/token，混合取 3 字符/token */
 function estimateTokens(text: string): number {

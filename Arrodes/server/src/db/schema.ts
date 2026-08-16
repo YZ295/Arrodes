@@ -86,6 +86,38 @@ CREATE TABLE IF NOT EXISTS workspace_agent_messages (
 
 CREATE INDEX IF NOT EXISTS idx_agent_messages_ws_agent
   ON workspace_agent_messages(workspace_id, agent_id, created_at);
+
+-- 多 Agent 研讨会（互相对话学习）
+CREATE TABLE IF NOT EXISTS workspace_seminars (
+  id           TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  topic        TEXT NOT NULL,
+  agent_a      TEXT NOT NULL,
+  agent_b      TEXT NOT NULL,
+  rounds       INTEGER NOT NULL DEFAULT 3,
+  status       TEXT NOT NULL DEFAULT 'running'
+               CHECK(status IN ('running','done','failed')),
+  summary      TEXT NOT NULL DEFAULT '',
+  error        TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL,
+  completed_at TEXT,
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_seminars_ws_created
+  ON workspace_seminars(workspace_id, created_at);
+
+CREATE TABLE IF NOT EXISTS workspace_seminar_messages (
+  id          TEXT PRIMARY KEY,
+  seminar_id  TEXT NOT NULL,
+  speaker     TEXT NOT NULL,
+  content     TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  FOREIGN KEY (seminar_id) REFERENCES workspace_seminars(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_seminar_messages_seminar
+  ON workspace_seminar_messages(seminar_id, created_at);
 `;
 
 /** 幂等迁移：为存量表补充 workspace_id 列（workspace-v2） */

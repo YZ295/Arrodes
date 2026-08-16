@@ -28,6 +28,10 @@ export interface LlmRequestOptions {
   stream: boolean;
   maxTokens: number;
   temperature: number;
+  /** 思考强度（deepseek-v4 系支持 low/medium/high/none；传 none 可关思考，避免 reasoning 吃光预算） */
+  reasoningEffort?: string;
+  /** 显式关闭思考模式（thinking: {type:"disabled"}，deepseek-v4 系可靠方案） */
+  thinkingDisabled?: boolean;
   signal?: AbortSignal;
 }
 
@@ -65,6 +69,8 @@ export class DeepSeekLlmProvider implements LlmProvider {
         stream: options.stream,
         max_tokens: options.maxTokens,
         temperature: options.temperature,
+        ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
+        ...(options.thinkingDisabled ? { thinking: { type: 'disabled' } } : {}),
       });
 
       const response = await fetch(`${options.baseUrl}/chat/completions`, {
@@ -86,6 +92,10 @@ export class DeepSeekLlmProvider implements LlmProvider {
           usage?: LlmUsage;
         };
         const text = json.choices?.[0]?.message?.content || '';
+        if (!text) {
+          // 诊断：空完成时记录原始响应（帮助区分 API 过滤/限流/截断）
+          console.warn('[LlmProvider] 空完成响应:', JSON.stringify(json).slice(0, 400));
+        }
         callbacks.onChunk(text);
         callbacks.onComplete(text, json.usage);
         return;

@@ -9,6 +9,10 @@ import { agentAdapters } from '../services/agentAdapters.js';
 import { dispatchAgentTask } from '../services/agentTasks.js';
 import { recordAgentMemory } from '../services/agentMemories.js';
 import { workspaceProjectDir } from '../services/workspaceProjectDir.js';
+import { seminarRepo } from '../db/seminar-repo.js';
+import { runSeminar, injectLearnings } from '../services/seminarService.js';
+import { llmService } from '../services/llmService.js';
+import { workspaceMemoryHub } from '../workspace/memory-hub.js';
 
 const chatRepo = new AgentChatRepository();
 
@@ -39,8 +43,9 @@ export function createWorkspaceAgentsRouter(): Router {
       const historyText = history
         .map((m) => `${m.role === 'user' ? '用户' : agentId}: ${m.content}`)
         .join('\n');
+      const learnings = injectLearnings(ws.id, agentId);
       const task = history.length > 1
-        ? `以下是你们之前的对话（按时间顺序）：\n${historyText}\n\n请继续对话，回答用户最新消息。`
+        ? `${learnings ? `【过往研讨会学习（可参考）】\n${learnings}\n\n` : ''}以下是你们之前的对话（按时间顺序）：\n${historyText}\n\n请继续对话，回答用户最新消息。`
         : content;
 
       let reply: string;
@@ -119,6 +124,87 @@ export function createWorkspaceAgentsRouter(): Router {
       res.status(201).json({ memory });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : '写入记忆失败' });
+    }
+  });
+
+  // 创建研讨会：两个已接入 agent 围绕主题互相对话学习（异步执行，轮询 /seminars/:id）
+  router.post('/seminars', async (req, res) => {
+    try {
+      const ws = workspaceRepo.get((req.params as Record<string, string>).id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+
+      const agentA = String(req.body?.agentA ?? '');
+      const agentB = String(req.body?.agentB ?? '');
+      const topic = String(req.body?.topic ?? '').trim();
+      const rounds = Math.min(Math.max(parseInt(String(req.body?.rounds ?? '3'), 10) || 3, 1), 6);
+      if (!topic) { res.status(400).json({ error: '主题不能为空' }); return; }
+      if (!agentA || !agentB || agentA === agentB) {
+        res.status(400).json({ error: '需要选择两个不同的智能体' }); return;
+      }
+      for (const id of [agentA, agentB]) {
+        if (!isConnectedAgent(ws.id, id)) {
+          res.status(400).json({ error: `智能体 ${id} 未接入此工作区` }); return;
+        }
+        if (!agentAdapters.get(id)) {
+          res.status(400).json({ error: `智能体 ${id} 暂不支持研讨会对话` }); return;
+        }
+      }
+
+      const seminar = seminarRepo.create({
+        workspaceId: ws.id, topic, agentA, agentB, rounds,
+      });
+
+      // 异步执行：创建后立刻返回，客户端轮询状态；失败由服务端落库标记
+      void runSeminar({
+        seminarId: seminar.id,
+        workspaceId: ws.id,
+        topic,
+        agentA,
+        agentB,
+        rounds,
+        adapters: {
+          [agentA]: agentAdapters.get(agentA)!,
+          [agentB]: agentAdapters.get(agentB)!,
+        },
+        cwd: workspaceProjectDir(ws),
+        repo: seminarRepo,
+        llm: llmService,
+        memoryHub: workspaceMemoryHub,
+      }).catch((err) => {
+        console.error('[Seminar] 执行异常:', err instanceof Error ? err.message : err);
+      });
+
+      res.status(201).json({ seminar });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '创建研讨会失败';
+      console.error('[Seminar] 创建失败:', msg);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  // 研讨会列表（按工作区）
+  router.get('/seminars', (req, res) => {
+    try {
+      const ws = workspaceRepo.get((req.params as Record<string, string>).id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      res.json({ seminars: seminarRepo.list(ws.id) });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : '查询失败' });
+    }
+  });
+
+  // 研讨会详情（含逐轮对话）
+  router.get('/seminars/:seminarId', (req, res) => {
+    try {
+      const ws = workspaceRepo.get((req.params as Record<string, string>).id);
+      if (!ws) { res.status(404).json({ error: '工作区不存在' }); return; }
+      const seminar = seminarRepo.get(req.params.seminarId);
+      if (!seminar || seminar.workspaceId !== ws.id) {
+        res.status(404).json({ error: '研讨会不存在' }); return;
+      }
+      res.json({ seminar, messages: seminarRepo.messages(seminar.id) });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : '查询失败' });
     }
   });
 
