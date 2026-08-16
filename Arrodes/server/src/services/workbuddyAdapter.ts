@@ -59,7 +59,8 @@ export class WorkBuddyGatewayAdapter implements AgentChatAdapter {
       const res = await fetch(`${base}/api/v1/runs`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ prompt: task, cwd: opts.cwd }),
+        // 网关通用消息格式：必填 id/type，任务内容放 text（2026-08-16 实测修正）
+        body: JSON.stringify({ id: crypto.randomUUID(), type: 'message', text: task }),
         signal: opts.signal,
       });
       if (res.status === 401 || res.status === 403) return authMessage();
@@ -69,7 +70,8 @@ export class WorkBuddyGatewayAdapter implements AgentChatAdapter {
       }
       const data = await res.json().catch(() => null) as Record<string, unknown> | null;
       runId = String(
-        (data as Record<string, unknown>)?.runId
+        (data as { data?: { runId?: unknown } })?.data?.runId   // 网关实际响应 {data:{runId}}
+        ?? (data as Record<string, unknown>)?.runId
         ?? (data as Record<string, unknown>)?.id
         ?? (data as { run?: { id?: unknown } })?.run?.id
         ?? '',
@@ -112,9 +114,18 @@ export class WorkBuddyGatewayAdapter implements AgentChatAdapter {
             output += payload;
             return;
           }
-          const text = parsed?.text ?? parsed?.content ?? parsed?.delta ?? parsed?.message;
+          const rawContent = parsed?.content;
+          // 网关回复事件：content 为对象 {markdown/type/text}（2026-08-16 实测）
+          let text: unknown = parsed?.text ?? parsed?.delta ?? parsed?.message;
+          if (typeof rawContent === 'object' && rawContent !== null) {
+            const c = rawContent as Record<string, unknown>;
+            text = c.markdown ?? c.text ?? c.type ?? '';
+          } else if (typeof rawContent === 'string') {
+            text = rawContent;
+          }
           if (typeof text === 'string' && text) output += text;
-          if (parsed?.done === true || parsed?.type === 'done' || parsed?.type === 'result') {
+          if (parsed?.done === true || parsed?.type === 'done' || parsed?.type === 'result'
+            || parsed?.status === 'completed') {
             if (typeof parsed?.result === 'string' && parsed.result) output += parsed.result;
           }
         }
