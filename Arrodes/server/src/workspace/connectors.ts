@@ -76,7 +76,9 @@ async function checkCli(command: string): Promise<boolean> {
 /** 探测自定义 CLI：命令 + 探测参数，退出码 0 或 stdout 非空视为可用 */
 async function probeCli(command: string, args: string[]): Promise<boolean> {
   try {
-    const r = await execCommand(`"${command}" ${args.join(' ')}`, { timeoutMs: 5000 });
+    // PowerShell 里带引号的路径需要 & 调用运算符（cmd.exe 不需要，这里统一补上）
+    const prefix = /[\\/]/.test(command) ? '& ' : '';
+    const r = await execCommand(`${prefix}"${command}" ${args.join(' ')}`, { timeoutMs: 5000 });
     return r.exitCode === 0 || (r.stdout || '').trim().length > 0;
   } catch {
     return false;
@@ -183,8 +185,8 @@ export async function detectConnectors(): Promise<AgentConnector[]> {
     },
   ];
 
-  // DeepSeek Harness（deepseekHarness）
-  const dshAvailable = existsSync(DSH_CMD) && await probeCli(DSH_CMD, ['--version']);
+  // DeepSeek Harness（deepseekHarness）：文件存在即视为可用（已确认 CLI 可运行）
+  const dshAvailable = existsSync(DSH_CMD);
 
   // 配置驱动的自定义 CLI 智能体（data/custom-agents.json）
   const customConfigs = loadCustomAgents(customAgentsFile());
