@@ -30,3 +30,14 @@
 - [x] 真实端到端：codex ↔ hermes 研讨会 done，四段学习小结写入共享记忆
 - [x] 学习注入验证：codex 对话中引用了研讨会结论
 - [x] 未引入不当 hardcode（agent id、轮数上限等为业务常量，已有命名与校验）
+
+确认：无未授权的行为、接口、依赖或跨模块变化；新接口与表均为本变更
+范围内的新增，旧行为未改变。
+
+### 自动验证 2026-08-16T19:27:45+08:00
+
+- 范围：`targeted`
+- `vitest-server`：exit `0`，通过
+- `vitest-client`：exit `0`，通过
+- `tsc-server`：exit `0`，通过
+- `build-client`：exit `0`，通过
