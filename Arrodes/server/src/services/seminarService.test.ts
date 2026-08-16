@@ -296,6 +296,83 @@ describe('runSeminar（多 Agent 互相对话学习）', () => {
     const memories = workspaceMemoryHub.search('裁决', 10, ws.id);
     expect(memories.length).toBeGreaterThan(0);
   });
+
+  it('短历史不触发滚动摘要，第二轮仍含完整历史', async () => {
+    const repo = new SeminarRepository();
+    const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
+    const seminar = repo.create({
+      workspaceId: ws.id, topic: '短', participants: ['codex', 'hermes'], rounds: 2,
+    });
+
+    await runSeminar({
+      seminarId: seminar.id,
+      workspaceId: ws.id,
+      topic: '短',
+      participants: ['codex', 'hermes'],
+      rounds: 2,
+      adapters: { codex: adapter('codex'), hermes: adapter('hermes') },
+      cwd: 'E:/x',
+      repo,
+      llm,
+      memoryHub: workspaceMemoryHub,
+      summaryThreshold: 3000,
+    });
+
+    // 第二轮 codex 的 prompt：无摘要段，含第一轮双方原文
+    const codexCalls = calls.filter((c) => c.id === 'codex');
+    expect(codexCalls).toHaveLength(2);
+    const round2 = codexCalls[1];
+    expect(round2.task).not.toContain('早期对话摘要');
+    expect(round2.task).toContain('codex 的回应 #1');
+    expect(round2.task).toContain('hermes 的回应 #1');
+  });
+
+  it('长历史触发滚动摘要：任务文本=早期摘要+最近一轮原文，且落库全量', async () => {
+    const repo = new SeminarRepository();
+    const ws = workspaceRepo.list().find((w) => w.id !== 'default')!;
+    const seminar = repo.create({
+      workspaceId: ws.id, topic: '长', participants: ['codex', 'hermes'], rounds: 3,
+    });
+    const longReply = (id: string) => `${id} 的长发言：${'观点与依据'.repeat(120)}`;
+    const longAdapters = {
+      codex: { run: async (task: string) => { calls.push({ id: 'codex', task }); return longReply('codex'); } } as AgentChatAdapter,
+      hermes: { run: async (task: string) => { calls.push({ id: 'hermes', task }); return longReply('hermes'); } } as AgentChatAdapter,
+    };
+    const summarizeCalls: Array<{ opts?: { thinkingDisabled?: boolean; maxTokens?: number } }> = [];
+    const ctxLlm: Pick<LlmService, 'summarizeText'> = {
+      summarizeText: async (_msgs, opts) => {
+        summarizeCalls.push({ opts });
+        return '早期摘要：双方就边界达成初步一致，分歧在同步方式。';
+      },
+    };
+
+    await runSeminar({
+      seminarId: seminar.id,
+      workspaceId: ws.id,
+      topic: '长',
+      participants: ['codex', 'hermes'],
+      rounds: 3,
+      adapters: longAdapters,
+      cwd: 'E:/x',
+      repo,
+      llm: ctxLlm,
+      memoryHub: workspaceMemoryHub,
+      summaryThreshold: 500,
+    });
+
+    // 摘要被调用（长历史触发），且关闭思考、限制输出
+    expect(summarizeCalls.some((c) => c.opts?.thinkingDisabled === true && c.opts?.maxTokens === 300)).toBe(true);
+
+    // 第三轮 codex 的任务文本含早期摘要（第二轮结束生成）+ 最近一轮（第二轮）原文
+    const codexCalls = calls.filter((c) => c.id === 'codex');
+    expect(codexCalls).toHaveLength(3);
+    expect(codexCalls[2].task).toContain('早期对话摘要');
+    expect(codexCalls[2].task).toContain('hermes 的长发言');
+
+    // 落库全量：4 条消息都在
+    expect(repo.messages(seminar.id)).toHaveLength(6);
+    expect(repo.get(seminar.id)?.status).toBe('done');
+  });
 });
 
 describe('injectLearnings', () => {
