@@ -12,7 +12,7 @@ import { detectConnectors } from '../workspace/connectors.js';
 import { workspaceMemoryHub } from '../workspace/memory-hub.js';
 import { workspaceRepo } from '../db/workspace-repo.js';
 import { syncWorkspaceMemoriesToObsidian } from '../services/obsidianMemory.js';
-import { listDirectories } from '../services/dirBrowser.js';
+import { listDirectories, listDriveRoots } from '../services/dirBrowser.js';
 
 export function createWorkspaceRouter(): Router {
   const router = Router();
@@ -81,6 +81,11 @@ export function createWorkspaceRouter(): Router {
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : '浏览失败' });
     }
+  });
+
+  // GET /workspace/roots — 列出可用驱动器根（文件夹选择器起始页）
+  router.get('/roots', (_req, res) => {
+    res.json({ roots: listDriveRoots() });
   });
 
   return router;

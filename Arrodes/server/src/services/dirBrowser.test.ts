@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { listDirectories } from './dirBrowser.js';
+import { listDirectories, listDriveRoots } from './dirBrowser.js';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'arrodes-browse-'));
 fs.mkdirSync(path.join(tmp, 'sub1'));
@@ -15,11 +15,24 @@ describe('listDirectories（项目文件夹选择）', () => {
     expect(r.dirs).toEqual(expect.arrayContaining(['sub1', 'sub2']));
     expect(r.dirs).not.toContain('a.txt');
     expect(r.parent).toBe(path.dirname(tmp));
+    expect(Array.isArray(r.roots)).toBe(true);
+    expect(r.roots.length).toBeGreaterThan(0);
   });
 
   it('盘符根目录没有上级', () => {
     const root = path.parse(tmp).root;
     const r = listDirectories(root);
     expect(r.parent).toBeNull();
+  });
+
+  it('Windows 下能枚举到系统盘根目录', () => {
+    const roots = listDriveRoots();
+    expect(roots.length).toBeGreaterThan(0);
+    if (process.platform === 'win32') {
+      // 系统盘必须在可用根里
+      expect(roots).toContain(`${(process.env.SystemDrive || 'C:').replace(/[\\:]$/, '')}:/`);
+    } else {
+      expect(roots).toEqual(['/']);
+    }
   });
 });
