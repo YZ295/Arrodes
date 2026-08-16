@@ -43,11 +43,17 @@ export class LocalFsProvider implements FsProvider {
   }
 
   readdir(dir: string): FsDirEntry[] {
-    return fs.readdirSync(dir, { withFileTypes: true }).map((entry) => ({
-      name: entry.name,
-      isDirectory: entry.isDirectory(),
-      size: entry.isDirectory() ? 0 : fs.statSync(path.join(dir, entry.name)).size,
-    }));
+    return fs.readdirSync(dir, { withFileTypes: true }).map((entry) => {
+      let size = 0;
+      if (!entry.isDirectory()) {
+        try {
+          size = fs.statSync(path.join(dir, entry.name)).size;
+        } catch {
+          size = 0;
+        }
+      }
+      return { name: entry.name, isDirectory: entry.isDirectory(), size };
+    });
   }
 
   stat(p: string): FsStat {

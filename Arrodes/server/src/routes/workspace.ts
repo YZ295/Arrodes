@@ -12,6 +12,7 @@ import { detectConnectors } from '../workspace/connectors.js';
 import { workspaceMemoryHub } from '../workspace/memory-hub.js';
 import { workspaceRepo } from '../db/workspace-repo.js';
 import { syncWorkspaceMemoriesToObsidian } from '../services/obsidianMemory.js';
+import { listDirectories } from '../services/dirBrowser.js';
 
 export function createWorkspaceRouter(): Router {
   const router = Router();
@@ -69,6 +70,16 @@ export function createWorkspaceRouter(): Router {
       res.json({ ok: true, count: result.count, dir: result.dir });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : '同步失败' });
+    }
+  });
+
+  // 目录浏览（项目文件夹选择：只列目录，供前端选择器使用）
+  router.get('/browse', (req, res) => {
+    try {
+      const p = typeof req.query.path === 'string' && req.query.path ? String(req.query.path) : process.cwd();
+      res.json(listDirectories(p));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : '浏览失败' });
     }
   });
 
