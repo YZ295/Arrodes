@@ -1,8 +1,14 @@
 {
   "workflow_version": 2,
   "project_kind": "legacy",
-  "phase": "ready-to-push",
-  "active_change": null,
+  "phase": "implementing",
+  "active_change": {
+    "slug": "wallpaper-plugin",
+    "type": "feature",
+    "mode": "full",
+    "branch": "feature/wallpaper-plugin",
+    "created_at": "2026-08-24T20:07:50+08:00"
+  },
   "approvals": {
     "baseline": {
       "valid": true,
@@ -11,18 +17,16 @@
       "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
     },
     "spec": {
-      "valid": false,
-      "digest": "0833c53654f16559b9734963ef1a3cef4f57cf668ce58596dbc9fa43d6b54e3a",
-      "approved_at": "2026-08-24T19:17:26+08:00",
-      "head_before": "5e1d7ac51897fa24da12da0046844da9225bd599",
-      "invalidated_at": "2026-08-24T19:26:14+08:00"
+      "valid": true,
+      "digest": "b395f6a8cb9cadb19da0bab1618240914b875282edbf4adfa0653630dd4dc13c",
+      "approved_at": "2026-08-24T20:15:03+08:00",
+      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972"
     },
     "plan": {
-      "valid": false,
-      "digest": "696aba1d28ec7e57666a3b0815b511ba5af2e403e40e1eb370b9aaecff07de26",
-      "approved_at": "2026-08-24T19:17:26+08:00",
-      "head_before": "5e1d7ac51897fa24da12da0046844da9225bd599",
-      "invalidated_at": "2026-08-24T19:26:14+08:00"
+      "valid": true,
+      "digest": "c9373042e36ed88ba069315d0ebf93f448a8b3c525fd7b00eb281ca1bd99121a",
+      "approved_at": "2026-08-24T20:15:04+08:00",
+      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972"
     },
     "hotfix": {
       "valid": false,
@@ -30,16 +34,7 @@
       "approved_at": null
     }
   },
-  "dependency_approvals": [
-    {
-      "name": "codex-sdk",
-      "approved_at": "2026-08-24T19:17:53+08:00"
-    },
-    {
-      "name": "zod",
-      "approved_at": "2026-08-24T19:22:16+08:00"
-    }
-  ],
+  "dependency_approvals": [],
   "verification": null,
   "task_progress": [],
   "last_completed": {
