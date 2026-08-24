@@ -27,7 +27,7 @@ import SidebarBeam from './SidebarBeam';
 
 export type SidebarView =
   | 'conversation' | 'workspace' | 'canvas' | 'workflow' | 'profile' | 'memory'
-  | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced';
+  | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced' | 'wallpaper';
 
 interface NavItem {
   id: SidebarView;
@@ -41,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'conversation', label: '对话', icon: 'conversation', available: true },
   { id: 'workspace', label: '工作区', icon: 'workspace', available: true, hint: 'Agent 大宇宙' },
   { id: 'canvas', label: '画布', icon: 'canvas', available: true, hint: '拖拽连线 · 共享记忆' },
+  { id: 'wallpaper', label: '壁纸', icon: 'wallpaper', available: true, hint: 'Wallpaper Engine' },
   { id: 'skills', label: '技能', icon: 'skills', available: true },
   { id: 'workflow', label: '工作流', icon: 'workflow', available: false, hint: '即将支持 n8n / Coze' },
   { id: 'profile', label: '画像', icon: 'profile', available: true },
@@ -83,6 +84,14 @@ function NavIcon({ id }: { id: SidebarView }) {
           <rect x="14" y="3" width="7" height="7" rx="1.5" />
           <rect x="3" y="14" width="7" height="7" rx="1.5" />
           <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+      );
+    case 'wallpaper':
+      return (
+        <svg {...props}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <circle cx="8.5" cy="10" r="1.5" />
+          <path d="M21 15l-5-5-7 7" />
         </svg>
       );
     case 'skills':

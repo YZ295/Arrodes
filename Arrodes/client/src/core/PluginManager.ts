@@ -17,6 +17,7 @@ import type {
 } from '@shared/types/plugin';
 import type { Message, MemoryNode } from '@shared/types';
 import type { PipelineContext, PipelineResult } from '@shared/types/pipeline';
+import { WallpaperPlugin } from './plugins/wallpaperPlugin';
 
 export class PluginManager implements PluginRegistry {
   private static instance: PluginManager;
@@ -32,6 +33,8 @@ export class PluginManager implements PluginRegistry {
   private constructor() {
     // 注册内置日志插件
     this.registerBuiltinLogger();
+    // 注册内置壁纸插件（Wallpaper Engine 连接能力）
+    this.register(WallpaperPlugin);
   }
 
   // ============================================================

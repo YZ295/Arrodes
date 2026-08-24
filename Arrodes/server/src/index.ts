@@ -27,6 +27,7 @@ import { createPetRouter } from './routes/pet.js';
 import { createPromptShellRouter } from './routes/promptShell.js';
 import { createActionsRouter } from './routes/actions.js';
 import { createModesRouter } from './routes/modes.js';
+import { createWallpaperRouter } from './routes/wallpaper.js';
 import { harness } from './harness/harness.js';
 import { classifyAction } from './services/actionGate.js';
 import { applySkillProfile } from './services/skillProfile.js';
@@ -59,6 +60,8 @@ import './skills/mcp.js';
 import './skills/files.js';
 // 自我修改技能（委派本机 codex CLI，高风险需确认）
 import './skills/selfModify.js';
+// Wallpaper Engine 壁纸控制技能（壁纸插件）
+import './skills/wallpaper.js';
 import { getAllSkills, registerSkill, unregisterSkill, isSkillEnabled } from './skills/registry.js';
 
 // 启动时按配置裁剪技能（profile 组合）
@@ -100,6 +103,7 @@ app.use('/api/v1/prompt-shell', createPromptShellRouter());
 app.use('/api/v1/workspaces', createWorkspacesRouter());
 app.use('/api/v1/actions', createActionsRouter());
 app.use('/api/v1/modes', createModesRouter());
+app.use('/api/v1/wallpaper', createWallpaperRouter());
 
 // ---- 多 Agent 展示（Harness）----
 app.get('/api/v1/agents', (_req, res) => {

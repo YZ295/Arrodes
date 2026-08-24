@@ -1,0 +1,166 @@
+{
+  "workflow_version": 2,
+  "project_kind": "legacy",
+  "phase": "ready-to-archive",
+  "active_change": {
+    "slug": "wallpaper-plugin",
+    "type": "feature",
+    "mode": "full",
+    "branch": "feature/wallpaper-plugin",
+    "created_at": "2026-08-24T20:07:50+08:00"
+  },
+  "approvals": {
+    "baseline": {
+      "valid": true,
+      "digest": "e2612df9780fdd28df39aac99c842f8777ababfb3f3cd88906e9e0cdb41c23bb",
+      "approved_at": "2026-08-12T22:33:10+08:00",
+      "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
+    },
+    "spec": {
+      "valid": true,
+      "digest": "b395f6a8cb9cadb19da0bab1618240914b875282edbf4adfa0653630dd4dc13c",
+      "approved_at": "2026-08-24T20:15:03+08:00",
+      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972"
+    },
+    "plan": {
+      "valid": true,
+      "digest": "c9373042e36ed88ba069315d0ebf93f448a8b3c525fd7b00eb281ca1bd99121a",
+      "approved_at": "2026-08-24T20:15:04+08:00",
+      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972"
+    },
+    "hotfix": {
+      "valid": false,
+      "digest": null,
+      "approved_at": null
+    }
+  },
+  "dependency_approvals": [],
+  "verification": {
+    "scope": "targeted",
+    "passed": true,
+    "verified_at": "2026-08-24T20:23:52+08:00",
+    "fingerprint": "4978320ff1bbb3c3506eb8599ae95e95d3a3f685a9874ddfbddbb75cdff951e3",
+    "head": "c16c5d41673fcee12ee1144ed7c777f9e7ce977c",
+    "results": [
+      {
+        "name": "vitest-server",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/server",
+          "run",
+          "test"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> arrodes-server@0.1.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/server\n\n\n Test Files  92 passed (92)\n      Tests  510 passed (510)\n   Start at  20:23:40\n   Duration  6.47s (transform 31.20s, setup 0ms, import 48.89s, tests 3.72s, environment 9ms)\n\n(node:32828) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:32828) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)\n(node:33492) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:33492) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)"
+      },
+      {
+        "name": "vitest-client",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/client",
+          "run",
+          "test"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> client@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/client\n\n\n Test Files  4 passed (4)\n      Tests  20 passed (20)\n   Start at  20:23:47\n   Duration  389ms (transform 85ms, setup 0ms, import 162ms, tests 20ms, environment 0ms)"
+      },
+      {
+        "name": "tsc-server",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/server",
+          "run",
+          "typecheck"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> arrodes-server@0.1.0 typecheck\n> tsc --noEmit"
+      },
+      {
+        "name": "build-client",
+        "command": [
+          "npm.cmd",
+          "--prefix",
+          "Arrodes/client",
+          "run",
+          "build"
+        ],
+        "exit_code": 0,
+        "passed": true,
+        "summary": "> client@0.0.0 build\n> tsc -b && vite build\n\nvite v8.1.5 building client environment for production...\n\u001b[2K\ntransforming...✓ 237 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                            0.76 kB │ gzip:   0.43 kB\ndist/assets/arrodes_avatar-BZH2u6cA.jpg  238.38 kB\ndist/assets/index-CdAo6mjO.css            98.55 kB │ gzip:  14.73 kB\ndist/assets/index-CWP4CjMl.js            580.44 kB │ gzip: 176.76 kB\n\n✓ built in 223ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+      }
+    ]
+  },
+  "task_progress": [],
+  "last_completed": {
+    "slug": "codex-sdk",
+    "archived_at": "2026-08-24T19:25:42+08:00",
+    "archive": "spec/archive/2026-08-24-codex-sdk",
+    "verification": {
+      "scope": "targeted",
+      "passed": true,
+      "verified_at": "2026-08-24T19:25:37+08:00",
+      "fingerprint": "854cf4729862fc218cb481bae6c0a8079125a536c44a91347e2a6082fe713a95",
+      "head": "5e1d7ac51897fa24da12da0046844da9225bd599",
+      "results": [
+        {
+          "name": "vitest-server",
+          "command": [
+            "npm.cmd",
+            "--prefix",
+            "Arrodes/server",
+            "run",
+            "test"
+          ],
+          "exit_code": 0,
+          "passed": true,
+          "summary": "> arrodes-server@0.1.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/server\n\n\n Test Files  84 passed (84)\n      Tests  430 passed (430)\n   Start at  19:25:25\n   Duration  5.71s (transform 26.01s, setup 0ms, import 42.52s, tests 3.13s, environment 8ms)\n\n(node:31444) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:31444) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)\n(node:24284) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:24284) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)"
+        },
+        {
+          "name": "vitest-client",
+          "command": [
+            "npm.cmd",
+            "--prefix",
+            "Arrodes/client",
+            "run",
+            "test"
+          ],
+          "exit_code": 0,
+          "passed": true,
+          "summary": "> client@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/client\n\n\n Test Files  4 passed (4)\n      Tests  20 passed (20)\n   Start at  19:25:32\n   Duration  369ms (transform 83ms, setup 0ms, import 146ms, tests 20ms, environment 0ms)"
+        },
+        {
+          "name": "tsc-server",
+          "command": [
+            "npm.cmd",
+            "--prefix",
+            "Arrodes/server",
+            "run",
+            "typecheck"
+          ],
+          "exit_code": 0,
+          "passed": true,
+          "summary": "> arrodes-server@0.1.0 typecheck\n> tsc --noEmit"
+        },
+        {
+          "name": "build-client",
+          "command": [
+            "npm.cmd",
+            "--prefix",
+            "Arrodes/client",
+            "run",
+            "build"
+          ],
+          "exit_code": 0,
+          "passed": true,
+          "summary": "> client@0.0.0 build\n> tsc -b && vite build\n\nvite v8.1.5 building client environment for production...\n\u001b[2K\ntransforming...✓ 234 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                            0.76 kB │ gzip:   0.43 kB\ndist/assets/arrodes_avatar-BZH2u6cA.jpg  238.38 kB\ndist/assets/index-DDxAIFUc.css            94.45 kB │ gzip:  14.28 kB\ndist/assets/index-CZHUv1yS.js            573.06 kB │ gzip: 174.90 kB\n\n✓ built in 254ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+        }
+      ]
+    }
+  }
+}
