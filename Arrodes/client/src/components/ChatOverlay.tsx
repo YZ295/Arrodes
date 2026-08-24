@@ -235,7 +235,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
       )}
 
       {/* 底部输入栏（NeonInputBar：参照 Codex / DeepSeek Harness 输入框风格；始终显示，水平居中） */}
-      <div className="flex justify-center px-4 pb-5 pt-2 pointer-events-auto">
+      <div className="flex justify-center px-8 pb-5 pt-2 pointer-events-auto">
         <NeonInputBar
           text={text}
           onTextChange={setText}

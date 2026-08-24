@@ -17,3 +17,4 @@
 - [2026-08-16-seminar-multi](archive/2026-08-16-seminar-multi/)
 - [2026-08-16-seminar-context](archive/2026-08-16-seminar-context/)
 - [2026-08-24-dev-workflow](archive/2026-08-24-dev-workflow/)
+- [2026-08-24-inputbar-indent](archive/2026-08-24-inputbar-indent/)
