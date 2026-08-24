@@ -2,7 +2,7 @@
 
 - 阶段：`ready-to-push`
 - 项目类型：`legacy`
-- 当前分支：`fix/inputbar-indent`
+- 当前分支：`main`
 - 活动变更：`none`
 - 变更模式：`none`
 
