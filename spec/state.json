@@ -11,16 +11,18 @@
       "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
     },
     "spec": {
-      "valid": true,
+      "valid": false,
       "digest": "b395f6a8cb9cadb19da0bab1618240914b875282edbf4adfa0653630dd4dc13c",
       "approved_at": "2026-08-24T20:15:03+08:00",
-      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972"
+      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972",
+      "invalidated_at": "2026-08-24T20:24:12+08:00"
     },
     "plan": {
-      "valid": true,
+      "valid": false,
       "digest": "c9373042e36ed88ba069315d0ebf93f448a8b3c525fd7b00eb281ca1bd99121a",
       "approved_at": "2026-08-24T20:15:04+08:00",
-      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972"
+      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972",
+      "invalidated_at": "2026-08-24T20:24:12+08:00"
     },
     "hotfix": {
       "valid": false,

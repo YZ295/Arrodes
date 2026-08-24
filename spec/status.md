@@ -9,8 +9,8 @@
 ## 批准
 
 - baseline: 有效
-- spec: 有效
-- plan: 有效
+- spec: 无效/未批准
+- plan: 无效/未批准
 - hotfix: 无效/未批准
 
 ## 验证
