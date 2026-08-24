@@ -1,10 +1,10 @@
 # Wu5 Dev Flow 状态
 
-- 阶段：`ready-to-push`
+- 阶段：`ready-to-archive`
 - 项目类型：`legacy`
 - 当前分支：`fix/inputbar-indent`
-- 活动变更：`none`
-- 变更模式：`none`
+- 活动变更：`inputbar-indent`
+- 变更模式：`light`
 
 ## 批准
 
@@ -15,6 +15,8 @@
 
 ## 验证
 
-- 尚无验证记录
+- 结果：通过
+- 时间：`2026-08-24T19:07:23+08:00`
+- 范围：`targeted`
 
 本文件由 `wu5_flow.py` 同步；请勿手工修改。
