@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { workspaceRepo } from '../db/workspace-repo.js';
 import { AgentChatRepository } from '../db/agent-chat-repo.js';
 import { agentAdapters } from '../services/agentAdapters.js';
-import { dispatchAgentTask } from '../services/agentTasks.js';
+import { buildAgentChatTask, dispatchAgentTask } from '../services/agentTasks.js';
 import { recordAgentMemory } from '../services/agentMemories.js';
 import { workspaceProjectDir } from '../services/workspaceProjectDir.js';
 import { seminarRepo } from '../db/seminar-repo.js';
@@ -40,19 +40,25 @@ export function createWorkspaceAgentsRouter(): Router {
 
       chatRepo.append(ws.id, agentId, 'user', content);
       const history = chatRepo.list(ws.id, agentId, 12);
-      const historyText = history
-        .map((m) => `${m.role === 'user' ? '用户' : agentId}: ${m.content}`)
-        .join('\n');
       const learnings = injectLearnings(ws.id, agentId);
-      const task = history.length > 1
-        ? `${learnings ? `【过往研讨会学习（可参考）】\n${learnings}\n\n` : ''}以下是你们之前的对话（按时间顺序）：\n${historyText}\n\n请继续对话，回答用户最新消息。`
-        : content;
+      // codex SDK 适配器原生有状态：只发学习注入 + 最新消息，不再拼接历史
+      const task = buildAgentChatTask({
+        stateful: adapter.stateful === true,
+        content,
+        history,
+        agentId,
+        learnings,
+      });
 
       let reply: string;
       try {
         // 不用 req.signal：POST 长任务下请求体读完 ~3s 会虚假 abort（keep-alive），会误杀子进程。
         // 中止语义由显式 cancel 端点负责（见 /runs/:runId/cancel）。
-        reply = await adapter.run(task, { cwd: workspaceProjectDir(ws) });
+        reply = await adapter.run(task, {
+          cwd: workspaceProjectDir(ws),
+          sessionKey: `${ws.id}:${agentId}`,
+          permission: ws.config?.permission === 'full' ? 'full' : 'default',
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         chatRepo.append(ws.id, agentId, 'assistant', `（对话失败: ${msg.slice(0, 500)}）`);
@@ -97,6 +103,8 @@ export function createWorkspaceAgentsRouter(): Router {
         task,
         adapter,
         cwd: workspaceProjectDir(ws),
+        sessionKey: `${ws.id}:${agentId}`,
+        permission: ws.config?.permission === 'full' ? 'full' : 'default',
       });
       res.json({ reply });
     } catch (err) {
