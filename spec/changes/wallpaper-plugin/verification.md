@@ -38,10 +38,18 @@
 
 ## 审查
 
-- [ ] 规格符合性审查
-- [ ] 代码质量审查
-- [ ] 未引入不当 hardcode
-- [ ] 独立复审（不适用时写明原因）
+- [x] 规格符合性审查——REQ-001~008 全部落地：
+  GET 总览/apply/preview 白名单与状态码、背景降级、侧栏视图、
+  harness 技能、env 探测、客户端插件协议；
+- [x] 代码质量审查——测试先行 35 用例全绿（服务端 16+13+6）、
+  全量 479 通过、client tsc/build 通过；无 shell 字符串拼接、
+  路径白名单防穿越、config 解析失败降级；
+- [x] 未引入不当 hardcode——仅保留 Steam 官方默认安装位
+  （`Program Files (x86)/Program Files`，与社区包同款缺省）与
+  WE workshop 平台常量 `431960`；用户实际路径 `E:\SteamLibrary`
+  未写死（走盘符扫描），env 可覆盖；
+- [x] 独立复审（不适用时写明原因）——单人会话内实施，已按
+  RED→GREEN 证据、真实 WE 冒烟与全量门禁复核；未另开独立复审人。
 
 ## 偏差、风险与遗留债务
 
@@ -53,6 +61,14 @@
 - 多显示器：服务端预留 monitor 参数，客户端 v1 全屏应用。
 
 ### 自动验证 2026-08-24T20:23:05+08:00
+
+- 范围：`targeted`
+- `vitest-server`：exit `0`，通过
+- `vitest-client`：exit `0`，通过
+- `tsc-server`：exit `0`，通过
+- `build-client`：exit `0`，通过
+
+### 自动验证 2026-08-24T20:23:51+08:00
 
 - 范围：`targeted`
 - `vitest-server`：exit `0`，通过
