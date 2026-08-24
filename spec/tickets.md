@@ -142,6 +142,21 @@ T-01 接入与连线
 - 规模：S
 - 状态：done（2026-08-16，滚动摘要实现 + 长/短历史测试；3 人 2 轮真实研讨会验证通过，第二轮引用第一轮观点）
 
+### T-10 开发工作流功能
+
+- 来源：用户「开发工作流功能」（2026-08-16）
+- 目标：把 devworkflow 技能族从「对话协议」升级为工作区级流程功能——6 阶段状态机
+  （idea→spec→tickets→implement→review→done）+ 产出物追踪 + 研讨会一键转入。
+- 验收条件：
+  - Given 工作区；When 创建 workflow（含标题/项目目录/来源研讨会）；Then 初始 stage=idea。
+  - Given workflow 存在；When 推进；Then 按序 idea→…→done，当前阶段 in_progress、前一阶段 done。
+  - Given 任一阶段；When 登记产出物/备注；Then 步骤状态与产出可查。
+  - Given 不同工作区；When 查列表；Then 只返回本工作区 workflow。
+  - Given 研讨会学习小结；When 点击「转入开发工作流」；Then 创建关联 workflow 并打开面板。
+- 前置依赖：T-08（研讨会来源）
+- 规模：M
+- 状态：done（2026-08-16，两张新表 + 仓库 + 路由 + DevWorkflowPanel + 研讨会转入按钮；端到端验证通过）
+
 ## 汇总表
 
 | Ticket | 标题 | 来源 | 依赖 | 规模 | 里程碑 |
@@ -155,3 +170,4 @@ T-01 接入与连线
 | T-07 | 多 Agent 研讨会 | FR-10 | T-01/T-04 | M | M3 |
 | T-08 | 多方研讨会与分歧仲裁 | T-07 延伸 | T-07 | M | M3 |
 | T-09 | 研讨会滚动摘要 | T-08 遗留 | T-08 | S | M3 |
+| T-10 | 开发工作流功能 | 用户需求 | T-08 | M | M4 |

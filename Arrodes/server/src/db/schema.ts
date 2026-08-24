@@ -119,6 +119,40 @@ CREATE TABLE IF NOT EXISTS workspace_seminar_messages (
 
 CREATE INDEX IF NOT EXISTS idx_seminar_messages_seminar
   ON workspace_seminar_messages(seminar_id, created_at);
+
+-- 开发工作流（阶段状态机 + 产出物追踪）
+CREATE TABLE IF NOT EXISTS workspace_dev_workflows (
+  id                TEXT PRIMARY KEY,
+  workspace_id      TEXT NOT NULL,
+  title             TEXT NOT NULL,
+  project_dir       TEXT NOT NULL DEFAULT '',
+  source_seminar_id TEXT,
+  stage             TEXT NOT NULL DEFAULT 'idea'
+                    CHECK(stage IN ('idea','spec','tickets','implement','review','done')),
+  status            TEXT NOT NULL DEFAULT 'active',
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL,
+  FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dev_workflows_ws
+  ON workspace_dev_workflows(workspace_id, created_at);
+
+CREATE TABLE IF NOT EXISTS workspace_dev_workflow_steps (
+  id            TEXT PRIMARY KEY,
+  workflow_id   TEXT NOT NULL,
+  stage         TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending'
+                CHECK(status IN ('pending','in_progress','done')),
+  artifact_path TEXT NOT NULL DEFAULT '',
+  notes         TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  FOREIGN KEY (workflow_id) REFERENCES workspace_dev_workflows(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dev_workflow_steps_wf
+  ON workspace_dev_workflow_steps(workflow_id, stage);
 `;
 
 /** 幂等迁移：为存量表补充 workspace_id 列（workspace-v2） */

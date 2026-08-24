@@ -15,6 +15,7 @@ import { Router } from 'express';
 import { workspaceRepo } from '../db/workspace-repo.js';
 import { createWorkspaceMembersRouter } from './workspaceMembers.js';
 import { createWorkspaceAgentsRouter } from './workspaceAgents.js';
+import { createWorkspaceWorkflowsRouter } from './workspaceWorkflows.js';
 import { workspaceProjectDir } from '../services/workspaceProjectDir.js';
 import { importWorkbuddyNotes } from '../services/workbuddyMemory.js';
 import { actionGate } from '../services/actionGate.js';
@@ -69,6 +70,7 @@ export function createWorkspacesRouter(): Router {
   // 成员与 Agent 交互子路由
   router.use('/:id/members', createWorkspaceMembersRouter());
   router.use('/:id/agents', createWorkspaceAgentsRouter());
+  router.use('/:id/workflows', createWorkspaceWorkflowsRouter());
 
   // 导入 WorkBuddy 记忆（.workbuddy/memory/*.md → 统一共享记忆）
   router.post('/:id/workbuddy/import', (req, res) => {
