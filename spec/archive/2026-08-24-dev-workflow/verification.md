@@ -34,3 +34,11 @@
 - 无偏差
 - 遗留：devworkflow 技能协议仍为静态文本，未动态注入 projectDir；后续可将技能执行与工作流阶段联动
 - 遗留：阶段推进不校验产出物真实性（人工门禁，符合设计）
+
+### 自动验证 2026-08-24T19:04:51+08:00
+
+- 范围：`targeted`
+- `vitest-server`：exit `0`，通过
+- `vitest-client`：exit `0`，通过
+- `tsc-server`：exit `0`，通过
+- `build-client`：exit `0`，通过

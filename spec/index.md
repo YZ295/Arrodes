@@ -16,3 +16,4 @@
 - [2026-08-16-agent-seminar](archive/2026-08-16-agent-seminar/)
 - [2026-08-16-seminar-multi](archive/2026-08-16-seminar-multi/)
 - [2026-08-16-seminar-context](archive/2026-08-16-seminar-context/)
+- [2026-08-24-dev-workflow](archive/2026-08-24-dev-workflow/)
