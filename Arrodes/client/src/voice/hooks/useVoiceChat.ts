@@ -17,6 +17,7 @@ import { createVoicePipeline } from '../../pipeline/voicePipeline';
 import { useTTS } from './useTTS';
 import { useSessionManager } from './useSessionManager';
 import { useVoiceRecorder } from './useVoiceRecorder';
+import { getPluginManager } from '../../core/PluginManager';
 
 interface UseVoiceChatReturn {
   messages: import('@shared/types').Message[];
@@ -188,8 +189,6 @@ export function useVoiceChat(): UseVoiceChatReturn {
     console.log('[VoiceChat] 已完整停止：语音已停、推理已中断');
   }, [ttsStop]);
 
-  const sendTextMessage = useCallback((text: string) => sendMessage(text, false), [sendMessage]);
-
   // 追加助手消息（确认弹窗执行后回填结果，不触发新的 LLM 流程）
   const appendAssistantMessage = useCallback((content: string) => {
     setMessages((prev) => [
@@ -197,6 +196,29 @@ export function useVoiceChat(): UseVoiceChatReturn {
       { id: uid(), role: 'assistant', content, timestamp: new Date().toISOString(), isVoice: false },
     ]);
   }, [setMessages]);
+
+  // 文字发送：/wallpaper 等斜杠命令先走插件命令钩子，命中则直接回填结果
+  const sendTextMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (trimmed.startsWith('/')) {
+        const [command, ...args] = trimmed.slice(1).split(/\s+/);
+        void getPluginManager()
+          .runCommandHooks(command.toLowerCase(), args)
+          .then((result) => {
+            if (result !== null && result !== undefined) {
+              appendAssistantMessage(String(result));
+            } else {
+              sendMessage(text, false);
+            }
+          })
+          .catch(() => sendMessage(text, false));
+        return;
+      }
+      sendMessage(text, false);
+    },
+    [sendMessage, appendAssistantMessage],
+  );
 
   // 卸载清理
   useEffect(() => () => { ttsStop(); }, [ttsStop]);

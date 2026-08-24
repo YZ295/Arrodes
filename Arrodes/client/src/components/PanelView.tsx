@@ -12,6 +12,7 @@ import MemoryPanel from './MemoryPanel';
 import ProfilePanel from './ProfilePanel';
 import VisionPanel from '../modules/vision/VisionPanel';
 import WorkspacePanel from './WorkspacePanel';
+import WallpaperPanel from './WallpaperPanel';
 
 interface PanelViewProps {
   view: SidebarView;
@@ -53,7 +54,7 @@ export default memo(function PanelView(props: PanelViewProps) {
           <span className="text-sm font-medium text-white/60">
             {view === 'profile' ? '人物画像' : view === 'memory' ? '记忆库' : view === 'vision' ? '视觉理解'
             : view === 'skills' ? '智能体技能' : view === 'settings' ? '配置' : view === 'workflow' ? '工作流'
-            : view === 'workspace' ? '工作区' : view === 'mobile' ? '移动端' : '高级'}
+            : view === 'workspace' ? '工作区' : view === 'wallpaper' ? '壁纸' : view === 'mobile' ? '移动端' : '高级'}
           </span>
           <div className="w-12" />
         </div>
@@ -62,6 +63,7 @@ export default memo(function PanelView(props: PanelViewProps) {
         <div className="flex-1 overflow-y-auto">
           {view === 'skills' && <SkillsPanel />}
           {view === 'workspace' && <WorkspacePanel />}
+          {view === 'wallpaper' && <WallpaperPanel onBack={onBack} />}
           {view === 'profile' && <ProfilePanel onNavigate={onNavigate} />}
           {view === 'memory' && <MemoryPanel onClose={onBack} />}
           {view === 'vision' && <VisionPanel />}

@@ -29,6 +29,7 @@ import { useVoiceChat } from './voice/hooks/useVoiceChat';
 import { useWakeWord } from './voice/hooks/useWakeWord';
 import { useWorkspaceStore } from './store/workspaceStore';
 import CanvasPanel from './components/CanvasPanel';
+import WallpaperBackground from './components/WallpaperBackground';
 
 const App = memo(function App() {
   const [sidebarView, setSidebarView] = useState<SidebarView>('conversation');
@@ -66,6 +67,7 @@ const App = memo(function App() {
 
     const pm = getPluginManager();
     pm.activate('builtin.logger').catch(() => {});
+    pm.activate('builtin.wallpaper').catch(() => {});
 
     // 首次交互解锁音频
     const unlock = () => voice.unlockAudio();
@@ -139,6 +141,9 @@ const App = memo(function App() {
 
       {/* 主区域：3D 背景 + 覆盖层 */}
       <div className="relative flex-1 overflow-hidden">
+        {/* Wallpaper Engine 壁纸背景层（未连接/失败时透明露出黑底） */}
+        <WallpaperBackground />
+
         {/* 唤醒监听状态提示 */}
         {wake.isSupported && wake.isListening && !voice.isRecording && (
           <div className="absolute top-3 right-4 z-40 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[12px] text-white/40 pointer-events-none">
