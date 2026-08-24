@@ -45,6 +45,8 @@ import './skills/web.js';
 import './skills/reminder.js';
 // 开发工作流技能族（grill-me / to-spec / to-tickets / implement / code-review / improve-architecture）
 import './skills/devworkflow.js';
+// 外部智能体协议技能族（metagpt / openbot，对应 $CODEX_HOME/skills 的 SKILL.md）
+import './skills/agentProtocols.js';
 // 天气查询技能（HoloJarvis 借鉴：Open-Meteo 免 key）
 import './skills/weather.js';
 // 桌面操控技能族（Daisy/HoloJarvis 借鉴，分级授权）

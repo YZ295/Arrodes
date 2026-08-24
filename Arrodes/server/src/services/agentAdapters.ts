@@ -3,6 +3,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getCommandProvider, type AsyncCommandOutcome } from './commandProvider.js';
 import { WorkBuddyGatewayAdapter } from './workbuddyAdapter.js';
+import { AgentAdapterRegistry, type AgentChatAdapter, type AgentRunOptions } from './agentAdapterTypes.js';
+import { CodexSdkAdapter } from './codexSdkAdapter.js';
+
+export type { AgentChatAdapter, AgentRunOptions };
+export { AgentAdapterRegistry };
 
 /** Agent 调用超时（可配；默认 8 分钟，避免 15 分钟静默被杀） */
 const AGENT_TIMEOUT_MS = Number(process.env.ARRODES_AGENT_TIMEOUT_MS || 8 * 60 * 1000);
@@ -28,25 +33,6 @@ function summarizeOutcome(
   if (stdout) return stdout;
   if (stderrTail) return `${label} 无输出，诊断信息:\n${stderrTail}`;
   return `${label} 无输出（exit=${outcome.exitCode}）`;
-}
-
-export interface AgentChatAdapter {
-  run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string>;
-}
-
-export class AgentAdapterRegistry {
-  private map = new Map<string, AgentChatAdapter>();
-
-  register(id: string, adapter: AgentChatAdapter): () => void {
-    this.map.set(id, adapter);
-    return () => {
-      this.map.delete(id);
-    };
-  }
-
-  get(id: string): AgentChatAdapter | undefined {
-    return this.map.get(id);
-  }
 }
 
 export class CodexCliAdapter implements AgentChatAdapter {
@@ -108,9 +94,28 @@ export class ConfigCliAdapter implements AgentChatAdapter {
   }
 }
 
+/** 创建 codex 适配器：默认 SDK；env=cli 或 SDK 初始化失败时回退 CLI */
+export function createCodexAdapter(
+  env: NodeJS.ProcessEnv = process.env,
+  sdkFactory?: () => AgentChatAdapter,
+): AgentChatAdapter {
+  if (env.ARRODES_CODEX_ADAPTER === 'cli') {
+    return new CodexCliAdapter();
+  }
+  try {
+    return sdkFactory ? sdkFactory() : new CodexSdkAdapter({ env });
+  } catch (err) {
+    console.warn(
+      '[CodexSdk] 初始化失败，回退 CLI 适配器:',
+      err instanceof Error ? err.message : err,
+    );
+    return new CodexCliAdapter();
+  }
+}
+
 /** 全局适配器注册表（codex / hermes，未来 agent 在此追加） */
 export const agentAdapters = new AgentAdapterRegistry();
-agentAdapters.register('codex', new CodexCliAdapter());
+agentAdapters.register('codex', createCodexAdapter());
 agentAdapters.register('hermes', new HermesCliAdapter());
 
 /** 注册配置驱动的自定义智能体（幂等：已存在同名则不覆盖） */

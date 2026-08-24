@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { AgentAdapterRegistry, CodexCliAdapter, HermesCliAdapter, ConfigCliAdapter } from './agentAdapters.js';
+import { describe, it, expect, vi } from 'vitest';
+import {
+  AgentAdapterRegistry, CodexCliAdapter, HermesCliAdapter, ConfigCliAdapter, createCodexAdapter,
+} from './agentAdapters.js';
+import { CodexSdkAdapter } from './codexSdkAdapter.js';
 import { setCommandProvider, LocalCommandProvider, type CommandProvider } from './commandProvider.js';
 
 describe('AgentAdapterRegistry（T-02 对话适配）', () => {
@@ -132,5 +135,25 @@ describe('AgentAdapterRegistry（T-02 对话适配）', () => {
     } finally {
       setCommandProvider(new LocalCommandProvider());
     }
+  });
+
+  it('createCodexAdapter：ARRODES_CODEX_ADAPTER=cli 时注册 CLI 适配器', () => {
+    const adapter = createCodexAdapter({ ARRODES_CODEX_ADAPTER: 'cli' });
+    expect(adapter).toBeInstanceOf(CodexCliAdapter);
+  });
+
+  it('createCodexAdapter：默认注册 SDK 适配器', () => {
+    const adapter = createCodexAdapter({});
+    expect(adapter).toBeInstanceOf(CodexSdkAdapter);
+  });
+
+  it('createCodexAdapter：SDK 构造失败时回退 CLI 并警告', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const adapter = createCodexAdapter({}, () => {
+      throw new Error('spawn codex ENOENT');
+    });
+    expect(adapter).toBeInstanceOf(CodexCliAdapter);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
