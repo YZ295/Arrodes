@@ -19,3 +19,4 @@
 - [2026-08-24-dev-workflow](archive/2026-08-24-dev-workflow/)
 - [2026-08-24-inputbar-indent](archive/2026-08-24-inputbar-indent/)
 - [2026-08-24-codex-sdk](archive/2026-08-24-codex-sdk/)
+- [2026-08-24-wallpaper-plugin](archive/2026-08-24-wallpaper-plugin/)
