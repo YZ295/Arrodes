@@ -11,11 +11,17 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { AudioContextManager } from '../../modules/voice/AudioContextManager';
 import { useAudioLevelStore } from '../../shared/stores/useAudioLevelStore';
 import { eventBus, EVENTS } from '../../shared/events/EventBus';
-import { replayAudio } from './ttsLogic';
+import { chooseConfiguredProvider, createLinkedAbortController, normalizeStoredProvider, replayAudio } from './ttsLogic';
 
 // ===== 类型 =====
 
-export type TtsEngine = 'server';
+export type TtsEngine = 'cosyvoice3' | 'audio8';
+
+export interface TtsProvider {
+  id: TtsEngine;
+  name: string;
+  configured: boolean;
+}
 
 export interface TtsVoice {
   id: string;
@@ -37,7 +43,8 @@ interface UseTtsReturn {
   currentVoice: string;
   config: TtsConfig;
   voices: TtsVoice[];
-  speak: (text: string) => Promise<void>;
+  providers: TtsProvider[];
+  speak: (text: string, signal?: AbortSignal) => Promise<void>;
   stop: () => void;
   setConfig: (config: Partial<TtsConfig>) => void;
   available: boolean;
@@ -55,8 +62,8 @@ interface UseTtsReturn {
 // ===== 默认配置 =====
 
 const DEFAULT_CONFIG: TtsConfig = {
-  engine: 'server',
-  voiceId: 'zh-CN-XiaoxiaoNeural',
+  engine: 'cosyvoice3',
+  voiceId: 'default',
   rate: 1.0,
   pitch: 1.0,
 };
@@ -68,6 +75,9 @@ export function useTTS(): UseTtsReturn {
   const [currentVoice, setCurrentVoice] = useState(DEFAULT_CONFIG.voiceId);
   const [config, setConfigState] = useState<TtsConfig>(DEFAULT_CONFIG);
   const [voices, setVoices] = useState<TtsVoice[]>([]);
+  const [providers, setProviders] = useState<TtsProvider[]>([
+    { id: 'cosyvoice3', name: 'Fun-CosyVoice3（当前本地）', configured: true },
+  ]);
   const [error, setError] = useState<string | null>(null);
   // 静音开关（语音输出可关闭）：关闭时 speak 不触发合成、不播放（用户"不想听了"）
   const [isMuted, setIsMuted] = useState<boolean>(() => {
@@ -90,6 +100,7 @@ export function useTTS(): UseTtsReturn {
   }, []);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const requestAbortRef = useRef<AbortController | null>(null);
   const lastTextRef = useRef<string>('');
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -173,6 +184,18 @@ export function useTTS(): UseTtsReturn {
       .catch(() => {
         setError('无法连接语音服务');
       });
+    fetch('/api/v1/tts/providers')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data.providers)) return;
+        const nextProviders = data.providers as TtsProvider[];
+        setProviders(nextProviders);
+        setConfigState((current) => ({
+          ...current,
+          engine: chooseConfiguredProvider(current.engine, nextProviders),
+        }));
+      })
+      .catch(() => { /* 兼容尚未提供 provider 接口的旧服务端 */ });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- 更新配置 ----
@@ -191,6 +214,7 @@ export function useTTS(): UseTtsReturn {
       const saved = localStorage.getItem('arrodes_tts_config');
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<TtsConfig>;
+        parsed.engine = normalizeStoredProvider(parsed.engine as string | undefined);
         setConfigState((prev) => ({ ...prev, ...parsed }));
         if (parsed.voiceId) setCurrentVoice(parsed.voiceId);
       }
@@ -199,6 +223,8 @@ export function useTTS(): UseTtsReturn {
 
   // ---- 停止播放（同时清 audio） ----
   const stop = useCallback(() => {
+    requestAbortRef.current?.abort();
+    requestAbortRef.current = null;
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -220,9 +246,11 @@ export function useTTS(): UseTtsReturn {
   }, []);
 
   // ---- TTS 引擎（纯本地 CosyVoice；云端已移除） ----
-  const speakServer = useCallback(async (text: string): Promise<void> => {
-    // 纯本地引擎：零成本、离线稳定、隐私不出本机。重试由服务端内置（指数退避 5 次）。
-    const engine = 'local';
+  const speakServer = useCallback(async (text: string, outerSignal?: AbortSignal): Promise<void> => {
+    const engine = config.engine;
+    const linked = createLinkedAbortController(outerSignal);
+    requestAbortRef.current = linked.controller;
+    const signal = linked.controller.signal;
     let lastErr: unknown = null;
 
     // 合成 + 播放单次尝试（返回 base64 数据）
@@ -238,6 +266,7 @@ export function useTTS(): UseTtsReturn {
           engine,
           ...(promptWav ? { promptWav, promptText } : {}),
         }),
+        signal,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `TTS ${res.status}` }));
@@ -256,7 +285,7 @@ export function useTTS(): UseTtsReturn {
       if (isCustom) {
         const customId = currentVoice.replace('custom:', '');
         try {
-          const vres = await fetch('/api/v1/tts/custom-voices');
+          const vres = await fetch('/api/v1/tts/custom-voices', { signal });
           const vdata = await vres.json();
           const found = (vdata.voices || []).find((v: { id: string; path: string }) => v.id === customId);
           if (found) {
@@ -283,28 +312,54 @@ export function useTTS(): UseTtsReturn {
       if (!audio) throw new Error('audio 元素未就绪');
 
       await new Promise<void>((resolve, reject) => {
-          audio.onended = () => { setIsSpeaking(false); resolve(); };
-          audio.onerror = () => {
+          const cleanup = () => {
+            signal.removeEventListener('abort', onAbort);
+            audio.removeEventListener('ended', onEnded);
+            audio.removeEventListener('error', onError);
+          };
+          const onAbort = () => {
+            audio.pause();
+            cleanup();
+            const abortError = new Error('TTS playback aborted');
+            abortError.name = 'AbortError';
+            reject(abortError);
+          };
+          const onEnded = () => { setIsSpeaking(false); cleanup(); resolve(); };
+          const onError = () => {
             setIsSpeaking(false);
+            cleanup();
             reject(new Error('音频播放失败（autoplay 被拦截或音频损坏）'));
           };
+          audio.addEventListener('ended', onEnded, { once: true });
+          audio.addEventListener('error', onError, { once: true });
+          signal.addEventListener('abort', onAbort, { once: true });
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
           audio.src = `data:${data.contentType || 'audio/mpeg'};base64,${data.audioBase64}`;
           audio.play().catch((err) => {
             setIsSpeaking(false);
+            cleanup();
             reject(new Error(`play() 失败: ${err.message || err}`));
           });
         });
         return; // 播放成功
       } catch (err) {
         lastErr = err;
-        console.warn('[TTS] 本地语音引擎失败:', err instanceof Error ? err.message : err);
+        if (!(err instanceof Error && err.name === 'AbortError')) {
+          console.warn(`[TTS] ${engine} 语音引擎失败:`, err instanceof Error ? err.message : err);
+        }
+      } finally {
+        linked.dispose();
+        if (requestAbortRef.current === linked.controller) requestAbortRef.current = null;
       }
-    throw lastErr instanceof Error ? lastErr : new Error('本地语音引擎不可用');
-  }, [currentVoice, config.rate, config.pitch]);
+    throw lastErr instanceof Error ? lastErr : new Error(`${engine} 语音引擎不可用`);
+  }, [currentVoice, config.engine, config.rate, config.pitch]);
 
   // ---- 主 speak 方法（代际计数器防旧音频残留） ----
   const generationRef = useRef(0);
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, signal?: AbortSignal) => {
     if (!text || !text.trim()) return;
     // 静音模式：不触发语音合成、不播放（只保留文字展示）
     if (isMuted) return;
@@ -317,8 +372,9 @@ export function useTTS(): UseTtsReturn {
     const gen = generationRef.current;
 
     try {
-      await speakServer(text);
+      await speakServer(text, signal);
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       const msg = err instanceof Error ? err.message : 'unknown';
       console.warn('[TTS] 本地语音失败:', msg);
       // 纯本地模式：不发声，只提示
@@ -335,10 +391,11 @@ export function useTTS(): UseTtsReturn {
 
   return {
     isSpeaking,
-    engine: 'server',
+    engine: config.engine,
     currentVoice,
     config,
     voices,
+    providers,
     speak,
     stop,
     setConfig,

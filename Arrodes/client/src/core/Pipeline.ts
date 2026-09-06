@@ -96,6 +96,20 @@ export class PipelineRunner {
           const duration = Math.round(performance.now() - stageStart);
           stageDurations[stage.name] = duration;
 
+          // 用户取消优先于 continueOnError：停止后不得误触发完成钩子或后续阶段。
+          if (context.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+            return {
+              success: false,
+              duration: Math.round(performance.now() - context.startTime),
+              context,
+              reply: '',
+              newMemories: [],
+              stageDurations,
+              failedStage: stage.name,
+              error: 'cancelled',
+            };
+          }
+
           if (stage.continueOnError) {
             // 跳过失败的阶段，继续下一个
             console.warn(`[Pipeline] ${stage.name} 失败但跳过:`, error);

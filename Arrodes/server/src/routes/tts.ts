@@ -62,6 +62,11 @@ export function createTtsRouter(): Router {
 
   // POST /api/v1/tts/synthesize - 文本转语音
   router.post('/synthesize', async (req: Request, res: Response): Promise<void> => {
+    const controller = new AbortController();
+    const abortIfDisconnected = () => {
+      if (!res.writableEnded) controller.abort();
+    };
+    res.once('close', abortIfDisconnected);
     try {
       const { text, voice, rate, pitch, engine, promptWav, promptText } = req.body as {
         text?: string;
@@ -90,14 +95,17 @@ export function createTtsRouter(): Router {
         pitch,
         engine: engine as any,
         ...(promptWav ? { promptWav, promptText } : {}),
-      });
+      }, { signal: controller.signal });
 
       // 返回 Base64 音频
       // 前端可以直接用 data:${contentType};base64,${audioBase64} 播放
       res.json(result);
     } catch (err) {
+      if (controller.signal.aborted || res.destroyed) return;
       const msg = err instanceof Error ? err.message : 'TTS 合成失败';
       res.status(500).json({ error: msg, code: 'TTS_ERROR' });
+    } finally {
+      res.off('close', abortIfDisconnected);
     }
   });
 
@@ -105,6 +113,11 @@ export function createTtsRouter(): Router {
   router.get('/voices', (_req: Request, res: Response) => {
     const voices = ttsService.getVoices();
     res.json({ voices });
+  });
+
+  // GET /api/v1/tts/providers - 可选 provider 及其配置状态
+  router.get('/providers', (_req: Request, res: Response) => {
+    res.json({ providers: ttsService.getProviders() });
   });
 
   // GET /api/v1/tts/status - 服务状态 + 失败统计（诊断用）

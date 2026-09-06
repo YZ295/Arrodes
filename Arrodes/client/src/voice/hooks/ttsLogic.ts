@@ -24,3 +24,32 @@ export function replayAudio(
   audio!.play().catch((err) => onError?.(err));
   return true;
 }
+
+/** 创建 TTS 私有取消控制器，并单向跟随整条对话管道的取消信号。 */
+export function createLinkedAbortController(outerSignal?: AbortSignal): {
+  controller: AbortController;
+  dispose: () => void;
+} {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (outerSignal?.aborted) controller.abort();
+  else outerSignal?.addEventListener('abort', abort, { once: true });
+  return {
+    controller,
+    dispose: () => outerSignal?.removeEventListener('abort', abort),
+  };
+}
+
+/** 保留可用的当前 provider；失效时回退到首个已配置项。 */
+export function chooseConfiguredProvider<T extends string>(
+  current: T,
+  providers: ReadonlyArray<{ id: T; configured: boolean }>,
+): T {
+  if (providers.some((provider) => provider.id === current && provider.configured)) return current;
+  return providers.find((provider) => provider.configured)?.id ?? current;
+}
+
+/** 将 CosyVoice2 时代保存的引擎值迁移到当前规范 provider。 */
+export function normalizeStoredProvider(value?: string): 'cosyvoice3' | 'audio8' {
+  return value === 'audio8' ? 'audio8' : 'cosyvoice3';
+}

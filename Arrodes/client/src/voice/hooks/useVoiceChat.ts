@@ -54,10 +54,12 @@ interface UseVoiceChatReturn {
   unlockAudio: () => Promise<void>;
   /** 当前 TTS 配置 */
   ttsConfig: { engine: string; voiceId: string; rate: number; pitch: number };
+  /** 服务端可选 TTS provider 及配置状态 */
+  ttsProviders: Array<{ id: 'cosyvoice3' | 'audio8'; name: string; configured: boolean }>;
   /** 可用音色列表 */
   ttsVoices: Array<{ id: string; name: string; gender: string; style: string }>;
   /** 实时更新 TTS 配置（立即生效） */
-  setTtsConfig: (config: Partial<{ engine: 'server'; voiceId: string; rate: number; pitch: number }>) => void;
+  setTtsConfig: (config: Partial<{ engine: 'cosyvoice3' | 'audio8'; voiceId: string; rate: number; pitch: number }>) => void;
 }
 
 export function useVoiceChat(): UseVoiceChatReturn {
@@ -69,7 +71,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
 
   const channel = useMemo(() => MessageChannel.getInstance(), []);
   const { state: channelState } = useMessageChannel();
-  const { speak: ttsSpeak, stop: ttsStop, isSpeaking: ttsSpeaking, error: ttsError, replay: replayTTS, unlockAudio, config: ttsConfig, voices: ttsVoices, setConfig: setTtsConfigRaw, isMuted: ttsMuted, toggleMuted: ttsToggleMuted } = useTTS();
+  const { speak: ttsSpeak, stop: ttsStop, isSpeaking: ttsSpeaking, error: ttsError, replay: replayTTS, unlockAudio, config: ttsConfig, voices: ttsVoices, providers: ttsProviders, setConfig: setTtsConfigRaw, isMuted: ttsMuted, toggleMuted: ttsToggleMuted } = useTTS();
   const pipeline = useMemo(() => createVoicePipeline({ ttsSpeak }), [ttsSpeak]);
 
   // 会话管理（T10 拆分）
@@ -81,7 +83,14 @@ export function useVoiceChat(): UseVoiceChatReturn {
   const abortRef = useRef<AbortController | null>(null);
   // 当前会话 id 的 ref 同步（供 recorder/发送归属）
   const sessionIdRef = useRef<string | null>(null);
+  const visualContextRef = useRef('');
   useEffect(() => { sessionIdRef.current = currentSessionId; }, [currentSessionId]);
+  useEffect(() => eventBus.on(EVENTS.VISION_OBSERVATION, (payload) => {
+    const observation = payload as { description?: unknown };
+    if (typeof observation?.description === 'string') {
+      visualContextRef.current = observation.description.trim().slice(0, 2000);
+    }
+  }), []);
 
   // ---- 发送消息（自动中断正在播放的语音 + 取消上一个任务） ----
   const sendMessage = useCallback((content: string, isVoice: boolean) => {
@@ -107,13 +116,15 @@ export function useVoiceChat(): UseVoiceChatReturn {
     setIsLoading(true);
 
     eventBus.emit(EVENTS.VOICE_MESSAGE_SEND, { content, sessionId: activeSessionId, isVoice });
-    pipeline.run(content, activeSessionId, isVoice, generation, controller.signal).catch((err) => {
-      // 用户主动停止不算错误
-      if (err instanceof Error && err.message === 'cancelled') {
+    pipeline.run(content, activeSessionId, isVoice, generation, controller.signal, visualContextRef.current).then((result) => {
+      if (result.error === 'cancelled') {
         console.log('[VoiceChat] 已按用户指令停止');
-      } else {
+      }
+    }).catch((err) => {
+      if (!(err instanceof Error && err.message === 'cancelled')) {
         console.warn('[VoiceChat] 管道执行失败:', err);
       }
+    }).finally(() => {
       setIsLoading(false);
       if (abortRef.current === controller) abortRef.current = null;
     });
@@ -251,6 +262,7 @@ export function useVoiceChat(): UseVoiceChatReturn {
     toggleMuted: ttsToggleMuted,
     ttsConfig: { engine: ttsConfig.engine, voiceId: ttsConfig.voiceId, rate: ttsConfig.rate, pitch: ttsConfig.pitch },
     ttsVoices,
+    ttsProviders,
     setTtsConfig: setTtsConfigRaw,
   };
 }

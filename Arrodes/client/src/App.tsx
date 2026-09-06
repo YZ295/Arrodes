@@ -30,17 +30,36 @@ import { useWakeWord } from './voice/hooks/useWakeWord';
 import { useWorkspaceStore } from './store/workspaceStore';
 import CanvasPanel from './components/CanvasPanel';
 import WallpaperBackground from './components/WallpaperBackground';
+import { getWorkspaceLayout } from './ui/layoutPolicy';
+import { useContinuousVision } from './modules/vision/useContinuousVision';
+import { useDesktopPetPublisher } from './desktop-pet/desktopPetBridge';
 
 const App = memo(function App() {
   const [sidebarView, setSidebarView] = useState<SidebarView>('conversation');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const voice = useVoiceChat();
+  // 挂在应用根部：切走视觉面板后屏幕观察仍保持运行。
+  const continuousVision = useContinuousVision(voice.isSpeaking);
+  useDesktopPetPublisher({
+    active: continuousVision.active,
+    analyzing: continuousVision.analyzing,
+    error: continuousVision.error,
+    observation: continuousVision.observation,
+  });
   const wake = useWakeWord(() => voice.startRecording());
   const wakeStart = wake.start;
   const wakeStop = wake.stop;
   const spacePttRef = useRef(false);
+
+  useEffect(() => {
+    const updateWidth = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
   const { workspaces, activeWorkspaceId, loadWorkspaces } = useWorkspaceStore();
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -127,29 +146,28 @@ const App = memo(function App() {
   }, [voice.startRecording, voice.stopRecording]);
 
   const showPanel = sidebarView !== 'conversation';
+  const layout = getWorkspaceLayout(viewportWidth, sidebarCollapsed);
+  const narrow = layout.panelPresentation === 'full';
+  const compactNavigation = layout.compactNavigation && !(narrow && mobileNavOpen);
 
   return (
-    <div className="w-full h-full flex overflow-hidden bg-[#050608]">
+    <div className="w-full h-full flex overflow-hidden bg-[var(--color-bg-deep)]">
       {/* 左侧栏：功能导航 + 会话列表（一体） */}
       <Sidebar
         currentView={sidebarView}
-        onViewChange={(v) => setSidebarView(v)}
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed((p) => !p)}
+        onViewChange={(v) => { setSidebarView(v); setMobileNavOpen(false); }}
+        collapsed={compactNavigation}
+        onToggle={() => narrow ? setMobileNavOpen((p) => !p) : setSidebarCollapsed((p) => !p)}
+        overlay={narrow && mobileNavOpen}
+        isConnected={voice.isConnected}
         currentSessionId={voice.currentSessionId}
       />
+      {narrow && mobileNavOpen && <button aria-label="关闭导航" className="absolute inset-0 z-40 bg-black/60" onClick={() => setMobileNavOpen(false)} />}
 
       {/* 主区域：3D 背景 + 覆盖层 */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 min-w-0 overflow-hidden bg-[color:var(--color-bg-canvas)]/80">
         {/* Wallpaper Engine 壁纸背景层（未连接/失败时透明露出黑底） */}
         <WallpaperBackground />
-
-        {/* 唤醒监听状态提示 */}
-        {wake.isSupported && wake.isListening && !voice.isRecording && (
-          <div className="absolute top-3 right-4 z-40 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[12px] text-white/40 pointer-events-none">
-            唤醒监听中 · 说「嘿阿罗德斯」
-          </div>
-        )}
 
         {/* 对话覆盖层（仅 conversation 视图显示） */}
         {!showPanel && (
@@ -163,6 +181,7 @@ const App = memo(function App() {
             interimText={voice.interimText}
             isSpeaking={voice.isSpeaking}
             ttsError={voice.ttsError}
+            wakeListening={wake.isSupported && wake.isListening && !voice.isRecording}
             error={voice.error}
             showMemoryToast={voice.showMemoryToast}
             memoryToastText={voice.memoryToastText}
@@ -183,7 +202,7 @@ const App = memo(function App() {
 
         {/* 画布（T-06：全屏节点连线视图，节点内可直接对话） */}
         {sidebarView === 'canvas' && (
-          <CanvasPanel onBack={() => setSidebarView('conversation')} />
+          <CanvasPanel onBack={() => setSidebarView('workspace')} />
         )}
 
         {/* 面板覆盖层（非 conversation 视图） */}
@@ -192,9 +211,11 @@ const App = memo(function App() {
             view={sidebarView}
             ttsConfig={voice.ttsConfig}
             ttsVoices={voice.ttsVoices}
+            ttsProviders={voice.ttsProviders}
             setTtsConfig={voice.setTtsConfig}
             onBack={() => setSidebarView('conversation')}
             onNavigate={setSidebarView}
+            continuousVision={continuousVision}
           />
         )}
 
@@ -202,7 +223,11 @@ const App = memo(function App() {
         <Subtitle />
 
         {/* 高风险操作确认弹窗 */}
-        <ConfirmDialog messages={voice.messages} onAppendAssistant={voice.appendAssistantMessage} />
+        <ConfirmDialog
+          messages={voice.messages}
+          sessionId={voice.currentSessionId}
+          onAppendAssistant={voice.appendAssistantMessage}
+        />
 
         {/* 主输入栏的项目文件夹选择器 */}
         <FolderPicker

@@ -1,10 +1,10 @@
 """
-CosyVoice 2 TTS Sidecar
+CosyVoice 3 TTS Sidecar
 =======================
 本地离线语音合成服务（FastAPI）。
 
 职责：
-- 加载 CosyVoice2-0.5B 模型（懒加载，首次请求时初始化）
+- 加载 Fun-CosyVoice3-0.5B-2512 模型（懒加载，首次请求时初始化）
 - POST /synthesize → 合成 wav 文件，返回路径
 - GET /health → 健康检查（供 Node 后端探活）
 - 启动时预热模型，避免首包过慢
@@ -44,35 +44,32 @@ from pydantic import BaseModel
 
 _model = None
 _device = None
-
-
 def load_model():
-    """加载 CosyVoice2-0.5B（仅首次调用）"""
+    """加载 Fun-CosyVoice3（仅首次调用）。"""
     global _model, _device
     if _model is not None:
         return _model, _device
 
     import torch
-    from cosyvoice.cli.cosyvoice import CosyVoice2
+    from cosyvoice.cli.cosyvoice import CosyVoice3
+    default_model_name = "Fun-CosyVoice3-0.5B-2512"
 
     _device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"[CosyVoice] 设备: {_device}（{'CUDA ' + torch.cuda.get_device_name(0) if _device == 'cuda' else 'CPU'}）")
 
     model_dir = os.environ.get(
         "COSYVOICE_MODEL_DIR",
-        str(COSYVOICE_DIR / "pretrained_models" / "CosyVoice2-0.5B"),
+        str(COSYVOICE_DIR / "pretrained_models" / default_model_name),
     )
     if not Path(model_dir).exists():
         raise RuntimeError(
             f"模型目录不存在: {model_dir}\n"
-            "请先下载 CosyVoice2-0.5B 权重并放到该目录：\n"
-            "  huggingface-cli download --local-dir pretrained_models/CosyVoice2-0.5B FunAudioLLM/CosyVoice2-0.5B\n"
-            "或从 ModelScope: modelscope download --model iic/CosyVoice2-0.5B --local_dir pretrained_models/CosyVoice2-0.5B"
+            f"请先下载 {default_model_name} 权重并设置 COSYVOICE_MODEL_DIR"
         )
 
     print(f"[CosyVoice] 加载模型: {model_dir} ...")
     t0 = time.time()
-    _model = CosyVoice2(model_dir, load_jit=False, load_trt=False, fp16=(_device == "cuda"))
+    _model = CosyVoice3(model_dir, load_trt=False, fp16=(_device == "cuda"))
     print(f"[CosyVoice] 模型加载完成 ({time.time() - t0:.1f}s)")
     return _model, _device
 
@@ -84,7 +81,7 @@ app = FastAPI(title="CosyVoice TTS Sidecar", version="1.0")
 OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# 预设音色（CosyVoice2 内置 speaker id，无需参考音频）
+# UI 兼容音色名称；当前均走参考音频 zero-shot。
 VOICES = {
     "default": "中文女",
     "female": "中文女",
@@ -111,12 +108,12 @@ class SynthResponse(BaseModel):
     audioPath: str
     contentType: str
     duration: float
-    engine: str = "cosyvoice2-local"
+    engine: str
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "engine": "cosyvoice2", "device": _device or "not-loaded"}
+    return {"status": "ok", "engine": "cosyvoice3", "device": _device or "not-loaded"}
 
 
 @app.post("/synthesize", response_model=SynthResponse)
@@ -136,8 +133,7 @@ def synthesize(req: SynthRequest):
     text_hash = hashlib.md5(req.text.encode("utf-8")).hexdigest()[:8]
     out_path = OUTPUT_DIR / f"{int(time.time())}_{text_hash}.wav"
 
-    # 用 inference_zero_shot：参考音频提取音色（CosyVoice2 官方主推用法）
-    # 注意：CosyVoice2-0.5B 模型不包含 spk2info.pt，SFT 模式无内置音色，必须用 zero_shot
+    # 用 inference_zero_shot：参考音频提取音色。
     # 注意：prompt_wav 传文件路径字符串（inference_zero_shot 内部自行加载），勿传 tensor
     try:
         t0 = time.time()
@@ -148,6 +144,8 @@ def synthesize(req: SynthRequest):
         if not Path(ref_wav).exists():
             raise RuntimeError(f"缺少参考音频: {ref_wav}（需从 CosyVoice 仓库 asset/ 目录获取 zero_shot_prompt.wav，或上传自定义参考音频）")
         prompt_text = req.promptText or "希望你以后能够做的比我还好呦。"
+        if "<|endofprompt|>" not in prompt_text:
+            prompt_text = f"You are a helpful assistant.<|endofprompt|>{prompt_text}"
         for chunk in model.inference_zero_shot(
             req.text,
             prompt_text,  # prompt 文本（与参考音频配套）
@@ -163,6 +161,7 @@ def synthesize(req: SynthRequest):
             audioPath=str(out_path),
             contentType="audio/wav",
             duration=duration,
+            engine="cosyvoice3-local",
         )
     except HTTPException:
         raise
@@ -173,7 +172,7 @@ def synthesize(req: SynthRequest):
 def _write_chunk(chunk, out_path: Path, sample_rate: int = 24000):
     """CosyVoice 流式 chunk 写入 wav（第一个 chunk 初始化文件）
 
-    注意：CosyVoice2 的 chunk 只有 {'tts_speech'}，sample_rate 从模型全局取（默认 24000）。
+    CosyVoice3 的 chunk 只有 {'tts_speech'}，sample_rate 从模型全局取（默认 24000）。
     """
     if not hasattr(_write_chunk, "_fh") or _write_chunk._fh is None:
         # chunk 是 {tts_speech} dict（无 sample_rate 字段）

@@ -11,7 +11,7 @@ import type { StageConfig, StageInput, StageOutput } from '@shared/types/pipelin
 import { getVoiceGeneration } from '../../shared/utils/voiceGeneration';
 
 export type TtsStageDeps = {
-  speak: (text: string) => Promise<void>;
+  speak: (text: string, signal?: AbortSignal) => Promise<void>;
 };
 
 export function createTtsStage(deps: TtsStageDeps): StageConfig<string, void> {
@@ -23,6 +23,9 @@ export function createTtsStage(deps: TtsStageDeps): StageConfig<string, void> {
     processor: async (input: StageInput<string>): Promise<StageOutput<void>> => {
       const text = (input.context.state.reply as string) || input.previousOutput || '';
       if (!text) return { data: undefined, continue: true, duration: 0 };
+      if (input.context.signal?.aborted) {
+        return { data: undefined, continue: true, duration: 0 };
+      }
 
       // 代际检查：如果这条消息已被新消息取代，跳过播放
       const msgGeneration = (input.context.state.generation as number) ?? -1;
@@ -31,7 +34,7 @@ export function createTtsStage(deps: TtsStageDeps): StageConfig<string, void> {
         return { data: undefined, continue: true, duration: 0 };
       }
 
-      await deps.speak(text);
+      await deps.speak(text, input.context.signal);
       return { data: undefined, continue: true, duration: 0 };
     },
   };

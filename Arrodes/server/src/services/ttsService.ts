@@ -1,15 +1,12 @@
-/**
- * 阿罗德斯 TTS 服务 v3（纯本地）
- *
- * 2026-08-08 决策：移除云端引擎（Edge TTS），仅保留本地 CosyVoice。
- * - 本地合成零成本、离线稳定、隐私不出本机（商业化考虑）
- * - 移除：Edge WebSocket 合成、Sec-MS-GEC 签名、云端音色列表
- * - 保留：串行队列（防并发压力）、指数退避重试、失败统计
- */
+/** 阿罗德斯统一 TTS 服务：可插拔 provider、串行限流、可取消重试。 */
+import {
+  createAudio8Synthesizer,
+  type TtsSynthesizer,
+} from './ttsProviders.js';
 
-// ===== 类型 =====
-
-export type TtsEngine = 'local';
+export type TtsProviderId = 'cosyvoice3' | 'audio8';
+/** local 为旧客户端兼容别名，响应始终返回规范 provider id。 */
+export type TtsEngine = TtsProviderId | 'local';
 
 export interface TtsRequest {
   text: string;
@@ -17,7 +14,6 @@ export interface TtsRequest {
   rate?: number;
   pitch?: number;
   engine?: TtsEngine;
-  /** T9 自定义音色：参考音频路径（可选） */
   promptWav?: string;
   promptText?: string;
 }
@@ -25,48 +21,83 @@ export interface TtsRequest {
 export interface TtsResponse {
   audioBase64: string;
   contentType: string;
-  engine: TtsEngine;
+  engine: TtsProviderId;
   voice: string;
   duration: number;
   audioUrl?: string;
 }
 
-/** 本地合成器签名（可注入 mock 用于测试） */
-export type LocalSynthesizer = (
-  text: string,
-  voice: string,
-  rate: number,
-  /** T9 自定义音色：参考音频路径（可选） */
-  promptWav?: string,
-  promptText?: string,
-) => Promise<{ audioBase64: string; contentType: string }>;
+export interface TtsProviderInfo {
+  id: TtsProviderId;
+  name: string;
+  configured: boolean;
+}
 
-// ===== 本地 CosyVoice 合成 =====
+export type LocalSynthesizer = TtsSynthesizer;
+type AdditionalProviders = Partial<Record<Exclude<TtsProviderId, 'cosyvoice3'>, TtsSynthesizer>>;
 
-/** 默认本地合成实现：调用 cosyVoiceProxy（懒启动 sidecar） */
-const defaultLocalSynthesize: LocalSynthesizer = async (text, _voice, rate, promptWav, promptText) => {
+const defaultLocalSynthesize: LocalSynthesizer = async (
+  text, _voice, rate, promptWav, promptText, signal,
+) => {
   const { cosyVoiceEngine } = await import('./cosyVoiceProxy.js');
-  const { audioPath } = await cosyVoiceEngine.synthesize(text, 'default', rate, promptWav, promptText);
+  const { audioPath } = await cosyVoiceEngine.synthesize(
+    text, 'default', rate, promptWav, promptText, signal,
+  );
   const { readFileSync } = await import('node:fs');
   const wavBuffer = readFileSync(audioPath);
-  return {
-    audioBase64: wavBuffer.toString('base64'),
-    contentType: 'audio/wav',
-  };
+  return { audioBase64: wavBuffer.toString('base64'), contentType: 'audio/wav' };
 };
 
-// ===== 串行队列 =====
+function defaultAdditionalProviders(): AdditionalProviders {
+  const providers: AdditionalProviders = {};
+  if (process.env.AUDIO8_TTS_BASE_URL) {
+    providers.audio8 = createAudio8Synthesizer({
+      baseUrl: process.env.AUDIO8_TTS_BASE_URL,
+      model: process.env.AUDIO8_TTS_MODEL,
+      apiKey: process.env.AUDIO8_TTS_API_KEY,
+    });
+  }
+  return providers;
+}
 
 let ttsChain: Promise<unknown> = Promise.resolve();
 
-/** 串行化执行：一次只处理一个 TTS 合成请求（防并发压力） */
 function enqueue<T>(task: () => Promise<T>): Promise<T> {
   const run = ttsChain.then(() => task());
   ttsChain = run.catch(() => undefined);
   return run;
 }
 
-// ===== 失败统计（可观测，供诊断） =====
+function abortError(): Error {
+  const error = new Error('TTS request aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError();
+}
+
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function normalizeProvider(engine?: string): TtsProviderId {
+  if (!engine || ['cosyvoice2', 'local', 'server', 'edge', 'web'].includes(engine)) return 'cosyvoice3';
+  if (engine === 'cosyvoice3' || engine === 'audio8') return engine;
+  throw new Error(`未知 TTS 引擎: ${engine}`);
+}
 
 export interface TtsStats {
   totalAttempts: number;
@@ -81,48 +112,60 @@ export function getTtsStats(): TtsStats {
   return { ...ttsStats };
 }
 
-// ===== 服务类 =====
-
 export class TtsService {
-  /** 本地合成器（可注入 mock 用于测试；默认真实 CosyVoice 实现） */
-  private localSynthesizer: LocalSynthesizer;
+  private readonly providers: Partial<Record<TtsProviderId, TtsSynthesizer>>;
 
-  constructor(localSynthesizer?: LocalSynthesizer) {
-    this.localSynthesizer = localSynthesizer ?? defaultLocalSynthesize;
+  constructor(localSynthesizer?: LocalSynthesizer, additionalProviders: AdditionalProviders = {}) {
+    this.providers = {
+      cosyvoice3: localSynthesizer ?? defaultLocalSynthesize,
+      ...additionalProviders,
+    };
   }
 
-  async synthesize(request: TtsRequest): Promise<TtsResponse> {
-    const { text, voice = 'default', rate = 1.0, pitch = 1.0, engine = 'local', promptWav, promptText } = request;
+  async synthesize(
+    request: TtsRequest,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<TtsResponse> {
+    const {
+      text, voice = 'default', rate = 1.0, engine, promptWav, promptText,
+    } = request;
+    const { signal } = options;
 
     if (!text || !text.trim()) throw new Error('文本不能为空');
     if (text.length > 2000) throw new Error('文本过长（最大 2000 字）');
-    // 超长文本截断：朗读前 1000 字（避免合成超时）
+    throwIfAborted(signal);
+
+    const providerId = normalizeProvider(engine);
+    const provider = this.providers[providerId];
+    if (!provider) throw new Error(`TTS 引擎 ${providerId} 未配置`);
     const speakText = text.length > 1000 ? text.slice(0, 1000) : text;
 
-    // 纯本地引擎；如传入其他引擎值则视为 local（兼容旧请求）
-    if (engine !== 'local') {
-      console.warn(`[TTS] 引擎 "${engine}" 已随云端移除，使用本地引擎`);
-    }
-
-    // 串行队列 + 指数退避重试（最多 5 次）
     return enqueue(async () => {
-      let result: { audioBase64: string; contentType: string } | undefined;
+      throwIfAborted(signal);
+      let result: Awaited<ReturnType<TtsSynthesizer>> | undefined;
       let lastErr: unknown;
 
       for (let attempt = 1; attempt <= 5; attempt++) {
+        throwIfAborted(signal);
         ttsStats.totalAttempts++;
         try {
-          result = await this.localSynthesizer(speakText, voice, rate, promptWav, promptText);
+          result = await provider(speakText, voice, rate, promptWav, promptText, signal);
           break;
         } catch (err) {
+          if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+            throw abortError();
+          }
           lastErr = err;
           ttsStats.totalFailures++;
           ttsStats.lastError = err instanceof Error ? err.message : String(err);
           ttsStats.lastErrorAt = new Date().toISOString();
           if (attempt < 5) {
             const waitMs = attempt * 1000;
-            console.warn(`[TTS] 本地合成失败（第 ${attempt} 次），${waitMs}ms 后重试:`, err instanceof Error ? err.message : err);
-            await new Promise((r) => setTimeout(r, waitMs));
+            console.warn(
+              `[TTS:${providerId}] 合成失败（第 ${attempt} 次），${waitMs}ms 后重试:`,
+              err instanceof Error ? err.message : err,
+            );
+            await abortableDelay(waitMs, signal);
           }
         }
       }
@@ -130,19 +173,23 @@ export class TtsService {
       if (!result) throw lastErr;
       return {
         ...result,
-        engine: 'local',
+        engine: providerId,
         voice,
         duration: speakText.length / 4,
       };
     });
   }
 
-  /** 本地音色列表（CosyVoice 预设） */
-  getVoices(): Array<{ id: string; name: string; gender: string; style: string }> {
+  getProviders(): TtsProviderInfo[] {
     return [
-      { id: 'default', name: '默认音色', gender: 'female', style: '自然、清晰' },
+      { id: 'cosyvoice3', name: 'Fun-CosyVoice3（当前本地）', configured: Boolean(this.providers.cosyvoice3) },
+      { id: 'audio8', name: 'Audio8（OpenAI 兼容）', configured: Boolean(this.providers.audio8) },
     ];
+  }
+
+  getVoices(): Array<{ id: string; name: string; gender: string; style: string }> {
+    return [{ id: 'default', name: '默认音色', gender: 'female', style: '自然、清晰' }];
   }
 }
 
-export const ttsService = new TtsService();
+export const ttsService = new TtsService(defaultLocalSynthesize, defaultAdditionalProviders());

@@ -33,7 +33,13 @@ const TYPE_LABEL: Record<string, string> = {
   file: '文件级',
 };
 
-export default function WorkspacePanel() {
+const EMPTY_AUTHORIZED_DIRS: string[] = [];
+
+interface WorkspacePanelProps {
+  onOpenCanvas: () => void;
+}
+
+export default function WorkspacePanel({ onOpenCanvas }: WorkspacePanelProps) {
   const { workspaces, workspacesLoading, activeWorkspaceId, loadWorkspaces, setActiveWorkspace, createWorkspace } = useWorkspaceStore();
   const [agents, setAgents] = useState<AgentConnector[]>([]);
   const [connected, setConnected] = useState<string[]>([]);
@@ -48,8 +54,10 @@ export default function WorkspacePanel() {
   const [chatAgent, setChatAgent] = useState<string | null>(null);
   const [projectDir, setProjectDir] = useState('');
   const [browseOpen, setBrowseOpen] = useState(false);
+  const [browseTarget, setBrowseTarget] = useState<'project' | 'authorized'>('project');
 
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
+  const authorizedDirs = active?.config?.authorizedDirs ?? EMPTY_AUTHORIZED_DIRS;
 
   const load = useCallback(async (wsId: string) => {
     try {
@@ -183,7 +191,7 @@ export default function WorkspacePanel() {
     }
   }, [activeWorkspaceId, projectDir, loadWorkspaces]);
 
-  const updateWorkspaceConfig = useCallback(async (patch: { projectDir?: string; permission?: string }) => {
+  const updateWorkspaceConfig = useCallback(async (patch: { projectDir?: string; authorizedDirs?: string[]; permission?: string }) => {
     try {
       const res = await fetch(`/api/v1/workspaces/${activeWorkspaceId}`, {
         method: 'PATCH',
@@ -205,11 +213,39 @@ export default function WorkspacePanel() {
     await updateWorkspaceConfig({ projectDir: p });
   }, [updateWorkspaceConfig]);
 
+  const chooseAuthorizedDir = useCallback(async (p: string) => {
+    setBrowseOpen(false);
+    if (authorizedDirs.includes(p)) {
+      setSyncMsg('该目录已获得授权');
+      return;
+    }
+    await updateWorkspaceConfig({ authorizedDirs: [...authorizedDirs, p] });
+  }, [authorizedDirs, updateWorkspaceConfig]);
+
+  const revokeAuthorizedDir = useCallback(async (p: string) => {
+    await updateWorkspaceConfig({ authorizedDirs: authorizedDirs.filter((dir) => dir !== p) });
+  }, [authorizedDirs, updateWorkspaceConfig]);
+
   return (
     <div className="p-5 space-y-6">
       {/* 工作区切换器 */}
       <div>
-        <h3 className="text-[16px] text-white/30 uppercase tracking-wider mb-2">工作区</h3>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 className="text-[16px] text-white/30 uppercase tracking-wider">当前工作区</h3>
+          <button
+            type="button"
+            onClick={onOpenCanvas}
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-[12px] font-medium text-white/65 transition-colors hover:border-blue-400/30 hover:bg-blue-500/10 hover:text-blue-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+            画布视图
+          </button>
+        </div>
         <div className="rounded-xl border border-white/10 bg-white/3 p-3 space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-lg leading-none">{active?.icon || '🪐'}</span>
@@ -243,11 +279,49 @@ export default function WorkspacePanel() {
               保存
             </button>
             <button
-              onClick={() => setBrowseOpen(true)}
+              onClick={() => {
+                setBrowseTarget('project');
+                setBrowseOpen(true);
+              }}
               className="px-2.5 py-1.5 rounded-lg bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white/80 text-[16px]"
             >
               浏览…
             </button>
+          </div>
+          <div className="rounded-lg border border-white/5 bg-white/[0.02] p-2.5 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[16px] text-white/55">额外授权目录</div>
+                <div className="text-[16px] text-white/25">项目目录默认可访问；项目外目录须在此逐项授权。</div>
+              </div>
+              <button
+                onClick={() => {
+                  setBrowseTarget('authorized');
+                  setBrowseOpen(true);
+                }}
+                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white/80 text-[16px]"
+              >
+                + 授权目录
+              </button>
+            </div>
+            {authorizedDirs.length > 0 ? (
+              <div className="space-y-1">
+                {authorizedDirs.map((dir) => (
+                  <div key={dir} className="flex items-center gap-2 rounded bg-black/10 px-2 py-1.5">
+                    <code className="min-w-0 flex-1 truncate text-[16px] text-white/50" title={dir}>{dir}</code>
+                    <button
+                      onClick={() => revokeAuthorizedDir(dir)}
+                      className="text-[16px] text-red-300/70 hover:text-red-200"
+                      title={`撤销 ${dir} 的文件访问权限`}
+                    >
+                      撤销
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[16px] text-white/20">未授权项目外目录</div>
+            )}
           </div>
           {showNew && (
             <div className="flex gap-2 pt-1">
@@ -404,9 +478,9 @@ export default function WorkspacePanel() {
       {/* 项目文件夹选择器（复用组件） */}
       <FolderPicker
         open={browseOpen}
-        initialPath={projectDir}
+        initialPath={browseTarget === 'project' ? projectDir : ''}
         onClose={() => setBrowseOpen(false)}
-        onSelect={chooseProjectDir}
+        onSelect={browseTarget === 'project' ? chooseProjectDir : chooseAuthorizedDir}
       />
     </div>
   );

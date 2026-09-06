@@ -10,9 +10,7 @@
  * │ 会话列表              │
  * │  · 新建按钮           │
  * ├──────────────────────┤
- * │ 图标导航（功能入口）    │  ← 对话/工作区/技能/记忆...
- * ├──────────────────────┤
- * │ ● 在线                │  ← 底部状态
+ * │ 图标导航（功能入口）    │  ← 仅显示当前可用功能
  * └──────────────────────┘
  *
  * 折叠态：只显示图标导航（宽 14），会话区隐藏。
@@ -23,7 +21,6 @@ import type { SessionNode } from '@shared/types';
 import { eventBus, EVENTS } from '../shared/events/EventBus';
 import { api } from '../shared/utils/apiClient';
 import { useWorkspaceStore } from '../store/workspaceStore';
-import SidebarBeam from './SidebarBeam';
 
 export type SidebarView =
   | 'conversation' | 'workspace' | 'canvas' | 'workflow' | 'profile' | 'memory'
@@ -33,23 +30,18 @@ interface NavItem {
   id: SidebarView;
   label: string;
   icon: string;
-  available: boolean;
-  hint?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'conversation', label: '对话', icon: 'conversation', available: true },
-  { id: 'workspace', label: '工作区', icon: 'workspace', available: true, hint: 'Agent 大宇宙' },
-  { id: 'canvas', label: '画布', icon: 'canvas', available: true, hint: '拖拽连线 · 共享记忆' },
-  { id: 'wallpaper', label: '壁纸', icon: 'wallpaper', available: true, hint: 'Wallpaper Engine' },
-  { id: 'skills', label: '技能', icon: 'skills', available: true },
-  { id: 'workflow', label: '工作流', icon: 'workflow', available: false, hint: '即将支持 n8n / Coze' },
-  { id: 'profile', label: '画像', icon: 'profile', available: true },
-  { id: 'memory', label: '记忆', icon: 'memory', available: true },
-  { id: 'vision', label: '视觉', icon: 'vision', available: true },
-  { id: 'settings', label: '配置', icon: 'settings', available: true },
-  { id: 'mobile', label: '移动端', icon: 'mobile', available: false, hint: '待开发' },
-  { id: 'advanced', label: '高级', icon: 'advanced', available: true },
+  { id: 'conversation', label: '对话', icon: 'conversation' },
+  { id: 'workspace', label: '工作区', icon: 'workspace' },
+  { id: 'wallpaper', label: '壁纸', icon: 'wallpaper' },
+  { id: 'skills', label: '技能', icon: 'skills' },
+  { id: 'profile', label: '画像', icon: 'profile' },
+  { id: 'memory', label: '记忆', icon: 'memory' },
+  { id: 'vision', label: '视觉', icon: 'vision' },
+  { id: 'settings', label: '配置', icon: 'settings' },
+  { id: 'advanced', label: '高级', icon: 'advanced' },
 ];
 
 function NavIcon({ id }: { id: SidebarView }) {
@@ -159,9 +151,11 @@ interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   currentSessionId: string | null;
+  isConnected: boolean;
+  overlay?: boolean;
 }
 
-export default memo(function Sidebar({ currentView, onViewChange, collapsed, onToggle, currentSessionId }: SidebarProps) {
+export default memo(function Sidebar({ currentView, onViewChange, collapsed, onToggle, currentSessionId, overlay }: SidebarProps) {
   const [sessions, setSessions] = useState<SessionNode[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState('');
@@ -245,11 +239,9 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
   };
 
   return (
-    <div className={`relative z-40 h-full transition-all duration-300 ${
-      collapsed ? 'w-14' : 'w-64'
-    } bg-[#0a0d14]/85 backdrop-blur-2xl border-r border-white/5 flex flex-col`}>
-      {/* 右侧边框光束（border-beam 效果：光点沿侧边栏右缘周期性扫过） */}
-      {!collapsed && <SidebarBeam />}
+    <aside aria-label="主导航" className={`arrodes-sidebar ${overlay ? 'absolute inset-y-0 left-0 z-50 shadow-2xl' : 'relative z-40'} h-full shrink-0 transition-[width] duration-200 ${
+      collapsed ? 'w-[68px]' : 'w-[272px]'
+    } bg-[color:var(--color-bg-nav)]/95 backdrop-blur-xl border-r border-[var(--color-border)] flex flex-col`}>
       {/* 折叠按钮 */}
       <button
         onClick={onToggle}
@@ -265,40 +257,36 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
 
       {/* Logo / 标题 */}
       <div className="px-4 py-5 flex items-center gap-2 overflow-hidden shrink-0">
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-700
-          flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
-          <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2l2.4 6.2L21 10l-6.6 1.8L12 18l-2.4-6.2L3 10l6.6-1.8z" />
-          </svg>
+        <div className="w-8 h-8 rounded-[10px] bg-blue-500/15 border border-blue-400/25
+          flex items-center justify-center shrink-0 text-blue-300 font-semibold">
+          A
         </div>
         {!collapsed && (
           <div className="flex flex-col min-w-0">
             <span className="text-[16px] font-semibold text-white/90 truncate">阿罗德斯</span>
-            <span className="text-[16px] text-white/30 truncate">虚空之镜</span>
+            <span className="text-xs text-[var(--color-text-muted)] truncate">虚空之镜</span>
           </div>
         )}
       </div>
 
       {/* 功能导航（图标，始终显示） */}
-      <nav className={`flex flex-col gap-0.5 px-2 overflow-y-auto shrink-0 ${
+      <nav className={`flex flex-col gap-0.5 px-2 overflow-y-auto min-h-0 ${
         collapsed ? 'pt-2' : ''
       }`}>
-        {NAV_ITEMS.map((item) => {
-          const active = currentView === item.id;
+      {NAV_ITEMS.map((item) => {
+          const active = currentView === item.id || (item.id === 'workspace' && currentView === 'canvas');
           return (
             <button
               key={item.id}
-              onClick={() => item.available && onViewChange(item.id)}
-              disabled={!item.available}
+              onClick={() => onViewChange(item.id)}
+              aria-current={active ? 'page' : undefined}
               title={collapsed ? item.label : undefined}
               className={`group relative flex items-center gap-3 rounded-lg transition-all ${
                 collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'
               } ${
                 active
                   ? 'bg-white/10 text-white'
-                  : item.available
-                    ? 'text-white/40 hover:text-white/80 hover:bg-white/5'
-                    : 'text-white/15 cursor-not-allowed'
+                  : 'text-[var(--color-text-secondary)] hover:text-white hover:bg-white/5'
               }`}
             >
               {active && (
@@ -310,15 +298,7 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
                 <NavIcon id={item.id} />
               </span>
               {!collapsed && (
-                <span className="text-[16px] font-medium truncate flex-1 text-left">{item.label}</span>
-              )}
-              {!item.available && !collapsed && (
-                <span className="text-[16px] px-1 py-0.5 rounded bg-white/5 text-white/20 shrink-0">
-                  {item.hint || '待开发'}
-                </span>
-              )}
-              {!item.available && collapsed && (
-                <span className="absolute right-1 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-white/10" />
+                <span className="text-sm font-medium truncate flex-1 text-left">{item.label}</span>
               )}
             </button>
           );
@@ -426,7 +406,7 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
                   <button
                     onClick={(e) => remove(s.id, e)}
                     disabled={deleting === s.id}
-                    className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/20 text-gray-400 hover:text-red-400"
+                    className="w-5 h-5 rounded flex items-center justify-center text-red-300/70 hover:bg-red-500/20 hover:text-red-300"
                     title="删除"
                   >
                     {deleting === s.id ? (
@@ -462,14 +442,6 @@ export default memo(function Sidebar({ currentView, onViewChange, collapsed, onT
           </div>
         </div>
       )}
-
-      {/* 底部状态 */}
-      <div className="px-3 py-3 border-t border-white/5 shrink-0">
-        <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
-          <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          {!collapsed && <span className="text-[16px] text-white/30">在线</span>}
-        </div>
-      </div>
-    </div>
+    </aside>
   );
 });

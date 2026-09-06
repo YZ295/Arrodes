@@ -33,7 +33,7 @@ import { createMemoryStage } from './stages/memoryStage';
 // ============================================================
 
 export interface VoicePipelineDeps {
-  ttsSpeak: (text: string) => Promise<void>;
+  ttsSpeak: (text: string, signal?: AbortSignal) => Promise<void>;
 }
 
 /**
@@ -102,11 +102,12 @@ export class VoicePipelineRunner {
     isVoice = false,
     generation?: number,
     signal?: AbortSignal,
+    visualContext?: string,
   ): Promise<PipelineResult> {
     const ctx = createPipelineContext({
       sessionId,
       rawInput: text,
-      state: { isVoice, generation: generation ?? -1 },
+      state: { isVoice, generation: generation ?? -1, visualContext },
       signal,
     });
 
@@ -121,11 +122,13 @@ export class VoicePipelineRunner {
     // === 执行管道 ===
     const result = await this.runner.run(ctx);
 
-    // === PluginManager: afterPipeline 钩子 ===
-    try {
-      await pm.runAfterPipelineHooks(result);
-    } catch (err) {
-      console.warn('[Pipeline] afterPipeline 钩子异常:', err);
+    // 取消后不再执行插件完成钩子，避免“停止”之后仍触发任务副作用。
+    if (result.error !== 'cancelled') {
+      try {
+        await pm.runAfterPipelineHooks(result);
+      } catch (err) {
+        console.warn('[Pipeline] afterPipeline 钩子异常:', err);
+      }
     }
 
     return result;

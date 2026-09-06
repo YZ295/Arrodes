@@ -19,18 +19,24 @@ interface CustomVoice {
  * TTSControl — 主面板
  * ============================================================ */
 interface TTSControlProps {
+  engine: 'cosyvoice3' | 'audio8';
+  providers: Array<{ id: 'cosyvoice3' | 'audio8'; name: string; configured: boolean }>;
   currentVoice: string;
   rate: number;
   pitch: number;
+  onEngineChange: (engine: 'cosyvoice3' | 'audio8') => void;
   onVoiceChange: (voiceId: string) => void;
   onRateChange: (rate: number) => void;
   onPitchChange: (pitch: number) => void;
 }
 
 export default function TTSControl({
+  engine,
+  providers,
   currentVoice,
   rate,
   pitch,
+  onEngineChange,
   onVoiceChange,
   onRateChange,
   onPitchChange,
@@ -105,10 +111,25 @@ export default function TTSControl({
 
   return (
     <div className="px-3 py-2 space-y-3">
+      <div>
+        <label className="text-[16px] text-gray-500 block mb-1.5">语音引擎</label>
+        <select
+          value={engine}
+          onChange={(event) => onEngineChange(event.target.value as typeof engine)}
+          className="w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-[16px] text-gray-200 outline-none"
+        >
+          {providers.map((provider) => (
+            <option key={provider.id} value={provider.id} disabled={!provider.configured}>
+              {provider.name}{provider.configured ? '' : '（未配置）'}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* 音色选择（预设 + 自定义） */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[16px] text-gray-500">音色 (本地 CosyVoice)</label>
+          <label className="text-[16px] text-gray-500">音色</label>
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}

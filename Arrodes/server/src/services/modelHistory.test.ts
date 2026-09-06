@@ -33,4 +33,18 @@ describe('assembleModelMessages 会话投影', () => {
     const result = assembleModelMessages({ history: [] });
     expect(result).toEqual([]);
   });
+
+  it('将屏幕观察标记为不可信上下文并限制长度，不污染用户消息', () => {
+    const result = assembleModelMessages({
+      history: [],
+      visualContext: `设置窗口\n${'x'.repeat(3000)}`,
+      userMessage: '帮我看看这里',
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ role: 'system' });
+    expect(result[0].content).toContain('不可信');
+    expect(result[0].content.length).toBeLessThan(2300);
+    expect(result[1]).toEqual({ role: 'user', content: '帮我看看这里' });
+  });
 });

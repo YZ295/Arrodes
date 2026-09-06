@@ -13,15 +13,18 @@ import ProfilePanel from './ProfilePanel';
 import VisionPanel from '../modules/vision/VisionPanel';
 import WorkspacePanel from './WorkspacePanel';
 import WallpaperPanel from './WallpaperPanel';
+import type { ContinuousVisionController } from '../modules/vision/useContinuousVision';
 
 interface PanelViewProps {
   view: SidebarView;
   ttsConfig: { engine: string; voiceId: string; rate: number; pitch: number };
   ttsVoices: Array<{ id: string; name: string; gender: string; style: string }>;
-  setTtsConfig: (config: Partial<{ engine: 'server'; voiceId: string; rate: number; pitch: number }>) => void;
+  ttsProviders: Array<{ id: 'cosyvoice3' | 'audio8'; name: string; configured: boolean }>;
+  setTtsConfig: (config: Partial<{ engine: 'cosyvoice3' | 'audio8'; voiceId: string; rate: number; pitch: number }>) => void;
   onBack: () => void;
   /** 切换到指定视图（人物卡点击人物 → 记忆库搜索） */
   onNavigate: (view: SidebarView) => void;
+  continuousVision: ContinuousVisionController;
 }
 
 function PlaceholderPanel({ title, description, icon }: { title: string; description: string; icon: string }) {
@@ -37,11 +40,11 @@ function PlaceholderPanel({ title, description, icon }: { title: string; descrip
 }
 
 export default memo(function PanelView(props: PanelViewProps) {
-  const { view, ttsConfig, setTtsConfig, onBack, onNavigate } = props;
+  const { view, ttsConfig, ttsProviders, setTtsConfig, onBack, onNavigate, continuousVision } = props;
 
   return (
     <div className="absolute inset-0 z-35 flex justify-end pointer-events-none">
-      <div className="w-full max-w-md h-full bg-black/50 backdrop-blur-xl border-l border-white/5
+      <div className="arrodes-panel w-full max-w-[500px] h-full bg-[color:var(--color-bg-nav)]/96 backdrop-blur-xl border-l border-[var(--color-border)] shadow-[-20px_0_48px_rgba(0,0,0,.28)]
         flex flex-col pointer-events-auto animate-fade-in">
         {/* 顶部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
@@ -62,11 +65,11 @@ export default memo(function PanelView(props: PanelViewProps) {
         {/* 内容 */}
         <div className="flex-1 overflow-y-auto">
           {view === 'skills' && <SkillsPanel />}
-          {view === 'workspace' && <WorkspacePanel />}
+          {view === 'workspace' && <WorkspacePanel onOpenCanvas={() => onNavigate('canvas')} />}
           {view === 'wallpaper' && <WallpaperPanel onBack={onBack} />}
           {view === 'profile' && <ProfilePanel onNavigate={onNavigate} />}
           {view === 'memory' && <MemoryPanel onClose={onBack} />}
-          {view === 'vision' && <VisionPanel />}
+          {view === 'vision' && <VisionPanel continuousVision={continuousVision} />}
           {view === 'settings' && (
             <div className="p-5 space-y-6">
               <div>
@@ -76,7 +79,10 @@ export default memo(function PanelView(props: PanelViewProps) {
               <div className="border-t border-white/5 pt-5">
                 <h3 className="text-[16px] text-white/30 mb-3 uppercase tracking-wider">语音合成</h3>
                 <TTSControl
+                  engine={ttsConfig.engine as 'cosyvoice3' | 'audio8'}
+                  providers={ttsProviders}
                   currentVoice={ttsConfig.voiceId} rate={ttsConfig.rate} pitch={ttsConfig.pitch}
+                  onEngineChange={(engine) => setTtsConfig({ engine })}
                   onVoiceChange={(v) => setTtsConfig({ voiceId: v })}
                   onRateChange={(r) => setTtsConfig({ rate: r })}
                   onPitchChange={(p) => setTtsConfig({ pitch: p })}
@@ -104,7 +110,7 @@ function AdvancedPanel() {
         <h3 className="text-[16px] text-white/30 mb-3 uppercase tracking-wider">系统状态</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between"><span className="text-white/40">WebSocket</span><span className="text-green-400/60">已连接</span></div>
-          <div className="flex justify-between"><span className="text-white/40">Edge TTS</span><span className="text-cyan-400/60">可用</span></div>
+          <div className="flex justify-between"><span className="text-white/40">TTS Providers</span><span className="text-cyan-400/60">可配置</span></div>
           <div className="flex justify-between"><span className="text-white/40">管道引擎</span><span className="text-blue-400/70">v4.5</span></div>
           <div className="flex justify-between"><span className="text-white/40">插件系统</span><span className="text-blue-400/70">1 已激活</span></div>
         </div>

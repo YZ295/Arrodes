@@ -1,13 +1,13 @@
 /**
- * CosyVoice 2 本地 TTS 引擎代理（Engine B）
+ * CosyVoice 3 本地 TTS 引擎代理（Engine B）
  *
  * 职责：
  * - 懒启动 Python sidecar（首次请求时 spawn，避免拖累主服务启动）
  * - 健康检查：无响应判死重启
  * - 失败自动上报，由上层降级链决定是否切换
  *
- * 启动命令（cosyvoice conda 环境）：
- *   conda run -n cosyvoice python tts-sidecar/tts_sidecar.py --port 12001
+ * 启动命令（cosyvoice3 conda 环境）：
+ *   conda run -n cosyvoice3 python tts-sidecar/tts_sidecar.py --port 12003
  */
 import { spawn, ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -15,8 +15,8 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SIDECAR_PORT = 12001;
-const SIDECAR_URL = `http://127.0.0.1:${SIDECAR_PORT}`;
+const SIDECAR_PORT = Number(process.env.COSYVOICE3_PORT || 12003);
+const SIDECAR_URL = process.env.COSYVOICE3_SIDECAR_URL || `http://127.0.0.1:${SIDECAR_PORT}`;
 
 // sidecar 脚本路径：server/../tts-sidecar/tts_sidecar.py
 const SIDECAR_SCRIPT = resolve(__dirname, '../../tts-sidecar/tts_sidecar.py');
@@ -30,14 +30,56 @@ const DEV_PROJECT_DIRS = [
   'E:/project/Crow5/Arrodes/tts-sidecar/CosyVoice-unzip/cosyvoice-main',
 ];
 const PROJECT_DIR = DEV_PROJECT_DIRS.find((d) => d && existsSync(d)) || null;
+const MODEL_DIR = process.env.COSYVOICE3_MODEL_DIR
+  || (PROJECT_DIR ? join(PROJECT_DIR, 'pretrained_models', 'Fun-CosyVoice3-0.5B-2512') : null);
+
+function abortError(): Error {
+  const error = new Error('CosyVoice request aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError();
+}
+
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
+  return new Promise((resolveDelay, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolveDelay();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function linkedTimeoutSignal(parent: AbortSignal | undefined, timeoutMs: number) {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  parent?.addEventListener('abort', onAbort, { once: true });
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      clearTimeout(timer);
+      parent?.removeEventListener('abort', onAbort);
+    },
+  };
+}
 
 /** 找到可用的 conda 环境路径 */
 function findCondaPython(): string | null {
   const candidates = [
-    process.env.COSYVOICE_PYTHON, // 显式指定
-    'D:/Anaconda/envs/cosyvoice/python.exe',
-    'C:/ProgramData/Anaconda3/envs/cosyvoice/python.exe',
-    'C:/Users/29352/anaconda3/envs/cosyvoice/python.exe',
+    process.env.COSYVOICE3_PYTHON,
+    process.env.COSYVOICE_PYTHON, // 兼容旧变量名
+    'D:/Anaconda/envs/cosyvoice3/python.exe',
+    'C:/ProgramData/Anaconda3/envs/cosyvoice3/python.exe',
+    'C:/Users/29352/anaconda3/envs/cosyvoice3/python.exe',
     'D:/Anaconda/Scripts/conda.exe', // 兜底：用 conda run
   ];
   for (const c of candidates) {
@@ -53,9 +95,11 @@ class CosyVoiceEngine {
   private lastError: string | null = null;
 
   /** sidecar 是否已可用（健康检查通过） */
-  async checkAvailable(): Promise<boolean> {
+  async checkAvailable(signal?: AbortSignal): Promise<boolean> {
+    throwIfAborted(signal);
+    const linked = linkedTimeoutSignal(signal, 2000);
     try {
-      const res = await fetch(`${SIDECAR_URL}/health`, { signal: AbortSignal.timeout(2000) });
+      const res = await fetch(`${SIDECAR_URL}/health`, { signal: linked.signal });
       if (!res.ok) return false;
       const data = await res.json() as { status?: string };
       if (data.status === 'ok') {
@@ -64,18 +108,22 @@ class CosyVoiceEngine {
       }
       return false;
     } catch {
+      throwIfAborted(signal);
       return false;
+    } finally {
+      linked.dispose();
     }
   }
 
   /** 确保 sidecar 已启动（懒启动） */
-  async ensureStarted(): Promise<boolean> {
-    if (await this.checkAvailable()) return true;
+  async ensureStarted(signal?: AbortSignal): Promise<boolean> {
+    throwIfAborted(signal);
+    if (await this.checkAvailable(signal)) return true;
     if (this.starting) {
       // 已在启动中，等待就绪（最多 60s）
       for (let i = 0; i < 60; i++) {
-        await new Promise((r) => setTimeout(r, 1000));
-        if (await this.checkAvailable()) return true;
+        await abortableDelay(1000, signal);
+        if (await this.checkAvailable(signal)) return true;
       }
       return false;
     }
@@ -88,7 +136,7 @@ class CosyVoiceEngine {
 
     const condaPython = findCondaPython();
     if (!condaPython) {
-      this.lastError = '未找到 cosyvoice conda 环境（请先创建: conda create -n cosyvoice python=3.10）';
+      this.lastError = '未找到 cosyvoice3 conda 环境（请先创建: conda create -n cosyvoice3 python=3.10）';
       return false;
     }
 
@@ -97,7 +145,7 @@ class CosyVoiceEngine {
 
     // 用 conda run 或直接 python
     const args = condaPython.includes('conda.exe')
-      ? ['run', '-n', 'cosyvoice', 'python', script, '--port', String(SIDECAR_PORT)]
+      ? ['run', '-n', 'cosyvoice3', 'python', script, '--port', String(SIDECAR_PORT)]
       : [script, '--port', String(SIDECAR_PORT)];
 
     this.proc = spawn(condaPython, args, {
@@ -105,8 +153,10 @@ class CosyVoiceEngine {
       windowsHide: true,
       env: {
         ...process.env,
+        COSYVOICE_MODEL_KIND: '3',
         // 打包版：注入本机 CosyVoice 项目根（含模型权重），sidecar 找不到模型时兜底
         ...(PROJECT_DIR ? { COSYVOICE_PROJECT_DIR: PROJECT_DIR } : {}),
+        ...(MODEL_DIR ? { COSYVOICE_MODEL_DIR: MODEL_DIR } : {}),
       },
     });
 
@@ -120,8 +170,8 @@ class CosyVoiceEngine {
 
     // 等待就绪（模型加载可能需 30-60s）
     for (let i = 0; i < 90; i++) {
-      await new Promise((r) => setTimeout(r, 1000));
-      if (await this.checkAvailable()) {
+      await abortableDelay(1000, signal);
+      if (await this.checkAvailable(signal)) {
         this.starting = false;
         console.log('[CosyVoice] sidecar 就绪');
         return true;
@@ -139,22 +189,32 @@ class CosyVoiceEngine {
     rate = 1.0,
     promptWav?: string,
     promptText?: string,
+    signal?: AbortSignal,
   ): Promise<{ audioPath: string }> {
-    const ok = await this.ensureStarted();
+    const ok = await this.ensureStarted(signal);
     if (!ok) {
       this.failedCount++;
       throw new Error(`CosyVoice 不可用: ${this.lastError || '启动失败'}`);
     }
 
-    const res = await fetch(`${SIDECAR_URL}/synthesize`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text, voice, rate,
-        ...(promptWav ? { promptWav, promptText } : {}),
-      }),
-      signal: AbortSignal.timeout(120000), // 首次合成含模型加载，给足 2 分钟
-    });
+    const linked = linkedTimeoutSignal(signal, 120000);
+    let res: Response;
+    try {
+      res = await fetch(`${SIDECAR_URL}/synthesize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text, voice, rate,
+          ...(promptWav ? { promptWav, promptText } : {}),
+        }),
+        signal: linked.signal,
+      });
+    } catch (error) {
+      throwIfAborted(signal);
+      throw error;
+    } finally {
+      linked.dispose();
+    }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));

@@ -8,7 +8,7 @@
  * - 统一的 speak/synthesize 接口
  *
  * 当前引擎：
- * - server: Edge TTS（服务端合成，免费）
+ * - server-local: Fun-CosyVoice3（服务端本地合成）
  * - web: SpeechSynthesis（浏览器内置，零依赖）
  * - 预留: kokoro, chatTTS, elevenlabs
  */
@@ -145,7 +145,7 @@ export const EdgeTtsEngine: TtsEngine = {
       voice: voiceId,
       rate: options?.rate ?? 1.0,
       pitch: options?.pitch ?? 1.0,
-      engine: 'edge',
+      engine: 'cosyvoice3',
     });
     return {
       audioBase64: data.audioBase64,

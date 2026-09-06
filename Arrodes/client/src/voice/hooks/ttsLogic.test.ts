@@ -3,7 +3,13 @@
  * 锁定 C6 修复：本地 wav 音频必须可重播（旧逻辑反向判断导致失效）
  */
 import { describe, it, expect, vi } from 'vitest';
-import { canReplay, replayAudio } from './ttsLogic.js';
+import {
+  canReplay,
+  chooseConfiguredProvider,
+  createLinkedAbortController,
+  normalizeStoredProvider,
+  replayAudio,
+} from './ttsLogic.js';
 
 describe('canReplay（C6 回归）', () => {
   it('wav 音频（本地 CosyVoice）可重播', () => {
@@ -43,5 +49,52 @@ describe('replayAudio', () => {
     replayAudio(audio, onError);
     // play() 是异步 reject，需等微任务
     return Promise.resolve().then(() => expect(onError).toHaveBeenCalled());
+  });
+});
+
+describe('createLinkedAbortController', () => {
+  it('外部对话取消会同步中止 TTS 请求', () => {
+    const outer = new AbortController();
+    const linked = createLinkedAbortController(outer.signal);
+
+    outer.abort();
+
+    expect(linked.controller.signal.aborted).toBe(true);
+    linked.dispose();
+  });
+
+  it('TTS 自身停止不会反向中止外部对话', () => {
+    const outer = new AbortController();
+    const linked = createLinkedAbortController(outer.signal);
+
+    linked.controller.abort();
+
+    expect(outer.signal.aborted).toBe(false);
+    linked.dispose();
+  });
+});
+
+describe('chooseConfiguredProvider', () => {
+  const providers = [
+    { id: 'cosyvoice3', configured: true },
+    { id: 'audio8', configured: false },
+  ] as const;
+
+  it('保留仍已配置的 provider', () => {
+    expect(chooseConfiguredProvider('cosyvoice3', providers)).toBe('cosyvoice3');
+  });
+
+  it('已保存的 provider 失效时回退到首个已配置项', () => {
+    expect(chooseConfiguredProvider('audio8', providers)).toBe('cosyvoice3');
+  });
+});
+
+describe('normalizeStoredProvider', () => {
+  it.each(['cosyvoice2', 'server', 'local', 'edge', 'web'])('旧配置 %s 迁移到 cosyvoice3', (value) => {
+    expect(normalizeStoredProvider(value)).toBe('cosyvoice3');
+  });
+
+  it('保留 Audio8 配置', () => {
+    expect(normalizeStoredProvider('audio8')).toBe('audio8');
   });
 });
