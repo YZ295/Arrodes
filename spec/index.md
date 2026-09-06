@@ -1,0 +1,23 @@
+# 项目规格索引
+
+- 项目类型：`legacy`
+- 流程版本：`2`
+- 当前状态：[status.md](status.md)
+- 项目基线：[project.md](project.md)
+- 当前有效规格：[features/](features/)
+- 测试策略：[testing/](testing/)
+- 进行中变更：[changes/](changes/)
+- 历史归档：[archive/](archive/)
+
+每次 Session 先读取本文件和 `status.md`，再按任务读取相关文档。
+## 最近归档
+
+- [2026-07-24-fix3](archive/2026-07-24-fix3/)
+- [2026-08-13-desktop-shell](archive/2026-08-13-desktop-shell/)
+- [2026-08-16-agent-seminar](archive/2026-08-16-agent-seminar/)
+- [2026-08-16-seminar-multi](archive/2026-08-16-seminar-multi/)
+- [2026-08-16-seminar-context](archive/2026-08-16-seminar-context/)
+- [2026-08-24-dev-workflow](archive/2026-08-24-dev-workflow/)
+- [2026-08-24-inputbar-indent](archive/2026-08-24-inputbar-indent/)
+- [2026-08-24-codex-sdk](archive/2026-08-24-codex-sdk/)
+- [2026-08-24-wallpaper-plugin](archive/2026-08-24-wallpaper-plugin/)

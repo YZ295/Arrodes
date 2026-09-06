@@ -1,0 +1,31 @@
+node_modules/
+dist/
+.env
+*.log
+Arrodes/Plan/
+
+# 运行时数据（用户画像）
+data/
+# 一次性 TTS 实验脚本
+Arrodes/server/ab-test.mts
+Arrodes/server/verify-tts.mts
+Arrodes/server/test-tts-fix.mjs
+
+# 宸ュ叿鍐呴儴鏁版嵁 / 涓汉鏂囦欢 / 瀹為獙鐩綍
+.workbuddy/
+.freebuff/
+uploads/
+/tts-sidecar/
+Arrodes/server/v_bk.json
+TheFool/dist*/
+TheFool/build*/
+# db backup dirs (data archive)
+data-backup-*/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 鏈湴杩愯浜х墿锛堝惈鍑嵁锛岀姝㈠叆搴擄級
+.gateway.pid
+start-workbuddy-gateway.cmd

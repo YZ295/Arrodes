@@ -1,0 +1,61 @@
+{
+  "workflow_version": 2,
+  "project_kind": "legacy",
+  "protected_branches": [
+    "main",
+    "master"
+  ],
+  "quality_commands": [
+    {
+      "name": "vitest-server",
+      "command": [
+        "npm.cmd",
+        "--prefix",
+        "Arrodes/server",
+        "run",
+        "test"
+      ],
+      "required": true,
+      "enabled": true
+    },
+    {
+      "name": "vitest-client",
+      "command": [
+        "npm.cmd",
+        "--prefix",
+        "Arrodes/client",
+        "run",
+        "test"
+      ],
+      "required": true,
+      "enabled": true
+    },
+    {
+      "name": "tsc-server",
+      "command": [
+        "npm.cmd",
+        "--prefix",
+        "Arrodes/server",
+        "run",
+        "typecheck"
+      ],
+      "required": true,
+      "enabled": true
+    },
+    {
+      "name": "build-client",
+      "command": [
+        "npm.cmd",
+        "--prefix",
+        "Arrodes/client",
+        "run",
+        "build"
+      ],
+      "required": true,
+      "enabled": true
+    }
+  ],
+  "coverage_must_not_decrease_when_configured": true,
+  "remote": "github",
+  "merge_strategy": "squash"
+}

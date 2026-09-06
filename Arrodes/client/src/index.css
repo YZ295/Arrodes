@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/* 全局字号放大（Tailwind v4 覆盖默认刻度）：
+   原 xs=12px→13px, sm=14px→15px, base=16px→17px, lg=18px→19px, xl=20px→21px */
+@theme {
+  --text-xs: 0.8125rem;   /* 13px */
+  --text-xs--line-height: 1.3;
+  --text-sm: 0.9375rem;   /* 15px */
+  --text-sm--line-height: 1.45;
+  --text-base: 1.0625rem; /* 17px */
+  --text-base--line-height: 1.6;
+  --text-lg: 1.1875rem;   /* 19px */
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.3125rem;   /* 21px */
+  --text-xl--line-height: 1.4;
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-2xl--line-height: 1.35;
+}
+
+:root {
+  /* 主色：原金色改为蓝色（参照 Codex 桌面端黑+蓝主题） */
+  --color-home-gold: #3b82f6;
+  --color-accent: #3b82f6;
+  --color-accent-cyan: #22d3ee;
+  --color-accent-purple: #8B5CF6;
+  --color-bg-deep: #0a0d14;
+  --color-bg-glass: rgba(10, 13, 20, 0.72);
+  --color-text-primary: #f0f0f0;
+  --color-text-secondary: #a0a0b0;
+  --color-bubble-user: #3B82F6;
+  --color-bubble-ai: #374151;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(1100px 760px at 72% 18%, rgba(59, 130, 246, 0.08), transparent 60%),
+    radial-gradient(900px 680px at 20% 82%, rgba(139, 92, 246, 0.06), transparent 55%),
+    var(--color-bg-deep);
+  color: var(--color-text-primary);
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 镜片碎片弹出动画 — 字幕从虚空裂隙中逐字浮现 */
+@keyframes mirror-shard-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.3) rotateX(60deg);
+    filter: blur(8px);
+    text-shadow: 0 0 20px rgba(0, 255, 200, 0.8), 0 0 60px rgba(0, 255, 200, 0.4);
+  }
+  40% {
+    opacity: 0.6;
+    transform: translateY(4px) scale(1.05) rotateX(-5deg);
+    filter: blur(2px);
+    text-shadow: 0 0 12px rgba(0, 255, 200, 0.5), 0 0 30px rgba(0, 255, 200, 0.2);
+  }
+  70% {
+    opacity: 0.9;
+    transform: translateY(-1px) scale(0.98) rotateX(2deg);
+    filter: blur(0);
+    text-shadow: 0 0 6px rgba(0, 255, 200, 0.3), 0 0 15px rgba(0, 255, 200, 0.1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0);
+    filter: blur(0);
+    text-shadow: none;
+  }
+}
+
+@keyframes mirror-glitch {
+  0%, 100% { clip-path: inset(0 0 0 0); }
+  10% { clip-path: inset(20% 0 60% 0); }
+  20% { clip-path: inset(0 0 80% 0); }
+  30% { clip-path: inset(60% 0 0 0); }
+  40% { clip-path: inset(0 0 0 0); }
+}
+
+.char-shard {
+  display: inline-block;
+  animation: mirror-shard-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity, filter;
+}
+
+.char-glitch {
+  animation: mirror-glitch 0.3s ease-out 0.6s both;
+}
+
+/* 消息气泡淡入动画 */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* 统一聚焦态：柔和的琥珀色光环，替代默认蓝色描边 */
+input:focus, textarea:focus, button:focus-visible {
+  outline: none;
+}
+input:focus, textarea:focus {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4), 0 0 18px -6px rgba(59, 130, 246, 0.4);
+}

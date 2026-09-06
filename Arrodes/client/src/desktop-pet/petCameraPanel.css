@@ -1,0 +1,85 @@
+/* 桌宠机位调试面板 */
+
+.pet-camera-panel {
+  position: absolute;
+  z-index: 6;
+  top: 16px;
+  right: 14px;
+  width: 216px;
+  padding: 12px 14px;
+  border: 1px solid rgba(174, 184, 200, .3);
+  border-radius: 14px;
+  background: rgba(10, 14, 20, .96);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .4);
+  color: #e8f1ff;
+}
+
+.pet-camera-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pet-camera-panel__header button {
+  border: 0;
+  background: transparent;
+  color: #9db2cf;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.pet-camera-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+}
+
+.pet-camera-panel__label {
+  width: 56px;
+  font-size: 11px;
+  color: #b8c8de;
+  flex-shrink: 0;
+}
+
+.pet-camera-panel__row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: #6fa8ff;
+}
+
+.pet-camera-panel__value {
+  width: 40px;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #8fb6ef;
+}
+
+.pet-camera-panel__footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pet-camera-panel__footer button {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid rgba(174, 184, 200, .3);
+  border-radius: 9px;
+  background: rgba(30, 40, 58, .9);
+  color: #cfe0f5;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pet-camera-panel__footer button[data-role="cam-save"] {
+  border-color: rgba(111, 168, 255, .55);
+}
+
+.pet-camera-panel__footer button:hover {
+  filter: brightness(1.2);
+}
