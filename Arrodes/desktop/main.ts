@@ -10,7 +10,7 @@
  * 后端子进程用 process.execPath 里内置的 Node 运行，无需系统 Node。
  */
 import { app, BrowserWindow, ipcMain, shell, dialog, session, screen } from 'electron';
-import { fork, ChildProcess } from 'node:child_process';
+import { fork, spawn, ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
@@ -246,9 +246,54 @@ ipcMain.on('pet:set-interactive', (event, interactive: boolean) => {
 });
 
 // ---- 生命周期 ----
+/** 桌宠独立模式：--pet 启动时只开桌宠窗，不开主界面 */
+const PET_ONLY = process.argv.includes('--pet');
+
+/** 拉起 Mage-VL 视觉 sidecar（桌宠模式需要屏幕观察；路径由环境变量提供，未配置则跳过） */
+let visionProc: ChildProcess | null = null;
+function startVisionSidecar(): void {
+  const python = process.env.ARRODES_MAGEVL_PYTHON;
+  const script = join(__dirname, '../vision-sidecar/mage_vl_sidecar.py');
+  if (!python || !existsSync(script)) {
+    console.log('[Desktop] 未配置 ARRODES_MAGEVL_PYTHON，跳过视觉 sidecar（屏幕观察将不可用）');
+    return;
+  }
+  visionProc = spawn(python, [script], {
+    env: {
+      ...process.env,
+      HF_HOME: process.env.ARRODES_HF_HOME || process.env.HF_HOME || '',
+      HF_HUB_OFFLINE: '1',
+      TRANSFORMERS_OFFLINE: '1',
+      PYTHONIOENCODING: 'utf-8',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  const proc = visionProc;
+  proc.stdout?.on('data', (d: Buffer) => console.log('[Mage-VL]', d.toString().trim()));
+  proc.stderr?.on('data', (d: Buffer) => console.log('[Mage-VL]', d.toString().trim()));
+  proc.on('exit', (code) => {
+    console.log(`[Desktop] 视觉 sidecar 退出（${String(code)}）`);
+    if (visionProc === proc) visionProc = null;
+  });
+}
+
+function stopVisionSidecar(): void {
+  if (visionProc) {
+    try { visionProc.kill(); } catch { /* ignore */ }
+    visionProc = null;
+  }
+}
+
 app.whenReady().then(async () => {
   try {
     await startBackend();
+    if (PET_ONLY) {
+      // 桌宠模式：视觉 sidecar + 透明桌宠窗，不开主界面
+      startVisionSidecar();
+      await createPetWindow();
+      return;
+    }
     await createWindow();
     await createPetWindow();
   } catch (err) {
@@ -258,23 +303,29 @@ app.whenReady().then(async () => {
     if (backendProc) {
       try { backendProc.kill(); } catch { /* ignore */ }
     }
+    if (PET_ONLY) {
+      // 桌宠模式失败也保持安静退出（避免误弹错误主窗）
+      app.quit();
+      return;
+    }
     // 失败也开窗口显示错误信息，避免"双击没反应"
     mainWindow = new BrowserWindow({ width: 800, height: 500, title: '阿罗德斯 - 启动错误' });
     mainWindow.loadURL(`data:text/html,<h2 style="font-family:sans-serif;color:#e74c3c">启动失败</h2><pre style="font-family:monospace;color:#888">${encodeURIComponent(String(err))}</pre>`);
   }
 
   app.on('activate', () => {
-    if (!mainWindow) void createWindow();
+    if (!mainWindow && !PET_ONLY) void createWindow();
     if (!petWindow) void createPetWindow();
   });
 });
 
 app.on('window-all-closed', () => {
-  // 停后端再退出
+  // 停后端与视觉 sidecar 再退出
   quitting = true;
   if (backendProc) {
     try { backendProc.kill(); } catch { /* ignore */ }
   }
+  stopVisionSidecar();
   app.quit();
 });
 
@@ -283,4 +334,5 @@ app.on('before-quit', () => {
   if (backendProc) {
     try { backendProc.kill(); } catch { /* ignore */ }
   }
+  stopVisionSidecar();
 });

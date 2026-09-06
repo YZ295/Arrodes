@@ -8,12 +8,56 @@ import {
   type VisionObservation,
 } from './continuousVision';
 
-const DEFAULT_INTERVAL_MS = 3_000;
+const DEFAULT_INTERVAL_MS = 10_000;
 const MAX_FRAME_WIDTH = 1_280;
 const THUMBNAIL_SIZE = { width: 64, height: 36 };
 // 亮度标准差低于该阈值视为近乎纯色的黑帧/空帧（屏幕共享切换窗口时常见），
 // 直接跳过，避免模型对无信息帧编造「典型屏幕内容」。
 const MIN_FRAME_LUMA_STD = 2.5;
+const DEFAULT_CHANGE_THRESHOLD = 10;
+
+const INTERVAL_STORAGE_KEY = 'arrodes_vision_interval_ms';
+const THRESHOLD_STORAGE_KEY = 'arrodes_vision_change_threshold';
+
+function clampNumber(value: number, min: number, max: number, fallback: number): number {
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+}
+
+/** 采样间隔（毫秒）：可调范围 3s~60s。调大 = 更省 GPU（治卡顿），代价是反应变慢 */
+export function loadObservationInterval(): number {
+  try {
+    const raw = Number(localStorage.getItem(INTERVAL_STORAGE_KEY));
+    return clampNumber(raw, 3_000, 60_000, DEFAULT_INTERVAL_MS);
+  } catch {
+    return DEFAULT_INTERVAL_MS;
+  }
+}
+
+export function saveObservationInterval(ms: number): void {
+  try {
+    localStorage.setItem(INTERVAL_STORAGE_KEY, String(clampNumber(ms, 3_000, 60_000, DEFAULT_INTERVAL_MS)));
+  } catch {
+    // 忽略
+  }
+}
+
+/** 场景变化阈值（0~100）：调大 = 更不明显的变化才触发推理（更省 GPU） */
+export function loadChangeThreshold(): number {
+  try {
+    const raw = Number(localStorage.getItem(THRESHOLD_STORAGE_KEY));
+    return clampNumber(raw, 2, 40, DEFAULT_CHANGE_THRESHOLD);
+  } catch {
+    return DEFAULT_CHANGE_THRESHOLD;
+  }
+}
+
+export function saveChangeThreshold(value: number): void {
+  try {
+    localStorage.setItem(THRESHOLD_STORAGE_KEY, String(clampNumber(value, 2, 40, DEFAULT_CHANGE_THRESHOLD)));
+  } catch {
+    // 忽略
+  }
+}
 
 export interface ContinuousVisionController {
   active: boolean;
@@ -138,8 +182,10 @@ export function useContinuousVision(isSpeaking: boolean): ContinuousVisionContro
       setActive(true);
 
       const runId = ++runIdRef.current;
+      const intervalMs = loadObservationInterval();
       const sampler = new ContinuousVisionSampler({
         analyze: (imageBase64) => analyzeScreen(imageBase64, goalRef.current),
+        threshold: loadChangeThreshold(),
       });
       const loop = async () => {
         if (runId !== runIdRef.current) return;
@@ -158,7 +204,7 @@ export function useContinuousVision(isSpeaking: boolean): ContinuousVisionContro
             setAnalyzing(false);
           }
         }
-        if (runId === runIdRef.current) timerRef.current = setTimeout(loop, DEFAULT_INTERVAL_MS);
+        if (runId === runIdRef.current) timerRef.current = setTimeout(loop, intervalMs);
       };
       stream.getVideoTracks()[0]?.addEventListener('ended', stop, { once: true });
       void loop();

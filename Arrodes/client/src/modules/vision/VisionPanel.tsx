@@ -6,6 +6,12 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useCamera } from './useCamera';
 import { useVisionStatus } from './useVisionStatus';
 import type { ContinuousVisionController } from './useContinuousVision';
+import {
+  loadObservationInterval,
+  saveObservationInterval,
+  loadChangeThreshold,
+  saveChangeThreshold,
+} from './useContinuousVision';
 
 /* ============================================================
  * CameraPreview — 摄像头实时预览
@@ -159,6 +165,8 @@ export default function VisionPanel({ continuousVision }: { continuousVision?: C
     model: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [obsIntervalMs, setObsIntervalMs] = useState(() => loadObservationInterval());
+  const [obsThreshold, setObsThreshold] = useState(() => loadChangeThreshold());
 
   const {
     stream,
@@ -307,6 +315,42 @@ export default function VisionPanel({ continuousVision }: { continuousVision?: C
               className="min-h-11 w-full rounded-lg border border-[var(--color-border)] bg-black/20 px-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-blue-400/60"
             />
           </label>
+          <div className="mb-3 grid grid-cols-2 gap-3 rounded-lg border border-white/8 bg-black/15 p-2.5">
+            <label className="block">
+              <span className="mb-1 block text-xs text-[var(--color-text-secondary)]">采样间隔 {Math.round(obsIntervalMs / 1000)}s（调大更省 GPU）</span>
+              <input
+                aria-label="观察采样间隔"
+                type="range"
+                min={3}
+                max={60}
+                step={1}
+                value={Math.round(obsIntervalMs / 1000)}
+                onChange={(event) => {
+                  const ms = Number(event.target.value) * 1000;
+                  setObsIntervalMs(ms);
+                  saveObservationInterval(ms);
+                }}
+                className="w-full accent-blue-400"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-[var(--color-text-secondary)]">变化灵敏度阈值 {obsThreshold}（调大更省 GPU）</span>
+              <input
+                aria-label="画面变化灵敏度"
+                type="range"
+                min={2}
+                max={40}
+                step={1}
+                value={obsThreshold}
+                onChange={(event) => {
+                  const v = Number(event.target.value);
+                  setObsThreshold(v);
+                  saveChangeThreshold(v);
+                }}
+                className="w-full accent-blue-400"
+              />
+            </label>
+          </div>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className={continuousVision.active ? 'text-sm text-green-300' : 'text-sm text-[var(--color-text-primary)]'}>

@@ -150,7 +150,8 @@ async function doStartLive2dPet(container: HTMLElement, modelUrl: string): Promi
     };
   } catch (cause) {
     // 失败即清理：半初始化的画布不能留在 DOM 里（会叠加在 PNG 回退之上并泄漏内存）
-    app.destroy(true, { children: true, removeView: true });
+    (app.view as HTMLCanvasElement | undefined)?.remove();
+    app.destroy(true, { children: true });
     throw cause;
   }
 }
