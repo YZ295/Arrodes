@@ -9,6 +9,7 @@
  *   执行结果会自动注入为：系统通知: 技能执行结果: ...
  */
 import { actionGate, classifyAction } from '../services/actionGate.js';
+import { getActionScope, withActionScope } from '../services/actionContext.js';
 
 // ===== 技能接口 =====
 
@@ -72,12 +73,14 @@ export function registerToolPostHook(hook: ToolPostHook): () => void {
 registerToolPreHook(async (skill, args) => {
   const risk = skill.risk ?? classifyAction(skill.name);
   if (risk !== 'high') return null;
-  if (actionGate.isAutoApprove()) return null;
+  const scope = getActionScope();
+  if (!scope) return '错误: 高风险操作缺少工作区授权上下文，已拒绝执行。';
   const outcome = actionGate.request(
     skill.name,
     args,
     skill.describe?.(args) ?? `执行技能 ${skill.name}`,
-    skill.execute,
+    (confirmedArgs) => withActionScope(scope, () => skill.execute(confirmedArgs)),
+    scope.owner,
   );
   if (outcome.pending) {
     return `⚠️ 需要你确认：${outcome.pending.description}（ID: ${outcome.pending.id.slice(0, 8)}）。回复「确认」执行，回复「取消」拒绝。`;

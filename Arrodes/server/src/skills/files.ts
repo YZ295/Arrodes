@@ -9,6 +9,8 @@
 import * as path from 'node:path';
 import { registerSkill, type SkillArg } from './registry.js';
 import { getFsProvider } from '../services/fsProvider.js';
+import { getActionScope } from '../services/actionContext.js';
+import { assertAuthorizedPath } from '../services/fileAuthorization.js';
 
 interface FileSkillSpec {
   name: string;
@@ -19,31 +21,23 @@ interface FileSkillSpec {
   run: (args: Record<string, unknown>) => string;
 }
 
-/** 写/删/移动/复制时的系统路径保护（执行器内部防线） */
-const DANGEROUS_SEGMENTS = [
-  'C:\\Windows', 'C:\\Program Files', 'System32',
-  '/etc', '/boot', '/usr', '/bin',
-  '.bashrc', '.zshrc', '.env',
-];
-
-function guardMutate(abs: string): void {
-  const normalized = abs.replace(/\\/g, '/').toLowerCase();
-  for (const segment of DANGEROUS_SEGMENTS) {
-    if (normalized.includes(segment.replace(/\\/g, '/').toLowerCase())) {
-      throw new Error(`安全拦截: 禁止操作系统路径 "${segment}"`);
-    }
-  }
+function authorizedRoots(): string[] {
+  const scope = getActionScope();
+  if (!scope) throw new Error('缺少文件授权上下文，已拒绝操作');
+  return scope.getAuthorizedRoots();
 }
 
-function resolvePath(input: unknown): string {
+function resolvePath(input: unknown, allowMissing = false): string {
   const p = String(input ?? '').trim();
   if (!p) throw new Error('路径不能为空');
-  return path.resolve(p);
+  return assertAuthorizedPath(p, authorizedRoots(), { allowMissing });
 }
 
 function listDirectory(args: Record<string, unknown>): string {
   const fs = getFsProvider();
-  const dir = args.path ? resolvePath(args.path) : process.cwd();
+  const roots = authorizedRoots();
+  if (roots.length === 0) throw new Error('当前工作区没有已授权的文件目录');
+  const dir = args.path ? resolvePath(args.path) : resolvePath(roots[0]);
   if (!fs.exists(dir)) throw new Error(`目录不存在: ${dir}`);
   const entries = fs.readdir(dir);
   if (entries.length === 0) return '目录为空';
@@ -94,10 +88,9 @@ function getFileInfo(args: Record<string, unknown>): string {
 
 function writeFile(args: Record<string, unknown>): string {
   const fs = getFsProvider();
-  const filePath = resolvePath(args.path);
+  const filePath = resolvePath(args.path, true);
   const content = String(args.content || '');
   const overwrite = args.overwrite === true;
-  guardMutate(filePath);
   fs.mkdirp(path.dirname(filePath));
   if (!overwrite && fs.exists(filePath)) {
     fs.appendFile(filePath, '\n' + content);
@@ -111,9 +104,8 @@ function writeFile(args: Record<string, unknown>): string {
 
 function createFile(args: Record<string, unknown>): string {
   const fs = getFsProvider();
-  const filePath = resolvePath(args.path);
+  const filePath = resolvePath(args.path, true);
   const content = String(args.content ?? '');
-  guardMutate(filePath);
   if (fs.exists(filePath)) throw new Error(`文件已存在: ${filePath}`);
   fs.mkdirp(path.dirname(filePath));
   fs.writeFile(filePath, content);
@@ -124,7 +116,6 @@ function createFile(args: Record<string, unknown>): string {
 function deleteFile(args: Record<string, unknown>): string {
   const fs = getFsProvider();
   const filePath = resolvePath(args.path);
-  guardMutate(filePath);
   if (!fs.exists(filePath)) throw new Error(`路径不存在: ${filePath}`);
   const stat = fs.stat(filePath);
   if (stat.isDirectory) {
@@ -140,8 +131,7 @@ function deleteFile(args: Record<string, unknown>): string {
 function moveFile(args: Record<string, unknown>): string {
   const fs = getFsProvider();
   const source = resolvePath(args.source);
-  const target = resolvePath(args.target);
-  guardMutate(target);
+  const target = resolvePath(args.target, true);
   if (!fs.exists(source)) throw new Error(`源不存在: ${source}`);
   fs.mkdirp(path.dirname(target));
   fs.rename(source, target);
@@ -152,8 +142,7 @@ function moveFile(args: Record<string, unknown>): string {
 function copyFile(args: Record<string, unknown>): string {
   const fs = getFsProvider();
   const source = resolvePath(args.source);
-  const target = resolvePath(args.target);
-  guardMutate(target);
+  const target = resolvePath(args.target, true);
   if (!fs.exists(source)) throw new Error(`源不存在: ${source}`);
   fs.mkdirp(path.dirname(target));
   fs.copyFile(source, target);
@@ -186,9 +175,9 @@ registerFileSkill({
   readOnly: true,
   description: '列出指定目录下的文件和文件夹。当用户说"看看目录里有什么""列出文件"时使用。',
   args: [
-    { name: 'path', type: 'string', required: false, description: '目录路径，默认当前工作目录' },
+    { name: 'path', type: 'string', required: false, description: '目录路径，默认工作区的首个已授权目录' },
   ],
-  describe: (args) => `列出目录 ${String(args.path ?? process.cwd())}`,
+  describe: (args) => `列出目录 ${String(args.path ?? '工作区的首个已授权目录')}`,
   run: listDirectory,
 });
 

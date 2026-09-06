@@ -57,6 +57,24 @@ describe('工具执行管线', () => {
     dispose();
   });
 
+  it('高风险技能没有会话授权上下文时拒绝创建待确认项', async () => {
+    let executed = false;
+    registerSkill({
+      name: '__missing_scope_high_risk__',
+      description: 'x',
+      args: [],
+      risk: 'high',
+      execute: async () => {
+        executed = true;
+        return 'ran';
+      },
+    });
+
+    await expect(executeToolCall('__missing_scope_high_risk__', {}))
+      .resolves.toContain('缺少工作区授权上下文');
+    expect(executed).toBe(false);
+  });
+
   it('禁用技能后 executeToolCall 拒绝、buildSkillsPrompt 不包含（profile 组合）', async () => {
     registerSkill({
       name: '__profile_disable__',

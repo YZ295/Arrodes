@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools==81.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arrodes-magevl-image-only-mamba"
+version = "0.1.0"
+description = "Fail-closed optional-import shim for Mage-VL single-image inference; not Mamba"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["mamba_ssm*"]

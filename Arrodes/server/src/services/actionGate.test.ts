@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ActionGate, classifyAction, matchConfirmIntent, DEFAULT_RISK } from './actionGate.js';
 
+const ownerA = { localUserId: 'local-user', workspaceId: 'workspace-a', sessionId: 'session-a' };
+const ownerB = { localUserId: 'local-user', workspaceId: 'workspace-b', sessionId: 'session-b' };
+
 function makeGate(now: () => number = () => 1000): ActionGate {
   return new ActionGate({ ttlMs: 5000, maxPending: 2, now });
 }
@@ -90,6 +93,17 @@ describe('actionGate 分级授权', () => {
     const result = await confirmed.executor!(confirmed.args);
     expect(result).toBe('done');
     expect(calls).toEqual(['executed']);
+  });
+
+  it('待确认动作只能由其工作区和会话所有者查看、确认或取消', () => {
+    const gate = makeGate();
+    const pending = gate.request('type_text', { text: 'x' }, '输入 x', undefined, ownerA).pending!;
+
+    expect(gate.listForOwner(ownerA)).toHaveLength(1);
+    expect(gate.listForOwner(ownerB)).toEqual([]);
+    expect(gate.confirmForOwner(pending.id, ownerB)).toBeUndefined();
+    expect(gate.getForOwner(pending.id, ownerA)?.id).toBe(pending.id);
+    expect(gate.denyForOwner(pending.id, ownerA)?.id).toBe(pending.id);
   });
 });
 

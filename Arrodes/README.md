@@ -84,6 +84,10 @@ modelscope download --model iic/CosyVoice2-0.5B --local_dir tts-sidecar/CosyVoic
 huggingface-cli download --local-dir tts-sidecar/CosyVoice-unzip/cosyvoice-main/pretrained_models/CosyVoice2-0.5B FunAudioLLM/CosyVoice2-0.5B
 ```
 
+### 可选：Mage-VL 本地视觉
+
+将 `server/.env` 的 `VISION_PROVIDER` 设为 `magevl`，按 [Mage-VL Windows 安装与启动说明](vision-sidecar/README.md) 安装独立 Python 环境并启动侧车。Vision 面板会检查 `/api/v1/vision/status`，显示模型、冷启动状态及离线恢复步骤。侧车不由 Electron 自动启动，也不包含在桌面安装包中。
+
 ## 🧪 测试
 
 ```bash

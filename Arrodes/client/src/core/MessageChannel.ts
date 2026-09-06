@@ -194,7 +194,9 @@ export class MessageChannel {
 
   private doConnect(): void {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:3002';
+    // 浏览器开发模式经 Vite 的同源 WS 代理注入临时本机令牌；
+    // Electron/生产静态托管则自然解析为后端自身的 host。
+    const wsHost = import.meta.env.VITE_WS_HOST || window.location.host;
     const wsUrl = `${protocol}//${wsHost}${this.config.wsPath}`;
 
     const ws = new WebSocket(wsUrl);

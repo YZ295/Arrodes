@@ -3,7 +3,6 @@
  * Express + WebSocket 服务器
  */
 import express from 'express';
-import cors from 'cors';
 import { createServer } from 'http';
 import { existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -71,13 +70,18 @@ setSkillMode(loadPersistedMode());
 // 注册配置驱动的自定义智能体（后续接新 CLI agent：改 data/custom-agents.json 即可）
 registerCustomAgents(loadCustomAgents(customAgentsFile()));
 import { startMainloop } from './services/mainloop.js';
+import { createLocalAccessPolicy } from './services/localAccess.js';
 
 const app = express();
 const server = createServer(app);
+const localAccess = createLocalAccessPolicy({
+  token: config.localAccessToken,
+  uiOrigin: config.uiOrigin,
+});
 
 // ---- 中间件 ----
-app.use(cors());
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '14mb' }));
 
 // ---- 初始化 ----
 initSchema();
@@ -87,6 +91,9 @@ initModelRegistry();
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', version: '0.1.0' });
 });
+
+// 健康检查之外的 API 只由当前 Electron 窗口携带的本地临时凭据访问。
+app.use('/api', localAccess.middleware);
 
 // ---- 路由 (v1) ----
 app.use('/api/v1/sessions', createSessionRouter());
@@ -199,11 +206,18 @@ if (config.nodeEnv === 'production') {
 }
 
 // ---- WebSocket ----
-const wss = new WebSocketServer({ server, path: '/v1/chat' });
+const wss = new WebSocketServer({
+  server,
+  path: '/v1/chat',
+  verifyClient: (info, done) => {
+    const result = localAccess.authorizeWebSocket(info.req);
+    done(result.ok, result.status, result.ok ? undefined : 'Unauthorized');
+  },
+});
 wss.on('connection', createWebSocketHandler);
 
 // ---- 启动 ----
-server.listen(config.port, () => {
+server.listen(config.port, config.host, () => {
   console.log(`[Arodes] 服务器已启动 -> http://localhost:${config.port}`);
   console.log(`[Arodes] WebSocket 路径 -> ws://localhost:${config.port}/v1/chat`);
 });

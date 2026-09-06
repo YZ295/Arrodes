@@ -67,8 +67,8 @@ export default memo(function NeonInputBar({
     <div className="w-full max-w-3xl">
       {/* 深黑圆角卡片（DSH InputBar .card：22px、细边框、轻阴影、聚焦蓝光） */}
       <div
-        className="flex flex-col gap-2.5 rounded-[22px] border bg-[#17181b] transition-all duration-200
-          border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.45)] pt-2.5
+        className="flex flex-col gap-2.5 rounded-[20px] border bg-[color:var(--color-bg-elevated)] transition-all duration-200
+          border-[var(--color-border)] shadow-[0_14px_38px_rgba(0,0,0,0.32)] pt-2.5
           focus-within:border-blue-500/60 focus-within:shadow-[0_0_0_1px_rgba(59,130,246,0.25),0_8px_32px_rgba(0,0,0,0.45)]"
       >
         {/* 输入区：透明背景 + 蓝色光标 + 浅灰占位符 */}

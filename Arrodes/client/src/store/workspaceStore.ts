@@ -15,6 +15,8 @@ export interface WorkspaceInfo {
   status: 'active' | 'archived';
   config?: {
     projectDir?: string;
+    /** 项目外、由用户显式授权给本工作区的目录。 */
+    authorizedDirs?: string[];
     permission?: 'default' | 'full';
     canvas?: Record<string, { x: number; y: number }>;
   };

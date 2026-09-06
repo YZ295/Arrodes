@@ -187,14 +187,16 @@ export default function AgentChatPanel({
           </button>
           <button
             onClick={() => onUpdateWorkspace?.({ permission: permission === 'full' ? 'default' : 'full' })}
-            title={permission === 'full' ? '全部权限：任务自动执行，不确认' : '默认权限：高风险任务需确认'}
+            title={permission === 'full'
+              ? '外部 Agent 任务可直接派发；阿罗德斯本体的高风险操作仍需逐项确认'
+              : '派发外部 Agent 任务前需确认'}
             className={`text-[16px] px-2 py-1 rounded-lg border transition-colors ${
               permission === 'full'
                 ? 'bg-red-500/15 border-red-400/30 text-red-300 hover:bg-red-500/25'
                 : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80'
             }`}
           >
-            {permission === 'full' ? '全部权限' : '默认权限'}
+            {permission === 'full' ? 'Agent 直派' : '确认派发'}
           </button>
           <button
             onClick={() => setVoiceOn((v) => !v)}

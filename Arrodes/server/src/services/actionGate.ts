@@ -2,6 +2,18 @@ import { randomUUID } from 'node:crypto';
 
 export type Risk = 'low' | 'high';
 
+export interface ActionOwner {
+  localUserId: string;
+  workspaceId: string;
+  sessionId: string;
+}
+
+const SYSTEM_ACTION_OWNER: ActionOwner = {
+  localUserId: 'system',
+  workspaceId: 'system',
+  sessionId: 'system',
+};
+
 export interface PendingAction {
   id: string;
   skill: string;
@@ -9,6 +21,7 @@ export interface PendingAction {
   description: string;
   risk: Risk;
   createdAt: number;
+  owner: ActionOwner;
   /** 确认后的直通执行器（绕过技能内门禁，避免二次排队） */
   executor?: (args: Record<string, unknown>) => Promise<string>;
 }
@@ -61,7 +74,6 @@ export class ActionGate {
   private ttlMs: number;
   private maxPending: number;
   private now: () => number;
-  private autoApprove = false;
 
   constructor(opts: { ttlMs?: number; maxPending?: number; now?: () => number } = {}) {
     this.ttlMs = opts.ttlMs ?? 5 * 60 * 1000;
@@ -69,20 +81,12 @@ export class ActionGate {
     this.now = opts.now ?? (() => Date.now());
   }
 
-  /** 全部权限：高风险操作自动放行（不生成待确认项） */
-  setAutoApprove(v: boolean): void {
-    this.autoApprove = v;
-  }
-
-  isAutoApprove(): boolean {
-    return this.autoApprove;
-  }
-
   request(
     skill: string,
     args: Record<string, unknown>,
     description: string,
     executor?: (args: Record<string, unknown>) => Promise<string>,
+    owner: ActionOwner = SYSTEM_ACTION_OWNER,
   ): ActionRequestOutcome {
     this.prune();
     const risk = classifyAction(skill);
@@ -97,6 +101,7 @@ export class ActionGate {
       description,
       risk,
       createdAt: this.now(),
+      owner,
       ...(executor ? { executor } : {}),
     };
     this.pending.set(item.id, item);
@@ -118,9 +123,27 @@ export class ActionGate {
     return latest;
   }
 
+  getForOwner(id: string, owner: ActionOwner): PendingAction | undefined {
+    const item = this.get(id);
+    return item && sameOwner(item.owner, owner) ? item : undefined;
+  }
+
+  getLatestForOwner(owner: ActionOwner): PendingAction | null {
+    this.prune();
+    let latest: PendingAction | null = null;
+    for (const item of this.pending.values()) {
+      if (sameOwner(item.owner, owner) && (!latest || item.createdAt >= latest.createdAt)) latest = item;
+    }
+    return latest;
+  }
+
   list(): PendingAction[] {
     this.prune();
     return Array.from(this.pending.values()).sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  listForOwner(owner: ActionOwner): PendingAction[] {
+    return this.list().filter((item) => sameOwner(item.owner, owner));
   }
 
   confirm(id: string): PendingAction | undefined {
@@ -130,8 +153,17 @@ export class ActionGate {
     return item;
   }
 
+  confirmForOwner(id: string, owner: ActionOwner): PendingAction | undefined {
+    const item = this.getForOwner(id, owner);
+    return item ? this.confirm(item.id) : undefined;
+  }
+
   deny(id: string): PendingAction | undefined {
     return this.confirm(id);
+  }
+
+  denyForOwner(id: string, owner: ActionOwner): PendingAction | undefined {
+    return this.confirmForOwner(id, owner);
   }
 
   private prune(): void {
@@ -140,6 +172,12 @@ export class ActionGate {
       if (item.createdAt < cutoff) this.pending.delete(id);
     }
   }
+}
+
+function sameOwner(a: ActionOwner, b: ActionOwner): boolean {
+  return a.localUserId === b.localUserId
+    && a.workspaceId === b.workspaceId
+    && a.sessionId === b.sessionId;
 }
 
 export const actionGate = new ActionGate();

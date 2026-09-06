@@ -14,9 +14,7 @@
  */
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import AudioVisualizer from './AudioVisualizer';
-import MirrorShardText from './MirrorShardText';
 import StatusBar from './StatusBar';
-import BorderBeam from './BorderBeam';
 import AgentStatusOrb from './AgentStatusOrb';
 import NeonInputBar from './NeonInputBar';
 import type { PermissionLevel } from './composer/PermissionSelect';
@@ -32,6 +30,7 @@ interface ChatOverlayProps {
   interimText: string;
   isSpeaking: boolean;
   ttsError: string | null;
+  wakeListening?: boolean;
   error: string | null;
   showMemoryToast: boolean;
   memoryToastText: string;
@@ -77,7 +76,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
   };
 
   // 最新的 AI 消息和用户消息
-  const lastAiMsg = [...messages].reverse().find((m) => m.role === 'assistant');
   const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
 
   // 自动滚动到底部（新消息或内容增长时）
@@ -119,11 +117,14 @@ export default function ChatOverlay(props: ChatOverlayProps) {
       <StatusBar
         isConnected={isConnected}
         isSpeaking={isSpeaking}
+        error={error}
+        wakeListening={props.wakeListening}
         ttsError={ttsError}
         uiHidden={uiHidden}
         onToggleUi={toggleUiHidden}
         isMuted={isMuted}
         onToggleMuted={toggleMuted}
+        onReplayTTS={replayTTS}
       />
 
       {/* 顶部：完整对话消息列表（可滚动，水平居中） */}
@@ -138,12 +139,15 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         <div className="w-full max-w-2xl flex flex-col justify-end gap-2 min-h-full">
           {messages.length === 0 && !isLoading ? (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-white/20 tracking-wider">向阿罗德斯问点什么吧</p>
+              <div className="max-w-md text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-[14px] border border-blue-400/20 bg-blue-500/10 text-lg font-semibold text-blue-300">A</div>
+                <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">从一个清晰的目标开始</h1>
+                <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">描述你要完成的工作，或先选择项目、模式与权限。阿罗德斯会在当前工作区持续协作。</p>
+              </div>
             </div>
           ) : (
             messages.map((m) => {
               const isUser = m.role === 'user';
-              const isLastAi = m.id === lastAiMsg?.id;
               // 最新 AI 消息：边框光束（border-beam 效果，视觉强调 AI 活跃）
               const bubble = (
                 <div
@@ -153,27 +157,12 @@ export default function ChatOverlay(props: ChatOverlayProps) {
                       : 'bg-white/5 border border-white/10 text-white/85'
                   }`}
                 >
-                  {!isUser && isLastAi ? (
-                    <MirrorShardText
-                      text={m.content}
-                      charDelay={12}
-                      color="#e0f7fa"
-                      className="text-[15px] md:text-[17px]"
-                    />
-                  ) : (
-                    m.content
-                  )}
+                  {m.content}
                 </div>
               );
               return (
                 <div key={m.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                  {!isUser && isLastAi ? (
-                    <BorderBeam duration={6} colorVariant="ocean" radius={16} active={!uiHidden} borderWidth={1} fitContent>
-                      {bubble}
-                    </BorderBeam>
-                  ) : (
-                    bubble
-                  )}
+                  {bubble}
                 </div>
               );
             })
@@ -209,22 +198,6 @@ export default function ChatOverlay(props: ChatOverlayProps) {
         </div>
       )}
 
-      {/* 错误提示 */}
-      {error && (
-        <div className="px-8 pb-1 text-center">
-          <span className="text-[16px] text-red-400/60">{error}</span>
-        </div>
-      )}
-
-      {/* TTS 错误（含重播） */}
-      {ttsError && !error && (
-        <div className="px-8 pb-1 text-center">
-          <button onClick={replayTTS} className="text-[16px] text-red-400/60 hover:text-red-300 pointer-events-auto">
-            {ttsError} · ▶ 重播
-          </button>
-        </div>
-      )}
-
       {/* 录音指示器 */}
       {isRecording && (
         <div className="px-8 pb-1 flex items-center justify-center gap-3">
@@ -235,7 +208,7 @@ export default function ChatOverlay(props: ChatOverlayProps) {
       )}
 
       {/* 底部输入栏（NeonInputBar：参照 Codex / DeepSeek Harness 输入框风格；始终显示，水平居中） */}
-      <div className="flex justify-center px-8 pb-5 pt-2 pointer-events-auto">
+      <div className="arrodes-composer-wrap flex justify-center px-8 pb-5 pt-2 pointer-events-auto">
         <NeonInputBar
           text={text}
           onTextChange={setText}

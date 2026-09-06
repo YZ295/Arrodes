@@ -1,0 +1,14 @@
+# Python 3.10/3.12, single-image inference. Direct dependencies pinned; not a transitive lock.
+# Install the matching CUDA torch/torchvision wheels first if using an NVIDIA GPU.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+torch==2.5.1
+torchvision==0.20.1
+transformers==5.16.1
+accelerate==1.14.0
+bitsandbytes==0.50.2
+pillow==12.3.0
+opencv-python-headless==5.0.0.93
+safetensors==0.8.0
+# Video/codec/streaming extras are intentionally excluded (Linux-only codec wheels).

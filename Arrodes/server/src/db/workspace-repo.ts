@@ -123,12 +123,12 @@ export class WorkspaceRepository {
     return ws;
   }
 
-  update(id: string, patch: { name?: string; icon?: string; status?: 'active' | 'archived'; config?: Record<string, unknown>; projectDir?: string; permission?: string }): Workspace | null {
+  update(id: string, patch: { name?: string; icon?: string; status?: 'active' | 'archived'; config?: Record<string, unknown>; projectDir?: string; permission?: string; authorizedDirs?: string[] }): Workspace | null {
     const db = getDb();
     const cur = this.get(id);
     if (!cur) return null;
     const now = new Date().toISOString();
-    const nextConfig = { ...cur.config };
+    const nextConfig = { ...cur.config, ...(patch.config ?? {}) };
     if (patch.projectDir !== undefined) {
       const pd = String(patch.projectDir).trim();
       if (pd) nextConfig.projectDir = pd;
@@ -138,6 +138,9 @@ export class WorkspaceRepository {
       const perm = String(patch.permission);
       if (perm === 'default' || perm === 'full') nextConfig.permission = perm;
     }
+    if (patch.authorizedDirs !== undefined) {
+      nextConfig.authorizedDirs = patch.authorizedDirs;
+    }
     db.prepare(`
       UPDATE workspaces
       SET name = ?, icon = ?, status = ?, config_json = ?, updated_at = ?
@@ -146,7 +149,7 @@ export class WorkspaceRepository {
       patch.name ?? cur.name,
       patch.icon ?? cur.icon,
       patch.status ?? cur.status,
-      JSON.stringify(patch.config ?? nextConfig),
+      JSON.stringify(nextConfig),
       now, id,
     );
     return this.get(id);

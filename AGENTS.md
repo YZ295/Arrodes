@@ -1,9 +1,10 @@
-<!-- wu5-dev-flow:start -->
-## Wu5 Dev Flow
+# Arrodes 项目协作规则
 
-在任何开发、修复、重构、测试、依赖或 Git 操作前，先读取 `spec/index.md` 与 `spec/status.md`，并运行：
+## 开发流程（2026-09-04 用户要求取消强制门禁）
 
-`python "E:/project/Crow5/Skills/wu5-dev-flow/scripts/wu5_flow.py" status`
-
-遵守 `spec/state.json` 的阶段和批准状态。没有新鲜验证证据不得提交或宣称完成；push、PR 和 merge 必须分别获得用户明确授权。
-<!-- wu5-dev-flow:end -->
+- 本项目不再强制使用 Wu5 Dev Flow；本条覆盖上级目录继承的同类要求。
+- 不必运行 `wu5_flow.py`，不以 `spec/state.json` 的阶段、批准状态或活动变更作为实施前置条件。
+- `spec/` 保留为需求、设计与历史验证参考，不要求先完成旧变更归档或逐阶段审批才能处理用户明确提出的任务。
+- 工作区存在未提交修改时，先识别并保护现有修改；可以实施不冲突的任务，不得自动提交、stash、覆盖或删除他人的修改。确实发生无法安全处理的重叠时再询问用户。
+- 仍须执行与改动风险相称的测试和构建；没有新鲜验证证据不得宣称完成。
+- push、PR 和 merge 仍须分别获得用户明确授权。

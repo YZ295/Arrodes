@@ -9,6 +9,7 @@ import {
 } from './winops.js';
 import { executeToolCall } from '../skills/registry.js';
 import { actionGate } from './actionGate.js';
+import { withActionScope } from './actionContext.js';
 import { setWinopsRunnerForTest as setRunner } from './winops.js';
 await import('../skills/desktop.js');
 
@@ -73,7 +74,10 @@ describe('runWinOp', () => {
       calls.push(args[args.indexOf('-Op') + 1]);
       return { stdout: '{"ok":true,"data":{"detail":"typed 2 chars"}}\n', stderr: '', exitCode: 0, timedOut: false };
     });
-    const first = await executeToolCall('type_text', { text: 'hi' });
+    const first = await withActionScope({
+      owner: { localUserId: 'local-user', workspaceId: 'workspace-test', sessionId: 'session-test' },
+      getAuthorizedRoots: () => [],
+    }, () => executeToolCall('type_text', { text: 'hi' }));
     expect(first).toContain('需要你确认');
     expect(actionGate.list().length).toBe(1);
     const latest = actionGate.getLatest()!;

@@ -104,6 +104,11 @@ export class SessionRepository {
     };
   }
 
+  findWorkspaceId(id: string): string | null {
+    const row = this.db.prepare('SELECT workspace_id FROM sessions WHERE id = ?').get(id) as { workspace_id?: string } | undefined;
+    return row?.workspace_id || null;
+  }
+
   create(data: { title: string; topic: SessionTopic; parentId?: string; initialMessage?: string; workspaceId?: string }): SessionNode {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();

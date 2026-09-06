@@ -19,17 +19,22 @@ interface PendingAction {
 
 interface ConfirmDialogProps {
   messages: Message[];
+  sessionId: string | null;
   onAppendAssistant: (content: string) => void;
 }
 
-export default function ConfirmDialog({ messages, onAppendAssistant }: ConfirmDialogProps) {
+export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }: ConfirmDialogProps) {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, setBusy] = useState(false);
   const handled = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
+    if (!sessionId) {
+      setPending(null);
+      return;
+    }
     try {
-      const data = await api.get<{ pending: PendingAction[] }>('/actions/pending');
+      const data = await api.get<{ pending: PendingAction[] }>(`/actions/pending?sessionId=${encodeURIComponent(sessionId)}`);
       const list = data.pending ?? [];
       const latest = list[list.length - 1] ?? null;
       if (latest && !handled.current.has(latest.id)) {
@@ -40,7 +45,7 @@ export default function ConfirmDialog({ messages, onAppendAssistant }: ConfirmDi
     } catch {
       // 无待确认项或接口暂不可用时静默
     }
-  }, []);
+  }, [sessionId]);
 
   const lastMessageId = messages[messages.length - 1]?.id;
   const lastMessageLen = messages[messages.length - 1]?.content.length;
@@ -52,7 +57,7 @@ export default function ConfirmDialog({ messages, onAppendAssistant }: ConfirmDi
     if (!pending || busy) return;
     setBusy(true);
     try {
-      const data = await api.post<{ result: string }>(`/actions/${pending.id}/confirm`);
+      const data = await api.post<{ result: string }>(`/actions/${pending.id}/confirm`, { sessionId });
       handled.current.add(pending.id);
       setPending(null);
       onAppendAssistant(data.result || '已执行');
@@ -68,7 +73,7 @@ export default function ConfirmDialog({ messages, onAppendAssistant }: ConfirmDi
     if (!pending || busy) return;
     setBusy(true);
     try {
-      await api.post(`/actions/${pending.id}/cancel`);
+      await api.post(`/actions/${pending.id}/cancel`, { sessionId });
       handled.current.add(pending.id);
       setPending(null);
       onAppendAssistant('已取消该操作。');

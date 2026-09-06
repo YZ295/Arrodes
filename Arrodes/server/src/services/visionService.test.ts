@@ -48,6 +48,19 @@ describe('visionService（DeepSeek V4 Flash Vision Exp）', () => {
     expect(body.model).toBe('deepseek-v4-flash-vision-exp');
     expect(body.messages[0].content[1].image_url.url).toBe('data:image/jpeg;base64,aGVsbG8=');
   });
+
+  it('只接受受支持格式且校验图片签名和解码后大小', async () => {
+    const { visionService } = await import('./visionService.js');
+    const validPng = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(1024),
+    ]).toString('base64');
+    const invalid = Buffer.alloc(1024).toString('base64');
+
+    expect(visionService.validateImage(validPng, 'png').valid).toBe(true);
+    expect(visionService.validateImage(validPng, 'bmp').valid).toBe(false);
+    expect(visionService.validateImage(invalid, 'png').valid).toBe(false);
+  });
 });
 
 describe('visionService（Mage-VL 本地 sidecar）', () => {

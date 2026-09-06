@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { executeToolCall } from './registry.js';
 import { actionGate } from '../services/actionGate.js';
 import { setCommandProvider, LocalCommandProvider, type CommandProvider } from '../services/commandProvider.js';
+import { withActionScope } from '../services/actionContext.js';
 import './selfModify.js';
+
+function executeInSession(task: string): Promise<string> {
+  return withActionScope({
+    owner: { localUserId: 'local-user', workspaceId: 'workspace-test', sessionId: 'session-test' },
+    getAuthorizedRoots: () => [],
+  }, () => executeToolCall('self_modify', { task }));
+}
 
 describe('self_modify 自我修改技能', () => {
   beforeEach(() => {
@@ -21,7 +29,7 @@ describe('self_modify 自我修改技能', () => {
     setCommandProvider(fake);
 
     try {
-      const first = await executeToolCall('self_modify', { task: '把 README 改一下' });
+      const first = await executeInSession('把 README 改一下');
       expect(first).toContain('需要你确认');
 
       const pending = actionGate.getLatest()!;

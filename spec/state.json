@@ -1,8 +1,14 @@
 {
   "workflow_version": 2,
   "project_kind": "legacy",
-  "phase": "ready-to-push",
-  "active_change": null,
+  "phase": "implementing",
+  "active_change": {
+    "slug": "frontend-aesthetics",
+    "type": "refactor",
+    "mode": "full",
+    "branch": "refactor/frontend-aesthetics",
+    "created_at": "2026-09-04T10:24:06+08:00"
+  },
   "approvals": {
     "baseline": {
       "valid": true,
@@ -11,18 +17,16 @@
       "head_before": "0c8204443fa6eff2ca19f26f87d14d048ae2a101"
     },
     "spec": {
-      "valid": false,
-      "digest": "b395f6a8cb9cadb19da0bab1618240914b875282edbf4adfa0653630dd4dc13c",
-      "approved_at": "2026-08-24T20:15:03+08:00",
-      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972",
-      "invalidated_at": "2026-08-24T20:24:12+08:00"
+      "valid": true,
+      "digest": "24794dcf293a7f393e4b3bcc5642de44e0b63b77246d833fd28fba0c52d13c65",
+      "approved_at": "2026-09-04T10:25:45+08:00",
+      "head_before": "91e89abd5eb9d1911a41b26dd423a380cf0ce952"
     },
     "plan": {
-      "valid": false,
-      "digest": "c9373042e36ed88ba069315d0ebf93f448a8b3c525fd7b00eb281ca1bd99121a",
-      "approved_at": "2026-08-24T20:15:04+08:00",
-      "head_before": "07c09fe4b53907595c4ce82e8541b3a271ee9972",
-      "invalidated_at": "2026-08-24T20:24:12+08:00"
+      "valid": true,
+      "digest": "bf5637d1c7a5b9fd897e0e39ec512ca62ea5472353d9971627371fc389bb0e7b",
+      "approved_at": "2026-09-04T10:25:46+08:00",
+      "head_before": "91e89abd5eb9d1911a41b26dd423a380cf0ce952"
     },
     "hotfix": {
       "valid": false,
@@ -34,15 +38,15 @@
   "verification": null,
   "task_progress": [],
   "last_completed": {
-    "slug": "wallpaper-plugin",
-    "archived_at": "2026-08-24T20:23:59+08:00",
-    "archive": "spec/archive/2026-08-24-wallpaper-plugin",
+    "slug": "security-release-hardening",
+    "archived_at": "2026-09-04T10:19:20+08:00",
+    "archive": "spec/archive/2026-09-04-security-release-hardening",
     "verification": {
-      "scope": "targeted",
+      "scope": "full",
       "passed": true,
-      "verified_at": "2026-08-24T20:23:52+08:00",
-      "fingerprint": "4978320ff1bbb3c3506eb8599ae95e95d3a3f685a9874ddfbddbb75cdff951e3",
-      "head": "c16c5d41673fcee12ee1144ed7c777f9e7ce977c",
+      "verified_at": "2026-09-04T10:18:53+08:00",
+      "fingerprint": "c2541087ebbf4d1f793060ecea574d7e23e0a46468b004c31eff6b4718416b84",
+      "head": "36c01d5d98b7559a6c9795f9ffe9847a85762593",
       "results": [
         {
           "name": "vitest-server",
@@ -55,7 +59,7 @@
           ],
           "exit_code": 0,
           "passed": true,
-          "summary": "> arrodes-server@0.1.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/server\n\n\n Test Files  92 passed (92)\n      Tests  510 passed (510)\n   Start at  20:23:40\n   Duration  6.47s (transform 31.20s, setup 0ms, import 48.89s, tests 3.72s, environment 9ms)\n\n(node:32828) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:32828) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)\n(node:33492) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 8)\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:33492) PromiseRejectionHandledWarning: Promise rejection was handled asynchronously (rejection id: 9)"
+          "summary": "> arrodes-server@0.1.0 test\n> vitest run src\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/server\n\n\n Test Files  53 passed (53)\n      Tests  285 passed (285)\n   Start at  10:18:43\n   Duration  4.34s (transform 18.29s, setup 0ms, import 30.79s, tests 2.17s, environment 4ms)"
         },
         {
           "name": "vitest-client",
@@ -68,7 +72,7 @@
           ],
           "exit_code": 0,
           "passed": true,
-          "summary": "> client@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/client\n\n\n Test Files  4 passed (4)\n      Tests  20 passed (20)\n   Start at  20:23:47\n   Duration  389ms (transform 85ms, setup 0ms, import 162ms, tests 20ms, environment 0ms)"
+          "summary": "> client@0.0.0 test\n> vitest run\n\n\n RUN  v4.1.10 E:/project/Crow5/Arrodes/Arrodes/client\n\n\n Test Files  4 passed (4)\n      Tests  20 passed (20)\n   Start at  10:18:48\n   Duration  464ms (transform 118ms, setup 0ms, import 183ms, tests 19ms, environment 0ms)"
         },
         {
           "name": "tsc-server",
@@ -94,7 +98,7 @@
           ],
           "exit_code": 0,
           "passed": true,
-          "summary": "> client@0.0.0 build\n> tsc -b && vite build\n\nvite v8.1.5 building client environment for production...\n\u001b[2K\ntransforming...✓ 237 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                            0.76 kB │ gzip:   0.43 kB\ndist/assets/arrodes_avatar-BZH2u6cA.jpg  238.38 kB\ndist/assets/index-CdAo6mjO.css            98.55 kB │ gzip:  14.73 kB\ndist/assets/index-CWP4CjMl.js            580.44 kB │ gzip: 176.76 kB\n\n✓ built in 223ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+          "summary": "> client@0.0.0 build\n> tsc -b && vite build\n\nvite v8.1.5 building client environment for production...\n\u001b[2K\ntransforming...✓ 237 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                            0.76 kB │ gzip:   0.43 kB\ndist/assets/arrodes_avatar-BZH2u6cA.jpg  238.38 kB\ndist/assets/index-DuI6czSx.css            99.01 kB │ gzip:  14.77 kB\ndist/assets/index-8V_l05LK.js            582.17 kB │ gzip: 177.16 kB\n\n✓ built in 257ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
         }
       ]
     }

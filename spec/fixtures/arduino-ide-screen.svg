@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#1f2428"/>
+  <rect width="1280" height="42" fill="#111518"/>
+  <text x="18" y="27" fill="#f4f7f8" font-family="Segoe UI, Arial" font-size="16">Arduino IDE 2.3.6 — Blink</text>
+  <rect y="42" width="1280" height="54" fill="#006c75"/>
+  <circle cx="34" cy="69" r="15" fill="#f5f7f7"/>
+  <path d="M27 69h14M34 62v14" stroke="#006c75" stroke-width="3"/>
+  <circle cx="76" cy="69" r="15" fill="#f5f7f7"/>
+  <path d="M68 69h16l-6-6m6 6-6 6" fill="none" stroke="#006c75" stroke-width="3"/>
+  <text x="116" y="75" fill="#f4f7f8" font-family="Segoe UI, Arial" font-size="17">Arduino Uno on COM3</text>
+  <rect x="0" y="96" width="1280" height="42" fill="#292f34"/>
+  <rect x="18" y="103" width="130" height="35" rx="4" fill="#3b444b"/>
+  <text x="34" y="126" fill="#f5f7f7" font-family="Consolas, monospace" font-size="16">Blink.ino</text>
+  <rect x="0" y="138" width="56" height="412" fill="#262c31"/>
+  <g fill="#7d8a93" font-family="Consolas, monospace" font-size="17" text-anchor="end">
+    <text x="42" y="176">1</text><text x="42" y="204">2</text><text x="42" y="232">3</text>
+    <text x="42" y="260">4</text><text x="42" y="288">5</text><text x="42" y="316">6</text>
+    <text x="42" y="344">7</text><text x="42" y="372">8</text><text x="42" y="400">9</text>
+    <text x="42" y="428">10</text><text x="42" y="456">11</text><text x="42" y="484">12</text>
+  </g>
+  <g font-family="Consolas, monospace" font-size="20">
+    <text x="72" y="176" fill="#67d8ef">void <tspan fill="#f4f7f8">setup() {</tspan></text>
+    <text x="104" y="204" fill="#f0c674">pinMode<tspan fill="#f4f7f8">(LED_BUILTIN, OUTPUT);</tspan></text>
+    <text x="72" y="232" fill="#f4f7f8">}</text>
+    <text x="72" y="288" fill="#67d8ef">void <tspan fill="#f4f7f8">loop() {</tspan></text>
+    <text x="104" y="316" fill="#f0c674">digitalWrite<tspan fill="#f4f7f8">(LED_BUILTIN, HIGH);</tspan></text>
+    <text x="104" y="344" fill="#f0c674">delay<tspan fill="#f4f7f8">(1000);</tspan></text>
+    <text x="104" y="372" fill="#f0c674">digitalWrite<tspan fill="#f4f7f8">(LED_BUILTIN, LOW);</tspan></text>
+    <text x="104" y="400" fill="#f0c674">delay<tspan fill="#f4f7f8">(1000);</tspan></text>
+    <text x="72" y="428" fill="#f4f7f8">}</text>
+  </g>
+  <rect x="0" y="550" width="1280" height="34" fill="#30373d"/>
+  <text x="18" y="573" fill="#f5f7f7" font-family="Segoe UI, Arial" font-size="15">Output</text>
+  <rect x="0" y="584" width="1280" height="110" fill="#121619"/>
+  <text x="18" y="618" fill="#d6dde2" font-family="Consolas, monospace" font-size="17">Sketch uses 924 bytes (2%) of program storage space.</text>
+  <text x="18" y="650" fill="#d6dde2" font-family="Consolas, monospace" font-size="17">Global variables use 9 bytes (0%) of dynamic memory.</text>
+  <text x="18" y="682" fill="#64d488" font-family="Consolas, monospace" font-size="17">Done compiling.</text>
+  <rect y="694" width="1280" height="26" fill="#006c75"/>
+  <text x="18" y="713" fill="#f4f7f8" font-family="Segoe UI, Arial" font-size="13">Arduino Uno  •  COM3</text>
+</svg>

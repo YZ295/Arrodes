@@ -9,6 +9,14 @@ import { executeToolCall } from './registry.js';
 import { actionGate, classifyAction } from '../services/actionGate.js';
 import { blockedCommandReason } from './command.js';
 import { setCommandProvider, LocalCommandProvider, type CommandProvider } from '../services/commandProvider.js';
+import { withActionScope } from '../services/actionContext.js';
+
+function executeInSession(command: string): Promise<string> {
+  return withActionScope({
+    owner: { localUserId: 'local-user', workspaceId: 'workspace-test', sessionId: 'session-test' },
+    getAuthorizedRoots: () => [],
+  }, () => executeToolCall('exec_command', { command }));
+}
 
 describe('命令技能分级授权', () => {
   beforeEach(() => {
@@ -20,7 +28,7 @@ describe('命令技能分级授权', () => {
   });
 
   it('exec_command 需确认，不会直接执行', async () => {
-    const result = await executeToolCall('exec_command', { command: 'echo hello' });
+    const result = await executeInSession('echo hello');
     expect(result).toContain('需要你确认');
     const pending = actionGate.getLatest();
     expect(pending?.skill).toBe('exec_command');
@@ -51,7 +59,7 @@ describe('命令技能分级授权', () => {
 
     setCommandProvider(fake);
     try {
-      await executeToolCall('exec_command', { command: 'echo hi' });
+      await executeInSession('echo hi');
       const pending = actionGate.getLatest()!;
       const result = await pending.executor!(pending.args);
       expect(result).toBe('ok');

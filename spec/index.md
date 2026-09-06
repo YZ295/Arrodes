@@ -1,5 +1,7 @@
 # 项目规格索引
 
+> 2026-09-04：用户已取消本项目的 Wu5 强制门禁。下列阶段、状态和批准记录仅作历史参考，不再阻止开发；当前协作规则见根目录 `AGENTS.md`。
+
 - 项目类型：`legacy`
 - 流程版本：`2`
 - 当前状态：[status.md](status.md)
@@ -21,3 +23,4 @@
 - [2026-08-24-inputbar-indent](archive/2026-08-24-inputbar-indent/)
 - [2026-08-24-codex-sdk](archive/2026-08-24-codex-sdk/)
 - [2026-08-24-wallpaper-plugin](archive/2026-08-24-wallpaper-plugin/)
+- [2026-09-04-security-release-hardening](archive/2026-09-04-security-release-hardening/)
