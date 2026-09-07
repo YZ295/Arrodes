@@ -260,6 +260,48 @@ const PET_ONLY = process.argv.includes('--pet');
 
 /** 拉起 Mage-VL 视觉 sidecar（桌宠模式需要屏幕观察；路径由环境变量提供，未配置则跳过） */
 let visionProc: ChildProcess | null = null;
+let gatewayProc: ChildProcess | null = null;
+/** WorkBuddy 远程控制网关：Arrodes 启动时确保在线（detached 独立进程，Arrodes 退出不影响） */
+const GATEWAY_CLI = process.env.ARRODES_GATEWAY_CLI || 'E:/AI/Workbuddy/resources/app.asar.unpacked/cli/dist/codebuddy.js';
+const GATEWAY_PORT = process.env.ARRODES_GATEWAY_PORT || '8321';
+
+function probeGateway(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get({ host: '127.0.0.1', port: Number(GATEWAY_PORT), path: '/api/v1/health', timeout: 2000 }, (res) => {
+      res.resume(); // 任何 HTTP 响应（含 401）都说明有服务在
+      resolve(true);
+    });
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.on('error', () => resolve(false));
+  });
+}
+
+async function ensureGateway(): Promise<void> {
+  if (!existsSync(GATEWAY_CLI)) {
+    console.log('[Desktop] 未找到网关 CLI（ARRODES_GATEWAY_CLI），跳过拉起');
+    return;
+  }
+  if (await probeGateway()) {
+    console.log(`[Desktop] 网关已在运行（port ${GATEWAY_PORT}），跳过`);
+    return;
+  }
+  try {
+    // detached + unref：网关独立于 Arrodes 生命周期（它服务 WorkBuddy 集成，Arrodes 退出不应杀它）
+    // ELECTRON_RUN_AS_NODE：打包后 process.execPath 是 electron.exe，需以纯 Node 模式跑 CLI
+    const child = spawn(process.execPath, [GATEWAY_CLI, '--serve', '--port', GATEWAY_PORT], {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      windowsHide: true,
+    });
+    child.unref();
+    gatewayProc = child;
+    console.log(`[Desktop] 网关已拉起（port ${GATEWAY_PORT}，detached）`);
+  } catch (err) {
+    console.warn('[Desktop] 网关拉起失败（端口被占或 CLI 异常）:', err);
+  }
+}
+
 function startVisionSidecar(): void {
   const python = process.env.ARRODES_MAGEVL_PYTHON;
   const script = join(__dirname, '../vision-sidecar/mage_vl_sidecar.py');
@@ -296,6 +338,7 @@ function stopVisionSidecar(): void {
 
 app.whenReady().then(async () => {
   try {
+    await ensureGateway();
     await startBackend();
     if (PET_ONLY) {
       // 桌宠模式：视觉 sidecar + 透明桌宠窗，不开主界面
