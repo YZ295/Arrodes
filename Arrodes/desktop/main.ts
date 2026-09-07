@@ -9,7 +9,7 @@
  * 打包：electron-builder（asar + node 运行时 + 后端依赖）
  * 后端子进程用 process.execPath 里内置的 Node 运行，无需系统 Node。
  */
-import { app, BrowserWindow, ipcMain, shell, dialog, session, screen } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, shell, dialog, session, screen } from 'electron';
 import { fork, spawn, ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
@@ -228,6 +228,7 @@ async function createPetWindow() {
   petWindow.setAlwaysOnTop(true, 'floating');
   petWindow.setIgnoreMouseEvents(true, { forward: true });
   petWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  petWindow.webContents.on('context-menu', () => showPetContextMenu());
   dlog('pet window created (hidden)');
   petWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
     dlog(`pet did-fail-load code=${code} desc=${desc} url=${String(url).slice(0, 120)}`);
@@ -263,6 +264,35 @@ ipcMain.on('pet:resize', (event, width: number, height: number) => {
   petWindow.setResizable(false);
 });
 
+ipcMain.on('pet:vision-state', (event, on: boolean) => {
+  if (!petWindow || event.sender !== petWindow.webContents || typeof on !== 'boolean') return;
+  petVisionOn = on;
+});
+
+function showPetContextMenu(): void {
+  if (!petWindow) return;
+  const menu = Menu.buildFromTemplate([
+    {
+      label: petVisionOn ? '视觉观察：已开启（点击关闭）' : '视觉观察：已关闭（点击开启）',
+      click: () => petWindow?.webContents.send('pet:vision-toggle'),
+    },
+    { type: 'separator' },
+    {
+      label: '悬浮于桌面',
+      type: 'checkbox',
+      checked: petFloating,
+      click: (item) => {
+        petFloating = item.checked;
+        if (!petWindow) return;
+        petWindow.setAlwaysOnTop(petFloating, 'floating');
+        // 悬浮时禁止被截屏；取消悬浮后恢复可截图
+        petWindow.setContentProtection(petFloating);
+      },
+    },
+  ]);
+  menu.popup({ window: petWindow });
+}
+
 ipcMain.on('pet:set-interactive', (event, interactive: boolean) => {
   if (!petWindow || event.sender !== petWindow.webContents || typeof interactive !== 'boolean') return;
   petWindow.setIgnoreMouseEvents(!interactive, { forward: true });
@@ -275,6 +305,8 @@ const PET_ONLY = process.argv.includes('--pet');
 /** 拉起 Mage-VL 视觉 sidecar（桌宠模式需要屏幕观察；路径由环境变量提供，未配置则跳过） */
 let visionProc: ChildProcess | null = null;
 let gatewayProc: ChildProcess | null = null;
+let petVisionOn = false;   // 视觉观察状态（右键菜单标签用）
+let petFloating = true;    // 悬浮置顶（联动截图保护：悬浮时不可被截屏）
 /** 桌面端文件日志：双击启动时 stdout 丢失，关键事件落盘便于诊断 */
 function dlog(msg: string): void {
   try {

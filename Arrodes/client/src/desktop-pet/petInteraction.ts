@@ -16,6 +16,10 @@ export interface PetHostBridge {
   setInteractive(interactive: boolean): void;
   /** 调整 Electron 桌宠窗口整体大小（保持 660:600 比例由调用方计算） */
   resize(width: number, height: number): void;
+  /** 向主进程同步当前视觉观察状态（右键菜单标签用） */
+  notifyVisionState(on: boolean): void;
+  /** 订阅右键菜单的视觉开关命令 */
+  onVisionToggle(callback: (on: boolean) => void): void;
 }
 
 declare global {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import avatarUrl from '../assets/arrodes_desktop_pet.png';
-import { useDesktopPetSnapshot } from './desktopPetBridge';
+import { sendPetCommand, useDesktopPetSnapshot } from './desktopPetBridge';
 import { createDesktopPetViewModel, type DesktopPetSnapshot } from './desktopPetState';
 import { usePetChat } from './usePetChat';
 import { PET_MODEL_URL, startLive2dPet, type Live2dPetController } from './live2dPet';
@@ -184,6 +184,18 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
     } catch { /* 忽略 */ }
   }, [hostMode]);
 
+  // Electron 模式：视觉状态同步给主进程（右键菜单标签）
+  useEffect(() => {
+    if (hostMode !== 'electron') return;
+    window.arrodesPet?.notifyVisionState(snapshot.active);
+  }, [hostMode, snapshot.active]);
+
+  // Electron 模式：右键菜单「视觉观察」命令 → 广播给主窗口切换
+  useEffect(() => {
+    if (hostMode !== 'electron') return;
+    window.arrodesPet?.onVisionToggle(() => sendPetCommand('vision-toggle'));
+  }, [hostMode]);
+
   // Electron 模式：悬停桌宠时暂停点击穿透，离开后恢复（forward:true 下 DOM 仍能收到事件）
   const onRootEnter = useCallback(() => {
     if (hostMode === 'electron') window.arrodesPet?.setInteractive(true);
@@ -208,6 +220,15 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
       <section className="desktop-pet__bubble" aria-live="polite" aria-atomic="true">
         <div className="desktop-pet__meta">
           <span className="desktop-pet__status"><i aria-hidden="true" />{view.status}</span>
+          {view.diagnostics && (
+            <span
+              className="desktop-pet__diagnostics"
+              data-role="diagnostics"
+              title={`${view.diagnostics.model}${view.diagnostics.observedAt ? ` · ${view.diagnostics.observedAt}` : ''}`}
+            >
+              {(view.diagnostics.durationMs / 1000).toFixed(1)}s
+            </span>
+          )}
           {confidence !== null && <span className="desktop-pet__confidence">把握 {confidence}%</span>}
         </div>
         {!chatVisible && <h1>{view.title}</h1>}

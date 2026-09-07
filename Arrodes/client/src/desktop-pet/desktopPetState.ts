@@ -15,6 +15,22 @@ export interface DesktopPetViewModel {
   status: string;
   tone: 'idle' | 'working' | 'ready' | 'uncertain' | 'error';
   confidence: number | null;
+  diagnostics: DesktopPetDiagnostics | null;
+}
+
+export interface DesktopPetDiagnostics {
+  model: string;
+  durationMs: number;
+  observedAt: string | null;
+}
+
+function toDiagnostics(observation: VisionObservation | null): DesktopPetDiagnostics | null {
+  if (!observation) return null;
+  return {
+    model: observation.model,
+    durationMs: observation.durationMs,
+    observedAt: observation.observedAt ?? null,
+  };
 }
 
 const MAX_COPY_LENGTH = 160;
@@ -38,6 +54,7 @@ export function createDesktopPetViewModel(
       status: '需要处理',
       tone: 'error',
       confidence: null,
+      diagnostics: null,
     };
   }
 
@@ -50,6 +67,7 @@ export function createDesktopPetViewModel(
       status: '分析中',
       tone: 'working',
       confidence: observation?.confidence ?? null,
+      diagnostics: toDiagnostics(observation),
     };
   }
 
@@ -62,6 +80,7 @@ export function createDesktopPetViewModel(
       status: '未观察',
       tone: 'idle',
       confidence: null,
+      diagnostics: null,
     };
   }
 
@@ -74,6 +93,7 @@ export function createDesktopPetViewModel(
       status: '观察中',
       tone: 'working',
       confidence: null,
+      diagnostics: null,
     };
   }
 
@@ -105,5 +125,6 @@ export function createDesktopPetViewModel(
           : '观察中',
     tone: uncertainty || !adviceAllowed ? 'uncertain' : 'ready',
     confidence,
+    diagnostics: toDiagnostics(observation),
   };
 }

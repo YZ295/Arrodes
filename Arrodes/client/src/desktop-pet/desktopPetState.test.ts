@@ -56,6 +56,32 @@ describe('desktop pet presentation policy', () => {
     expect(view.action).toBe('补充输出格式和成功标准');
   });
 
+  it('projects model, duration and observation time as diagnostics', () => {
+    const view = createDesktopPetViewModel({
+      description: 'VS Code 正在编辑视觉模块',
+      durationMs: 1234,
+      model: 'microsoft/Mage-VL',
+      observedAt: '2026-09-07T12:00:00.000Z',
+      activeApplication: 'Visual Studio Code',
+      contextKind: 'development',
+      currentState: '正在修改 continuousVision.ts',
+      confidence: 0.86,
+      uncertainties: [],
+    }, { active: true, analyzing: false, error: null });
+
+    expect(view.diagnostics).toEqual({
+      model: 'microsoft/Mage-VL',
+      durationMs: 1234,
+      observedAt: '2026-09-07T12:00:00.000Z',
+    });
+  });
+
+  it('keeps diagnostics null while there is no observation to project', () => {
+    expect(createDesktopPetViewModel(null, { active: true, analyzing: false, error: null }).diagnostics).toBeNull();
+    expect(createDesktopPetViewModel(null, { active: false, analyzing: false, error: null }).diagnostics).toBeNull();
+    expect(createDesktopPetViewModel(null, { active: false, analyzing: true, error: null }).diagnostics).toBeNull();
+  });
+
   it('prefers evidence-checked guidance over raw model state and advice', () => {
     const view = createDesktopPetViewModel({
       description: 'Arduino IDE', durationMs: 100, model: 'mage',

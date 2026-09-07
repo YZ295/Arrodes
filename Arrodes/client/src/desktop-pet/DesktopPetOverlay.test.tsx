@@ -54,8 +54,9 @@ describe('DesktopPetOverlay', () => {
       error: null,
       observation: {
         description: '正在开发桌宠界面',
-        durationMs: 24,
-        model: 'mage',
+        durationMs: 1234,
+        model: 'microsoft/Mage-VL',
+        observedAt: '2026-09-07T12:00:00.000Z',
         activeApplication: 'Visual Studio Code',
         contextKind: 'development',
         currentState: '正在编辑 DesktopPetOverlay.tsx',
@@ -70,5 +71,10 @@ describe('DesktopPetOverlay', () => {
     expect(container.textContent).toContain('正在编辑 DesktopPetOverlay.tsx');
     expect(container.textContent).toContain('先运行桌宠界面测试');
     expect(container.querySelectorAll('[data-role="next-action"]')).toHaveLength(1);
+
+    const diagnostics = container.querySelector('[data-role="diagnostics"]');
+    expect(diagnostics?.textContent).toBe('1.2s');
+    expect(diagnostics?.getAttribute('title')).toContain('microsoft/Mage-VL');
+    expect(diagnostics?.getAttribute('title')).toContain('2026-09-07T12:00:00.000Z');
   });
 });

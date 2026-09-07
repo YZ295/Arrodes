@@ -11,7 +11,35 @@ const EMPTY_SNAPSHOT: DesktopPetSnapshot = {
 
 type DesktopPetMessage =
   | { type: 'snapshot'; snapshot: DesktopPetSnapshot }
-  | { type: 'request-snapshot' };
+  | { type: 'request-snapshot' }
+  | { type: 'command'; command: PetCommand };
+
+export type PetCommand = 'vision-toggle';
+
+/** 桌宠窗口 → 主窗口：发送控制命令（视觉开关等） */
+export function sendPetCommand(command: PetCommand): void {
+  const channel = openChannel();
+  if (!channel) return;
+  channel.postMessage({ type: 'command', command } satisfies DesktopPetMessage);
+  channel.close();
+}
+
+/** 主窗口：注册桌宠命令处理器 */
+export function usePetCommandHandler(handler: (command: PetCommand) => void): void {
+  const latest = useRef(handler);
+  latest.current = handler;
+  useEffect(() => {
+    const channel = openChannel();
+    if (!channel) return;
+    channel.onmessage = (event: MessageEvent<DesktopPetMessage>) => {
+      if (event.data?.type === 'command') latest.current(event.data.command);
+    };
+    return () => {
+      channel.onmessage = null;
+      channel.close();
+    };
+  }, []);
+}
 
 function openChannel(): BroadcastChannel | null {
   return typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHANNEL_NAME);
