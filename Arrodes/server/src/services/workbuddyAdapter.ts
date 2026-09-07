@@ -28,7 +28,7 @@ export async function probeWorkbuddyGateway(
     const timer = setTimeout(() => ctrl.abort(), 2500);
     const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/v1/health`, {
       signal: ctrl.signal,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: token ? { Authorization: `Bearer ${token}`, 'x-codebuddy-request': '1' } : undefined,
     });
     clearTimeout(timer);
     return res.status !== 404;
@@ -50,7 +50,7 @@ export class WorkBuddyGatewayAdapter implements AgentChatAdapter {
 
   async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
     const base = this.baseUrl.replace(/\/+$/, '');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-codebuddy-request': '1' };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
 
     // 1. 启动 Agent run
