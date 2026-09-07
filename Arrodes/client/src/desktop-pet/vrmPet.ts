@@ -104,13 +104,15 @@ export async function startVrmPet(
     const applyCamera = () => {
       camera.fov = camConfig.fov;
       camera.updateProjectionMatrix();
-      camera.position.set(
+      camBase.set(
         lookTarget.x,
         lookTarget.y + camConfig.verticalOffset,
         lookTarget.z + camConfig.distance,
       );
+      camera.position.copy(camBase);
       camera.lookAt(lookTarget);
     };
+    const camBase = new THREE.Vector3();
     applyCamera();
 
     const expression = vrm.expressionManager;
@@ -133,6 +135,24 @@ export async function startVrmPet(
 
     const clock = new THREE.Clock();
     let raf = 0;
+    // gaze 注视追踪（AIRI 拟生命细节）：视线跟随鼠标（挂在 window 上，容器本身 pointer-events:none）
+    let pointerNdcX = 0;
+    let pointerNdcY = 0;
+    let pointerInside = false;
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const inside =
+        event.clientX >= rect.left && event.clientX <= rect.right &&
+        event.clientY >= rect.top && event.clientY <= rect.bottom;
+      pointerInside = inside;
+      if (inside) {
+        pointerNdcX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNdcY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      }
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    if (vrm.lookAt) vrm.lookAt.target = camera; // lookAt 目标 = 相机，下面平移相机实现"看鼠标"
+
     let swayTime = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
@@ -156,6 +176,12 @@ export async function startVrmPet(
       vrm.scene.rotation.y = Math.sin(swayTime * 0.7) * 0.06;
       vrm.scene.position.y = Math.sin(swayTime * 1.4) * 0.006;
 
+      // 注视：微移相机让视线追随鼠标（幅度小，避免构图晃动）
+      const gazeX = pointerInside ? pointerNdcX * 0.12 : 0;
+      const gazeY = pointerInside ? pointerNdcY * 0.07 : 0;
+      camera.position.set(camBase.x + gazeX, camBase.y + gazeY, camBase.z);
+      camera.lookAt(lookTarget);
+
       vrm.update(delta);
       renderer.render(scene, camera);
     };
@@ -174,6 +200,7 @@ export async function startVrmPet(
       destroy() {
         cancelAnimationFrame(raf);
         resizeObserver.disconnect();
+        window.removeEventListener('pointermove', onPointerMove);
         VRMUtils.deepDispose(vrm.scene);
         renderer.dispose();
         renderer.domElement.remove();
