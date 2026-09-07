@@ -12,6 +12,8 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, session, screen } from 'electron';
 import { fork, spawn, ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { appendFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -228,7 +230,21 @@ async function createPetWindow() {
   // 避免桌宠内容进入屏幕观察画面并触发自我反馈循环。
   petWindow.setContentProtection(true);
   petWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  petWindow.once('ready-to-show', () => petWindow?.showInactive());
+  dlog('pet window created (hidden)');
+  petWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    dlog(`pet did-fail-load code=${code} desc=${desc} url=${String(url).slice(0, 120)}`);
+  });
+  petWindow.once('ready-to-show', () => {
+    dlog('pet ready-to-show -> showInactive');
+    petWindow?.showInactive();
+  });
+  // 兜底：个别 GPU/驱动状态下 ready-to-show 不触发，8 秒后强制显示
+  setTimeout(() => {
+    if (petWindow && !petWindow.isVisible()) {
+      dlog('pet show fallback (8s, ready-to-show 未触发)');
+      petWindow.showInactive();
+    }
+  }, 8000);
   await petWindow.loadURL(getUiUrl('desktop-pet'));
   petWindow.on('closed', () => { petWindow = null; });
 }
@@ -261,6 +277,13 @@ const PET_ONLY = process.argv.includes('--pet');
 /** 拉起 Mage-VL 视觉 sidecar（桌宠模式需要屏幕观察；路径由环境变量提供，未配置则跳过） */
 let visionProc: ChildProcess | null = null;
 let gatewayProc: ChildProcess | null = null;
+/** 桌面端文件日志：双击启动时 stdout 丢失，关键事件落盘便于诊断 */
+function dlog(msg: string): void {
+  try {
+    appendFileSync(join(homedir(), '.arrodes-desktop.log'), `[${new Date().toISOString()}] ${msg}\n`);
+  } catch { /* 日志失败不影响运行 */ }
+}
+
 /** WorkBuddy 远程控制网关：Arrodes 启动时确保在线（detached 独立进程，Arrodes 退出不影响） */
 const GATEWAY_CLI = process.env.ARRODES_GATEWAY_CLI || 'E:/AI/Workbuddy/resources/app.asar.unpacked/cli/dist/codebuddy.js';
 const GATEWAY_PORT = process.env.ARRODES_GATEWAY_PORT || '8321';
@@ -296,6 +319,7 @@ async function ensureGateway(): Promise<void> {
     });
     child.unref();
     gatewayProc = child;
+    dlog(`gateway started (port ${GATEWAY_PORT})`);
     console.log(`[Desktop] 网关已拉起（port ${GATEWAY_PORT}，detached）`);
   } catch (err) {
     console.warn('[Desktop] 网关拉起失败（端口被占或 CLI 异常）:', err);
@@ -349,7 +373,11 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
 
-  app.whenReady().then(async () => {
+  app.on('render-process-gone', (_e, wc, details) => {
+  dlog(`render-process-gone: reason=${details.reason} exit=${details.exitCode}`);
+});
+
+app.whenReady().then(async () => {
   try {
     await ensureGateway();
     await startBackend();
@@ -362,6 +390,7 @@ if (!app.requestSingleInstanceLock()) {
     await createWindow();
     await createPetWindow();
   } catch (err) {
+    dlog(`STARTUP FAILED: ${String(err)}`);
     console.error('[Desktop] 启动失败:', err);
     // 清理可能残留的后端子进程
     quitting = true;
