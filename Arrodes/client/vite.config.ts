@@ -18,6 +18,10 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, '../shared'),
     },
   },
+  build: {
+    // 沙箱 safe-delete 会拦截 vite 的 emptyOutDir 批量删除（>50 文件即失败），改为构建前手动清理
+    emptyOutDir: false,
+  },
   server: {
     port: 5173,
     proxy: {

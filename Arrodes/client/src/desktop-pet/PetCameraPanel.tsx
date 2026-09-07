@@ -27,6 +27,12 @@ export default function PetCameraPanel({
 }) {
   const [config, setConfig] = useState<VrmCameraConfig>(() => mergeCameraConfig());
   const [saved, setSaved] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem('arrodes_pet_window_width'));
+      return Number.isFinite(v) && v >= 440 && v <= 990 ? v : 660;
+    } catch { return 660; }
+  });
 
   // 打开面板时同步一次控制器当前生效值（含已保存的 localStorage 配置）
   useEffect(() => {
@@ -81,6 +87,24 @@ export default function PetCameraPanel({
           </label>
         );
       })}
+      <label className="pet-camera-panel__row">
+        <span className="pet-camera-panel__label">窗口大小</span>
+        <input
+          type="range"
+          min={440}
+          max={990}
+          step={10}
+          value={windowWidth}
+          onChange={(event) => {
+            const width = Number(event.target.value);
+            setWindowWidth(width);
+            const height = Math.round((width * 600) / 660);
+            try { localStorage.setItem('arrodes_pet_window_width', String(width)); } catch { /* 忽略 */ }
+            window.arrodesPet?.resize(width, height);
+          }}
+        />
+        <span className="pet-camera-panel__value">{windowWidth}</span>
+      </label>
       <footer className="pet-camera-panel__footer">
         <button type="button" data-role="cam-save" onClick={onSave}>{saved ? '已保存 ✓' : '保存'}</button>
         <button type="button" data-role="cam-reset" onClick={onReset}>重置</button>

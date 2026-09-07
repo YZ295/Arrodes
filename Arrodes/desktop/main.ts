@@ -240,6 +240,12 @@ ipcMain.on('pet:move-by', (event, dx: number, dy: number) => {
   petWindow.setPosition(x + Math.round(dx), y + Math.round(dy));
 });
 
+ipcMain.on('pet:resize', (event, width: number, height: number) => {
+  if (!petWindow || typeof width !== 'number' || typeof height !== 'number') return;
+  if (width < 400 || width > 1200) return;
+  petWindow.setSize(Math.round(width), Math.round(height));
+});
+
 ipcMain.on('pet:set-interactive', (event, interactive: boolean) => {
   if (!petWindow || event.sender !== petWindow.webContents || typeof interactive !== 'boolean') return;
   petWindow.setIgnoreMouseEvents(!interactive, { forward: true });

@@ -173,6 +173,17 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
     window.addEventListener('pointercancel', onUp);
   }, [hostMode, showReaction]);
 
+  // Electron 模式：应用上次保存的窗口大小（机位面板「窗口大小」滑条写入）
+  useEffect(() => {
+    if (hostMode !== 'electron') return;
+    try {
+      const width = Number(localStorage.getItem('arrodes_pet_window_width'));
+      if (Number.isFinite(width) && width >= 440 && width <= 990 && width !== 660) {
+        window.arrodesPet?.resize(width, Math.round((width * 600) / 660));
+      }
+    } catch { /* 忽略 */ }
+  }, [hostMode]);
+
   // Electron 模式：悬停桌宠时暂停点击穿透，离开后恢复（forward:true 下 DOM 仍能收到事件）
   const onRootEnter = useCallback(() => {
     if (hostMode === 'electron') window.arrodesPet?.setInteractive(true);

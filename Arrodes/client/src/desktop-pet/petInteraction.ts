@@ -14,6 +14,8 @@ export interface PetHostBridge {
   moveBy(dx: number, dy: number): void;
   /** 切换点击穿透：false = 鼠标事件穿透到下层窗口 */
   setInteractive(interactive: boolean): void;
+  /** 调整 Electron 桌宠窗口整体大小（保持 660:600 比例由调用方计算） */
+  resize(width: number, height: number): void;
 }
 
 declare global {

@@ -8,4 +8,5 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('arrodesPet', {
   moveBy: (dx: number, dy: number) => ipcRenderer.send('pet:move-by', dx, dy),
   setInteractive: (interactive: boolean) => ipcRenderer.send('pet:set-interactive', interactive),
+  resize: (width: number, height: number) => ipcRenderer.send('pet:resize', width, height),
 });
