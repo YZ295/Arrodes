@@ -6,8 +6,8 @@ html.desktop-pet-surface #root {
 
 .desktop-pet {
   position: relative;
-  width: 660px;
-  height: 600px;
+  width: 100vw;  /* 跟随 OS 窗口大小（机位面板可缩放整个窗口） */
+  height: 100vh;
   overflow: hidden;
   color: #f3f6fb;
   user-select: none;
@@ -328,5 +328,5 @@ html.desktop-pet-surface #root {
 
 /* VRM 容器同样右移：人物占右侧 420px，左侧 240px 留给气泡 */
 .desktop-pet__vrm {
-  left: 240px;
+  left: 36%;
 }

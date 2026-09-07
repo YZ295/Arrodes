@@ -227,8 +227,6 @@ async function createPetWindow() {
 
   petWindow.setAlwaysOnTop(true, 'floating');
   petWindow.setIgnoreMouseEvents(true, { forward: true });
-  // 避免桌宠内容进入屏幕观察画面并触发自我反馈循环。
-  petWindow.setContentProtection(true);
   petWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   dlog('pet window created (hidden)');
   petWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
