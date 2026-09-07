@@ -336,7 +336,20 @@ function stopVisionSidecar(): void {
   }
 }
 
-app.whenReady().then(async () => {
+// 单实例锁：重复启动时聚焦已有窗口，而不是报"端口被占"的启动错误
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    } else if (petWindow) {
+      petWindow.focus();
+    }
+  });
+
+  app.whenReady().then(async () => {
   try {
     await ensureGateway();
     await startBackend();
@@ -370,6 +383,8 @@ app.whenReady().then(async () => {
     if (!petWindow) void createPetWindow();
   });
 });
+
+}
 
 app.on('window-all-closed', () => {
   // 停后端与视觉 sidecar 再退出
