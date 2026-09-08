@@ -79,4 +79,65 @@ describe('WorkBuddy 网关适配器', () => {
     const reply = await adapter.run('你好', { cwd: 'E:/project' });
     expect(reply).toContain('WorkBuddy 网关不可达');
   });
+
+  it('health、runs 和 stream 都发送协议版本头', async () => {
+    const seenHeaders: Array<string | undefined> = [];
+    const server: Server = createServer((req, res) => {
+      seenHeaders.push(req.headers['x-codebuddy-request'] as string | undefined);
+      const url = req.url ?? '';
+      res.setHeader('Content-Type', url.endsWith('/stream') ? 'text/event-stream' : 'application/json');
+      if (url === '/api/v1/health') res.end(JSON.stringify({ data: { status: 'ok' } }));
+      else if (url === '/api/v1/runs') res.end(JSON.stringify({ data: { runId: 'run-headers' } }));
+      else if (url === '/api/v1/runs/run-headers/stream') res.end('data: {"type":"text","text":"ok"}\n\ndata: {"type":"done"}\n\n');
+      else {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
+    const g = await new Promise<{ url: string; close: () => void }>((resolve) => {
+      server.listen(0, '127.0.0.1', () => {
+        const addr = server.address();
+        resolve({ url: `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`, close: () => server.close() });
+      });
+    });
+    gateways.push(g);
+
+    expect(await probeWorkbuddyGateway(g.url, '')).toBe(true);
+    expect(await new WorkBuddyGatewayAdapter(g.url, '').run('header check', { cwd: 'E:/project' })).toBe('ok');
+    expect(seenHeaders).toEqual(['1', '1', '1']);
+  });
+
+  it('SSE 网络中断且 run 仍活跃时重新连接', async () => {
+    let streamAttempts = 0;
+    const server: Server = createServer((req, res) => {
+      const url = req.url ?? '';
+      res.setHeader('Content-Type', 'application/json');
+      if (url === '/api/v1/runs' && req.method === 'POST') {
+        res.end(JSON.stringify({ data: { runId: 'run-reconnect' } }));
+      } else if (url === '/api/v1/runs/run-reconnect' && req.method === 'GET') {
+        res.end(JSON.stringify({ data: { active: true } }));
+      } else if (url === '/api/v1/runs/run-reconnect/stream') {
+        streamAttempts += 1;
+        if (streamAttempts === 1) req.socket.destroy();
+        else {
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.end('data: {"type":"text","text":"recovered"}\n\ndata: {"type":"done"}\n\n');
+        }
+      } else {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
+    const g = await new Promise<{ url: string; close: () => void }>((resolve) => {
+      server.listen(0, '127.0.0.1', () => {
+        const addr = server.address();
+        resolve({ url: `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`, close: () => server.close() });
+      });
+    });
+    gateways.push(g);
+
+    const reply = await new WorkBuddyGatewayAdapter(g.url, '').run('retry stream', { cwd: 'E:/project' });
+    expect(reply).toBe('recovered');
+    expect(streamAttempts).toBe(2);
+  });
 });

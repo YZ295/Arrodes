@@ -24,7 +24,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 
 export type SidebarView =
   | 'conversation' | 'workspace' | 'canvas' | 'workflow' | 'profile' | 'memory'
-  | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced' | 'wallpaper';
+  | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced' | 'wallpaper' | 'activity';
 
 interface NavItem {
   id: SidebarView;
@@ -40,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'profile', label: '画像', icon: 'profile' },
   { id: 'memory', label: '记忆', icon: 'memory' },
   { id: 'vision', label: '视觉', icon: 'vision' },
+  { id: 'activity', label: '动态', icon: 'activity' },
   { id: 'settings', label: '配置', icon: 'settings' },
   { id: 'advanced', label: '高级', icon: 'advanced' },
 ];
@@ -118,6 +119,15 @@ function NavIcon({ id }: { id: SidebarView }) {
         <svg {...props}>
           <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
           <circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case 'activity':
+      return (
+        <svg {...props}>
+          <rect x="3" y="12" width="3" height="3" rx="0.5" />
+          <rect x="8" y="9" width="3" height="6" rx="0.5" />
+          <rect x="13" y="5" width="3" height="10" rx="0.5" />
+          <rect x="18" y="12" width="3" height="3" rx="0.5" />
         </svg>
       );
     case 'settings':

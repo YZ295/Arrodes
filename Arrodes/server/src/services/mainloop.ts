@@ -9,8 +9,10 @@
  */
 import type { WebSocketServer } from 'ws';
 import { pollDueReminders } from '../skills/reminder.js';
+import { getDb } from '../db/connection.js';
 import { consolidateMemories } from './MemoryGateway.js';
 import { updatePetTask, updatePetResult } from './petStatus.js';
+import { aggregateOnce, PERIOD_MS } from './activityAggregator.js';
 
 const TICK_INTERVAL_MS = 30_000;
 
@@ -53,6 +55,19 @@ export async function runTick(wss: WebSocketServer | null = null, tickNow = Date
     }
   } catch (err) {
     console.warn('[Mainloop] 提醒轮询失败:', err);
+  }
+
+  // 1.5 活动周期聚合：距上次聚合满 10 分钟且有新观察时触发（无观察则跳过，热力图留空）
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT MAX(ts) AS maxTs FROM vision_observations').get() as { maxTs: number | null };
+    const lastAgg = db.prepare('SELECT MAX(end_ts) AS maxEnd FROM activity_periods').get() as { maxEnd: number | null };
+    const due = row.maxTs !== null && (lastAgg.maxEnd === null || row.maxTs > lastAgg.maxEnd) && tickNow - (lastAgg.maxEnd ?? tickNow - PERIOD_MS) >= PERIOD_MS - 15_000;
+    if (due) {
+      await aggregateOnce(tickNow);
+    }
+  } catch (err) {
+    console.warn('[Mainloop] 活动聚合失败:', err);
   }
 
   // 2. 主动记忆整理（去重合并；每 3 次 tick 做一次，避免频繁 DB 写）

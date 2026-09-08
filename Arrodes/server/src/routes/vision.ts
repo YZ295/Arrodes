@@ -7,6 +7,7 @@ import type { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { visionService, checkVisionModel, MAX_VISION_IMAGE_BYTES } from '../services/visionService.js';
 import { enrichScreenObservation } from '../services/visionEnrichment.js';
+import { getDb } from '../db/connection.js';
 import { existsSync, mkdirSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 
@@ -114,6 +115,14 @@ export function createVisionRouter(): Router {
 
       // 屏幕观察增强：视觉模型输出的 4 字段 JSON 由 DeepSeek 推断高阶字段；失败原样返回
       const enrichedDescription = await enrichScreenObservation(result.description);
+      // 观察落库（活动周期汇总的数据源；失败不阻塞响应）
+      try {
+        getDb()
+          .prepare('INSERT INTO vision_observations (ts, description) VALUES (?, ?)')
+          .run(Date.now(), enrichedDescription);
+      } catch (err) {
+        console.warn('[Vision] 观察落库失败:', err);
+      }
       res.json({ ...result, description: enrichedDescription });
     } catch (err) {
       const msg = err instanceof Error ? err.message : '视觉分析失败';

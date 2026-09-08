@@ -97,7 +97,7 @@ export default function PetCameraPanel({
         <span className="pet-camera-panel__label">窗口大小</span>
         <input
           type="range"
-          min={440}
+          min={280}
           max={990}
           step={10}
           value={windowWidth}

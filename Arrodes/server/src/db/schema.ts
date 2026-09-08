@@ -29,6 +29,26 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 
+CREATE TABLE IF NOT EXISTS vision_observations (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts          INTEGER NOT NULL,
+  description TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_vision_obs_ts ON vision_observations(ts);
+
+CREATE TABLE IF NOT EXISTS activity_periods (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  start_ts          INTEGER NOT NULL,
+  end_ts            INTEGER NOT NULL,
+  name              TEXT NOT NULL,
+  category          TEXT NOT NULL DEFAULT '其他' CHECK(category IN ('工作','学习','娱乐','社交','其他')),
+  tag               TEXT,
+  observation_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_start ON activity_periods(start_ts);
+
 CREATE TABLE IF NOT EXISTS memories (
   id          TEXT PRIMARY KEY,
   session_id  TEXT NOT NULL,

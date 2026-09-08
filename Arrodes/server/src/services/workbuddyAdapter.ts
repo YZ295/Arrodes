@@ -18,6 +18,15 @@ import type { AgentChatAdapter } from './agentAdapters.js';
 const DEFAULT_URL = process.env.WORKBUDDY_GATEWAY_URL || 'http://127.0.0.1:57956';
 const DEFAULT_TOKEN = process.env.WORKBUDDY_GATEWAY_TOKEN || '';
 
+function gatewayHeaders(token: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-codebuddy-request': '1',
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 /** 探测网关是否在线（401 也算在线：只是缺 token） */
 export async function probeWorkbuddyGateway(
   baseUrl = DEFAULT_URL,
@@ -28,7 +37,7 @@ export async function probeWorkbuddyGateway(
     const timer = setTimeout(() => ctrl.abort(), 2500);
     const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/v1/health`, {
       signal: ctrl.signal,
-      headers: token ? { Authorization: `Bearer ${token}`, 'x-codebuddy-request': '1' } : undefined,
+      headers: gatewayHeaders(token),
     });
     clearTimeout(timer);
     return res.status !== 404;
@@ -50,8 +59,7 @@ export class WorkBuddyGatewayAdapter implements AgentChatAdapter {
 
   async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
     const base = this.baseUrl.replace(/\/+$/, '');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-codebuddy-request': '1' };
-    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+    const headers = gatewayHeaders(this.token);
 
     // 1. 启动 Agent run
     let runId: string;
@@ -83,69 +91,87 @@ export class WorkBuddyGatewayAdapter implements AgentChatAdapter {
       return `WorkBuddy 网关不可达（${msg}）。请确认 WorkBuddy 已启动且网关端口正确（WORKBUDDY_GATEWAY_URL）。`;
     }
 
-    // 2. 通过 SSE 流收集结果
-    try {
-      const res = await fetch(`${base}/api/v1/runs/${encodeURIComponent(runId)}/stream`, {
-        headers,
-        signal: opts.signal,
-      });
-      if (res.status === 401 || res.status === 403) return authMessage();
-      if (!res.ok || !res.body) {
-        return `WorkBuddy 网关流式接口错误（HTTP ${res.status}）`;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
+    // 2. 通过 SSE 流收集结果；长任务的空闲连接可能被网关中间层断开。
+    const deadline = Date.now() + 8 * 60 * 1000;
+    let reconnects = 0;
+    while (Date.now() <= deadline) {
       let output = '';
-      const deadline = Date.now() + 8 * 60 * 1000;
-
-      const push = (raw: string): void => {
-        const line = raw.trim();
-        if (!line || line.startsWith(':')) return;
-        if (line.startsWith('data:')) {
-          const payload = line.slice(5).trim();
-          if (!payload) return;
-          let parsed: Record<string, unknown> | null = null;
-          try {
-            parsed = JSON.parse(payload) as Record<string, unknown>;
-          } catch {
-            // 非 JSON 的 data 行按纯文本追加
-            output += payload;
-            return;
-          }
-          const rawContent = parsed?.content;
-          // 网关回复事件：content 为对象 {markdown/type/text}（2026-08-16 实测）
-          let text: unknown = parsed?.text ?? parsed?.delta ?? parsed?.message;
-          if (typeof rawContent === 'object' && rawContent !== null) {
-            const c = rawContent as Record<string, unknown>;
-            text = c.markdown ?? c.text ?? c.type ?? '';
-          } else if (typeof rawContent === 'string') {
-            text = rawContent;
-          }
-          if (typeof text === 'string' && text) output += text;
-          if (parsed?.done === true || parsed?.type === 'done' || parsed?.type === 'result'
-            || parsed?.status === 'completed') {
-            if (typeof parsed?.result === 'string' && parsed.result) output += parsed.result;
-          }
+      try {
+        const res = await fetch(`${base}/api/v1/runs/${encodeURIComponent(runId)}/stream`, {
+          headers,
+          signal: opts.signal,
+        });
+        if (res.status === 401 || res.status === 403) return authMessage();
+        if (!res.ok || !res.body) {
+          return `WorkBuddy 网关流式接口错误（HTTP ${res.status}，runId=${runId}）`;
         }
-      };
 
-      while (true) {
-        if (Date.now() > deadline) return output.trim() || '（WorkBuddy 响应超时）';
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() ?? '';
-        for (const line of lines) push(line);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        const push = (raw: string): void => {
+          const line = raw.trim();
+          if (!line || line.startsWith(':')) return;
+          if (line.startsWith('data:')) {
+            const payload = line.slice(5).trim();
+            if (!payload) return;
+            let parsed: Record<string, unknown> | null = null;
+            try {
+              parsed = JSON.parse(payload) as Record<string, unknown>;
+            } catch {
+              // 非 JSON 的 data 行按纯文本追加
+              output += payload;
+              return;
+            }
+            const rawContent = parsed?.content;
+            // 网关回复事件：content 为对象 {markdown/type/text}（2026-08-16 实测）
+            let text: unknown = parsed?.text ?? parsed?.delta ?? parsed?.message;
+            if (typeof rawContent === 'object' && rawContent !== null) {
+              const c = rawContent as Record<string, unknown>;
+              text = c.markdown ?? c.text ?? c.type ?? '';
+            } else if (typeof rawContent === 'string') {
+              text = rawContent;
+            }
+            if (typeof text === 'string' && text) output += text;
+            if (parsed?.done === true || parsed?.type === 'done' || parsed?.type === 'result'
+              || parsed?.status === 'completed') {
+              if (typeof parsed?.result === 'string' && parsed.result) output += parsed.result;
+            }
+          }
+        };
+
+        while (true) {
+          if (Date.now() > deadline) return output.trim() || `（WorkBuddy 响应超时，runId=${runId}）`;
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split(/\r?\n/);
+          buffer = lines.pop() ?? '';
+          for (const line of lines) push(line);
+        }
+        if (buffer.trim()) push(buffer);
+        return output.trim() || '（WorkBuddy 未返回内容）';
+      } catch (err) {
+        if (opts.signal?.aborted) return '（已停止）';
+        const msg = err instanceof Error ? err.message : String(err);
+        if (reconnects >= 3) return `WorkBuddy 回复中断（${msg}，runId=${runId}）`;
+        try {
+          const statusRes = await fetch(`${base}/api/v1/runs/${encodeURIComponent(runId)}`, {
+            headers,
+            signal: opts.signal,
+          });
+          const status = await statusRes.json().catch(() => null) as { data?: { active?: unknown } } | null;
+          if (!statusRes.ok || status?.data?.active !== true) {
+            return `WorkBuddy 回复中断且任务已结束或状态未知（${msg}，runId=${runId}）`;
+          }
+        } catch {
+          return `WorkBuddy 回复中断且无法查询任务状态（${msg}，runId=${runId}）`;
+        }
+        reconnects += 1;
+        await new Promise(resolve => setTimeout(resolve, 250 * reconnects));
       }
-      if (buffer.trim()) push(buffer);
-      return output.trim() || '（WorkBuddy 未返回内容）';
-    } catch (err) {
-      if (opts.signal?.aborted) return '（已停止）';
-      const msg = err instanceof Error ? err.message : String(err);
-      return `WorkBuddy 回复中断（${msg}）`;
     }
+    return `（WorkBuddy 响应超时，runId=${runId}）`;
   }
 }
