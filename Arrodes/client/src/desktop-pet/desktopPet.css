@@ -332,7 +332,7 @@ html.desktop-pet-surface #root {
   left: 36%;
 }
 
-/* 装饰态：悬停淡出让位（airi Fade on hover 模式），移开即恢复 */
+/* 装饰态：悬停半透明让位（airi Fade on hover 模式），移开即恢复；0.06 几乎隐形已弃用 */
 .desktop-pet.pet-decorative:hover {
-  opacity: 0.06;
+  opacity: 0.4;
 }
