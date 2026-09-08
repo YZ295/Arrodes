@@ -269,17 +269,21 @@ ipcMain.on('pet:vision-state', (event, on: boolean) => {
   petVisionOn = on;
 });
 
-/** 应用悬浮状态：置顶 + 截图保护联动；重新悬浮时强制拉回可见（Windows 透明窗 z 序重置后会"消失"） */
+/**
+ * 应用悬浮状态。悬浮=置顶+鼠标全穿透（纯装饰，点不到她）；非悬浮=可交互（右键/拖动/对话）。
+ * 不使用 setContentProtection：Windows 上该标志会让透明窗连屏幕显示一起失效（表现为"直接消失"）。
+ * hide+show 循环强制重置合成器，修复 setAlwaysOnTop 切换后的不绘制问题。
+ */
 function applyPetFloating(on: boolean): void {
   petFloating = on;
   if (!petWindow) return;
+  petWindow.setAlwaysOnTop(on, on ? 'floating' : 'normal');
   if (on) {
-    petWindow.setAlwaysOnTop(true, 'floating');
-    petWindow.setContentProtection(true);
+    petWindow.setIgnoreMouseEvents(true, { forward: true });
+    petWindow.hide();
     petWindow.showInactive();
   } else {
-    petWindow.setAlwaysOnTop(false);
-    petWindow.setContentProtection(false);
+    petWindow.setIgnoreMouseEvents(true, { forward: true }); // 交还渲染器按悬停控制
   }
   dlog(`pet floating=${on}`);
 }
@@ -297,7 +301,7 @@ function showPetContextMenu(): void {
       click: () => app.quit(),
     },
     {
-      label: '悬浮于桌面',
+      label: '悬浮于桌面（Ctrl+Alt+A 切换）',
       type: 'checkbox',
       checked: petFloating,
       click: (item) => {
@@ -309,6 +313,7 @@ function showPetContextMenu(): void {
 }
 
 ipcMain.on('pet:set-interactive', (event, interactive: boolean) => {
+  if (petFloating && interactive) return; // 悬浮态=纯装饰，不允许交互（Ctrl+Alt+A 切回交互态）
   if (!petWindow || event.sender !== petWindow.webContents || typeof interactive !== 'boolean') return;
   petWindow.setIgnoreMouseEvents(!interactive, { forward: true });
 });
