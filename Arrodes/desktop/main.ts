@@ -267,7 +267,7 @@ ipcMain.on('pet:move-by', (event, dx: number, dy: number) => {
 
 ipcMain.on('pet:resize', (event, width: number, height: number) => {
   if (!petWindow || typeof width !== 'number' || typeof height !== 'number') return;
-  if (width < 400 || width > 1200) return;
+  if (width < 280 || width > 1200) return;
   // Windows 上 resizable:false 时 setSize 会被忽略，需临时开启
   petWindow.setResizable(true);
   petWindow.setSize(Math.round(width), Math.round(height));
