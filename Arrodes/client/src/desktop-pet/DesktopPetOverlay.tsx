@@ -29,6 +29,23 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
   const confidence = view.confidence === null ? null : Math.round(view.confidence * 100);
 
   const hostMode = resolvePetHostMode();
+  // 等比缩放：以 660x600 设计稿为基准，窗口变小整体等比缩（气泡永不遮脸）
+  const [petScale, setPetScale] = useState(1);
+  useEffect(() => {
+    const compute = (w: number, h: number) => {
+      const scale = Math.min(w / 660, h / 600);
+      setPetScale(Math.max(0.3, Math.min(1.25, scale)));
+    };
+    if (hostMode === 'electron') {
+      window.arrodesPet?.onBounds((b) => compute(b.width, b.height));
+    } else {
+      const onResize = () => compute(window.innerWidth, window.innerHeight);
+      window.addEventListener('resize', onResize);
+      onResize();
+      return () => window.removeEventListener('resize', onResize);
+    }
+  }, [hostMode]);
+
   const [position, setPosition] = useState<{ x: number; y: number } | null>(() => (
     hostMode === 'browser' ? loadStoredPetPosition() : null
   ));
@@ -234,7 +251,10 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
       onDoubleClick={() => { if (hostMode === 'electron') window.arrodesPet?.toggleInteractive(); }}
       onMouseEnter={onRootEnter}
       onMouseLeave={onRootLeave}
-      style={position ? { left: position.x, top: position.y } : undefined}
+      style={{
+        ...(position ? { left: position.x, top: position.y } : {}),
+        ...(hostMode === 'electron' ? { transform: `scale(${petScale})`, transformOrigin: 'bottom right' } : {}),
+      }}
       data-positioned={position ? 'true' : 'false'}
     >
       <section className="desktop-pet__bubble" aria-live="polite" aria-atomic="true">
