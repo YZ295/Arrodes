@@ -281,16 +281,20 @@ ipcMain.on('pet:vision-state', (event, on: boolean) => {
 });
 
 /**
- * 应用悬浮状态：悬浮=仅置顶显示（可点击/右键/拖动，观察帧裁剪已防自我反馈）。
- * 不做鼠标穿透、不用 setContentProtection（后者在本机透明窗上会致整体隐形）。
+ * 应用悬浮状态：悬浮=置顶+鼠标全穿透（纯装饰，绝不干扰工作）；
+ * 非悬浮=可交互（点击/右键/拖动/对话），Ctrl+Alt+A 双向切换。
+ * 不用 setContentProtection（本机透明窗上会致整体隐形）。
  * hide+show 循环强制重置合成器，修复 setAlwaysOnTop 切换后的不绘制问题。
  */
 function applyPetFloating(on: boolean): void {
   petFloating = on;
   if (!petWindow) return;
   petWindow.setAlwaysOnTop(on, on ? 'floating' : 'normal');
-  petWindow.hide();
-  petWindow.showInactive();
+  petWindow.setIgnoreMouseEvents(true, { forward: true });
+  if (on) {
+    petWindow.hide();
+    petWindow.showInactive();
+  }
   dlog(`pet floating=${on}`);
 }
 
@@ -307,7 +311,7 @@ function showPetContextMenu(): void {
       click: () => app.quit(),
     },
     {
-      label: '悬浮于桌面（置顶显示）',
+      label: '悬浮于桌面（穿透装饰）',
       type: 'checkbox',
       checked: petFloating,
       click: (item) => {
@@ -324,6 +328,7 @@ ipcMain.on('pet:opacity', (event, opacity: number) => {
 });
 
 ipcMain.on('pet:set-interactive', (event, interactive: boolean) => {
+  if (petFloating && interactive) return; // 悬浮=纯装饰，不响应悬停交互（Ctrl+Alt+A 切回）
   if (!petWindow || event.sender !== petWindow.webContents || typeof interactive !== 'boolean') return;
   petWindow.setIgnoreMouseEvents(!interactive, { forward: true });
 });
