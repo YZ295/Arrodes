@@ -9,7 +9,7 @@
  * 打包：electron-builder（asar + node 运行时 + 后端依赖）
  * 后端子进程用 process.execPath 里内置的 Node 运行，无需系统 Node。
  */
-import { app, BrowserWindow, Menu, ipcMain, shell, dialog, session, screen } from 'electron';
+import { app, BrowserWindow, Menu, globalShortcut, ipcMain, shell, dialog, session, screen } from 'electron';
 import { fork, spawn, ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
@@ -269,6 +269,21 @@ ipcMain.on('pet:vision-state', (event, on: boolean) => {
   petVisionOn = on;
 });
 
+/** 应用悬浮状态：置顶 + 截图保护联动；重新悬浮时强制拉回可见（Windows 透明窗 z 序重置后会"消失"） */
+function applyPetFloating(on: boolean): void {
+  petFloating = on;
+  if (!petWindow) return;
+  if (on) {
+    petWindow.setAlwaysOnTop(true, 'floating');
+    petWindow.setContentProtection(true);
+    petWindow.showInactive();
+  } else {
+    petWindow.setAlwaysOnTop(false);
+    petWindow.setContentProtection(false);
+  }
+  dlog(`pet floating=${on}`);
+}
+
 function showPetContextMenu(): void {
   if (!petWindow) return;
   const menu = Menu.buildFromTemplate([
@@ -286,11 +301,7 @@ function showPetContextMenu(): void {
       type: 'checkbox',
       checked: petFloating,
       click: (item) => {
-        petFloating = item.checked;
-        if (!petWindow) return;
-        petWindow.setAlwaysOnTop(petFloating, 'floating');
-        // 悬浮时禁止被截屏；取消悬浮后恢复可截图
-        petWindow.setContentProtection(petFloating);
+        applyPetFloating(item.checked);
       },
     },
   ]);
@@ -413,6 +424,13 @@ if (!app.requestSingleInstanceLock()) {
 
 app.whenReady().then(async () => {
   try {
+    // 全局快捷键：桌宠被遮挡/丢失时随时唤回并恢复悬浮
+    try {
+      globalShortcut.register('Ctrl+Alt+A', () => applyPetFloating(true));
+    } catch (err) {
+      console.warn('[Desktop] 全局快捷键注册失败:', err);
+    }
+
     await ensureGateway();
     await startBackend();
     if (PET_ONLY) {
@@ -448,6 +466,8 @@ app.whenReady().then(async () => {
 });
 
 }
+
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('window-all-closed', () => {
   // 停后端与视觉 sidecar 再退出
