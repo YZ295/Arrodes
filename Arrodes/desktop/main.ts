@@ -289,6 +289,9 @@ function setPetInteractive(on: boolean): void {
   petInteractive = on;
   if (interactiveTimer) { clearTimeout(interactiveTimer); interactiveTimer = null; }
   if (!petWindow) return;
+  // 永远置顶（Bongo Cat 同款 HWND_TOPMOST 语义）：screen-saver 为最高置顶层，
+  // 压过 'floating' 层的其他置顶应用；全屏独占游戏为系统级例外（无解，Bongo Cat 同样如此）
+  petWindow.setAlwaysOnTop(true, 'screen-saver');
   petWindow.setIgnoreMouseEvents(!on, { forward: true });
   petWindow.webContents.send('pet:interactive', on);
   dlog(`pet interactive=${on}`);
@@ -461,6 +464,14 @@ app.whenReady().then(async () => {
     } catch (err) {
       console.warn('[Desktop] 托盘创建失败:', err);
     }
+
+    // 置顶看门狗：全屏切换/DWM 重置可能丢掉 topmost 标志，每 5 秒校验补挂
+    setInterval(() => {
+      if (petWindow && !petWindow.isAlwaysOnTop()) {
+        petWindow.setAlwaysOnTop(true, 'screen-saver');
+        dlog('watchdog: re-asserted always-on-top');
+      }
+    }, 5000);
 
     await ensureGateway();
     await startBackend();
