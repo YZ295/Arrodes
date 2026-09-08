@@ -6,6 +6,7 @@ html.desktop-pet-surface #root {
 
 .desktop-pet {
   position: relative;
+  transition: opacity 0.3s ease;
   width: 100vw;  /* 跟随 OS 窗口大小（机位面板可缩放整个窗口） */
   height: 100vh;
   overflow: hidden;
@@ -329,4 +330,9 @@ html.desktop-pet-surface #root {
 /* VRM 容器同样右移：人物占右侧 420px，左侧 240px 留给气泡 */
 .desktop-pet__vrm {
   left: 36%;
+}
+
+/* 装饰态：悬停淡出让位（airi Fade on hover 模式），移开即恢复 */
+.desktop-pet.pet-decorative:hover {
+  opacity: 0.06;
 }

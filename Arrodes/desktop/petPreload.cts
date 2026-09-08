@@ -17,4 +17,8 @@ contextBridge.exposeInMainWorld('arrodesPet', {
   onBounds: (callback: (bounds: { x: number; y: number; width: number; height: number }) => void) => {
     ipcRenderer.on('pet:bounds', (_event, bounds) => callback(bounds));
   },
+  onInteractive: (callback: (on: boolean) => void) => {
+    ipcRenderer.on('pet:interactive', (_event, on: boolean) => callback(on));
+  },
+  toggleInteractive: () => ipcRenderer.send('pet:interactive-toggle'),
 });

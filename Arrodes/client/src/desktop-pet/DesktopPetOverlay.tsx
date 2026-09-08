@@ -24,6 +24,7 @@ const PET_VISUAL = (import.meta.env.VITE_PET_VISUAL || 'vrm') as 'vrm' | 'proced
 
 export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot?: DesktopPetSnapshot }) {
   const snapshot = useDesktopPetSnapshot(initialSnapshot);
+  const [interactive, setInteractive] = useState(true);
   const view = createDesktopPetViewModel(snapshot.observation, snapshot);
   const confidence = view.confidence === null ? null : Math.round(view.confidence * 100);
 
@@ -196,7 +197,13 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
     } catch { /* 忽略 */ }
   }, [hostMode]);
 
-  // Electron 模式：视觉状态同步给主进程（右键菜单标签）
+  // Electron 模式：交互/装饰模式订阅 + 双击切换 + 淡出态控制
+  useEffect(() => {
+    if (hostMode !== 'electron') return;
+    window.arrodesPet?.onInteractive(setInteractive);
+  }, [hostMode]);
+
+  // Electron 模式：视觉状态同步给主进程（托盘菜单标签）
   useEffect(() => {
     if (hostMode !== 'electron') return;
     window.arrodesPet?.notifyVisionState(snapshot.active);
@@ -222,8 +229,9 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
 
   return (
     <main
-      className={`desktop-pet desktop-pet--${view.tone}`}
+      className={`desktop-pet desktop-pet--${view.tone}${hostMode === 'electron' && !interactive ? ' pet-decorative' : ''}`}
       aria-label="阿罗德斯桌面管家"
+      onDoubleClick={() => { if (hostMode === 'electron') window.arrodesPet?.toggleInteractive(); }}
       onMouseEnter={onRootEnter}
       onMouseLeave={onRootLeave}
       style={position ? { left: position.x, top: position.y } : undefined}

@@ -24,6 +24,10 @@ export interface PetHostBridge {
   setOpacity(opacity: number): void;
   /** 订阅窗口边界变化（供观察帧裁剪） */
   onBounds(callback: (bounds: { x: number; y: number; width: number; height: number }) => void): void;
+  /** 订阅交互/装饰模式切换（装饰态悬停淡出） */
+  onInteractive(callback: (on: boolean) => void): void;
+  /** 切换交互模式（双击管家触发） */
+  toggleInteractive(): void;
 }
 
 declare global {

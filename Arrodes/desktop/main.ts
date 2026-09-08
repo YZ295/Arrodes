@@ -9,7 +9,7 @@
  * 打包：electron-builder（asar + node 运行时 + 后端依赖）
  * 后端子进程用 process.execPath 里内置的 Node 运行，无需系统 Node。
  */
-import { app, BrowserWindow, Menu, globalShortcut, ipcMain, shell, dialog, session, screen } from 'electron';
+import { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, dialog, session, screen } from 'electron';
 import { fork, spawn, ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
@@ -225,8 +225,7 @@ async function createPetWindow() {
     },
   });
 
-  applyPetFloating(false); // 管家流程步骤 3：默认非悬浮（可交互）
-  petWindow.setIgnoreMouseEvents(true, { forward: true });
+  setPetInteractive(true); // 管家流程步骤 3：默认交互模式（可调机位/透明度/开观察）
   petWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   petWindow.webContents.on('context-menu', () => showPetContextMenu());
   // 边界广播（节流 200ms）：供主窗口在观察帧中裁掉管家区域，防自我反馈
@@ -281,21 +280,30 @@ ipcMain.on('pet:vision-state', (event, on: boolean) => {
 });
 
 /**
- * 应用悬浮状态：悬浮=置顶+鼠标全穿透（纯装饰，绝不干扰工作）；
- * 非悬浮=可交互（点击/右键/拖动/对话），Ctrl+Alt+A 双向切换。
- * 不用 setContentProtection（本机透明窗上会致整体隐形）。
- * hide+show 循环强制重置合成器，修复 setAlwaysOnTop 切换后的不绘制问题。
+ * 交互/装饰双态切换（airi "Fade on hover" 模式简版）：
+ * - 装饰态（挂机）：置顶 + 全穿透 + 悬停淡出，绝不干扰工作
+ * - 交互态：鼠标可用（机位面板/透明度/右键菜单/拖动）
+ * 窗口永远置顶；观察帧裁剪独立生效，与状态无关。
  */
-function applyPetFloating(on: boolean): void {
-  petFloating = on;
+function setPetInteractive(on: boolean): void {
+  petInteractive = on;
+  if (interactiveTimer) { clearTimeout(interactiveTimer); interactiveTimer = null; }
   if (!petWindow) return;
-  petWindow.setAlwaysOnTop(on, on ? 'floating' : 'normal');
-  petWindow.setIgnoreMouseEvents(true, { forward: true });
-  if (on) {
-    petWindow.hide();
-    petWindow.showInactive();
-  }
-  dlog(`pet floating=${on}`);
+  petWindow.setIgnoreMouseEvents(!on, { forward: true });
+  petWindow.webContents.send('pet:interactive', on);
+  dlog(`pet interactive=${on}`);
+  refreshTrayMenu();
+}
+
+/** 托盘菜单（状态变化时重建以刷新勾选态） */
+function refreshTrayMenu(): void {
+  if (!petTray) return;
+  petTray.setContextMenu(Menu.buildFromTemplate([
+    { label: petInteractive ? '交互模式：已开启' : '交互模式：已关闭（穿透装饰）', type: 'checkbox', checked: petInteractive, click: () => setPetInteractive(!petInteractive) },
+    { label: petVisionOn ? '视觉观察：已开启' : '视觉观察：已关闭', type: 'checkbox', checked: petVisionOn, click: () => petWindow?.webContents.send('pet:vision-toggle') },
+    { type: 'separator' },
+    { label: '退出阿罗德斯', click: () => app.quit() },
+  ]));
 }
 
 function showPetContextMenu(): void {
@@ -310,14 +318,6 @@ function showPetContextMenu(): void {
       label: '退出阿罗德斯',
       click: () => app.quit(),
     },
-    {
-      label: petHotkey ? `悬浮于桌面（${petHotkey} 切换）` : '悬浮于桌面',
-      type: 'checkbox',
-      checked: petFloating,
-      click: (item) => {
-        applyPetFloating(item.checked);
-      },
-    },
   ]);
   menu.popup({ window: petWindow });
 }
@@ -327,8 +327,13 @@ ipcMain.on('pet:opacity', (event, opacity: number) => {
   petWindow.setOpacity(Math.min(1, Math.max(0.15, opacity)));
 });
 
+ipcMain.on('pet:interactive-toggle', (event) => {
+  if (!petWindow || event.sender !== petWindow.webContents) return;
+  setPetInteractive(!petInteractive);
+});
+
 ipcMain.on('pet:set-interactive', (event, interactive: boolean) => {
-  if (petFloating && interactive) return; // 悬浮=纯装饰，不响应悬停交互（Ctrl+Alt+A 切回）
+  if (!petInteractive && interactive) return; // 装饰态：不响应悬停交互
   if (!petWindow || event.sender !== petWindow.webContents || typeof interactive !== 'boolean') return;
   petWindow.setIgnoreMouseEvents(!interactive, { forward: true });
 });
@@ -341,8 +346,9 @@ const PET_ONLY = process.argv.includes('--pet');
 let visionProc: ChildProcess | null = null;
 let gatewayProc: ChildProcess | null = null;
 let petVisionOn = false;   // 视觉观察状态（右键菜单标签用）
-let petFloating = false;
-let petHotkey: string | null = null; // 实际注册成功的全局快捷键  // 管家流程：默认非悬浮（可交互），开启屏幕观察后再手动切悬浮
+let petInteractive = true;  // 交互模式：可点击/右键/拖动/调面板；关闭=装饰模式（穿透+悬停淡出）
+let petTray: Tray | null = null;
+let interactiveTimer: ReturnType<typeof setTimeout> | null = null;
 /** 桌面端文件日志：双击启动时 stdout 丢失，关键事件落盘便于诊断 */
 function dlog(msg: string): void {
   try {
@@ -445,18 +451,14 @@ if (!app.requestSingleInstanceLock()) {
 
 app.whenReady().then(async () => {
   try {
-    // 全局快捷键：悬浮/交互双向切换。候选键依次降级（Ctrl+Alt+A 常被截图软件占用）
+    // 托盘：管家交互的永久入口（装饰态下窗口收不到鼠标，靠这里切回交互）
     try {
-      for (const acc of ['Ctrl+Alt+A', 'Ctrl+Alt+P', 'Ctrl+Alt+Space', 'Ctrl+Shift+A']) {
-        if (globalShortcut.register(acc, () => applyPetFloating(!petFloating))) {
-          petHotkey = acc;
-          dlog(`hotkey registered: ${acc}`);
-          break;
-        }
-      }
-      if (!petHotkey) dlog('hotkey FAILED: 全部候选键被其他程序占用');
+      petTray = new Tray(nativeImage.createFromPath(join(__dirname, '../assets/tray.png')));
+      petTray.setToolTip('阿罗德斯管家');
+      refreshTrayMenu();
+      dlog('tray created');
     } catch (err) {
-      console.warn('[Desktop] 全局快捷键注册失败:', err);
+      console.warn('[Desktop] 托盘创建失败:', err);
     }
 
     await ensureGateway();
@@ -495,7 +497,7 @@ app.whenReady().then(async () => {
 
 }
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => { if (petTray) { petTray.destroy(); petTray = null; } });
 
 app.on('window-all-closed', () => {
   // 停后端与视觉 sidecar 再退出
