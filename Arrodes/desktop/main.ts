@@ -311,7 +311,7 @@ function showPetContextMenu(): void {
       click: () => app.quit(),
     },
     {
-      label: '悬浮于桌面（穿透装饰）',
+      label: petHotkey ? `悬浮于桌面（${petHotkey} 切换）` : '悬浮于桌面',
       type: 'checkbox',
       checked: petFloating,
       click: (item) => {
@@ -341,7 +341,8 @@ const PET_ONLY = process.argv.includes('--pet');
 let visionProc: ChildProcess | null = null;
 let gatewayProc: ChildProcess | null = null;
 let petVisionOn = false;   // 视觉观察状态（右键菜单标签用）
-let petFloating = false;  // 管家流程：默认非悬浮（可交互），开启屏幕观察后再手动切悬浮
+let petFloating = false;
+let petHotkey: string | null = null; // 实际注册成功的全局快捷键  // 管家流程：默认非悬浮（可交互），开启屏幕观察后再手动切悬浮
 /** 桌面端文件日志：双击启动时 stdout 丢失，关键事件落盘便于诊断 */
 function dlog(msg: string): void {
   try {
@@ -444,9 +445,16 @@ if (!app.requestSingleInstanceLock()) {
 
 app.whenReady().then(async () => {
   try {
-    // 全局快捷键：桌宠被遮挡/丢失时随时唤回并恢复悬浮
+    // 全局快捷键：悬浮/交互双向切换。候选键依次降级（Ctrl+Alt+A 常被截图软件占用）
     try {
-      globalShortcut.register('Ctrl+Alt+A', () => applyPetFloating(!petFloating));
+      for (const acc of ['Ctrl+Alt+A', 'Ctrl+Alt+P', 'Ctrl+Alt+Space', 'Ctrl+Shift+A']) {
+        if (globalShortcut.register(acc, () => applyPetFloating(!petFloating))) {
+          petHotkey = acc;
+          dlog(`hotkey registered: ${acc}`);
+          break;
+        }
+      }
+      if (!petHotkey) dlog('hotkey FAILED: 全部候选键被其他程序占用');
     } catch (err) {
       console.warn('[Desktop] 全局快捷键注册失败:', err);
     }
