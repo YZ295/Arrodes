@@ -453,7 +453,8 @@ app.whenReady().then(async () => {
   try {
     // 托盘：管家交互的永久入口（装饰态下窗口收不到鼠标，靠这里切回交互）
     try {
-      petTray = new Tray(nativeImage.createFromPath(join(__dirname, '../assets/tray.png')));
+      const trayIcon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAcUlEQVR4nO3O2w3AIAxDUQbuCAzNBu0CvEzsBFWx5O97SsmBq097Zw8LyyBomAqxxk0IVvwIwY5DCFV8GxEKUMeXiFCAV3yISEACEhAO8ER041cAPBDT+BUAJWIrrkJAcTbiKM5CmOIWCC2MQmTh3+4D6GTVs6eUTeoAAAAASUVORK5CYII=');
+      petTray = new Tray(trayIcon);
       petTray.setToolTip('阿罗德斯管家');
       refreshTrayMenu();
       dlog('tray created');
