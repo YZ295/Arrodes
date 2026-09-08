@@ -447,7 +447,7 @@ app.whenReady().then(async () => {
   try {
     // 全局快捷键：桌宠被遮挡/丢失时随时唤回并恢复悬浮
     try {
-      globalShortcut.register('Ctrl+Alt+A', () => applyPetFloating(true));
+      globalShortcut.register('Ctrl+Alt+A', () => applyPetFloating(!petFloating));
     } catch (err) {
       console.warn('[Desktop] 全局快捷键注册失败:', err);
     }
