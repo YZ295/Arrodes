@@ -225,10 +225,21 @@ async function createPetWindow() {
     },
   });
 
-  petWindow.setAlwaysOnTop(true, 'floating');
+  applyPetFloating(false); // 管家流程步骤 3：默认非悬浮（可交互）
   petWindow.setIgnoreMouseEvents(true, { forward: true });
   petWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   petWindow.webContents.on('context-menu', () => showPetContextMenu());
+  // 边界广播（节流 200ms）：供主窗口在观察帧中裁掉管家区域，防自我反馈
+  let lastBoundsSent = 0;
+  const sendBounds = () => {
+    const now = Date.now();
+    if (now - lastBoundsSent < 200) return;
+    lastBoundsSent = now;
+    petWindow?.webContents.send('pet:bounds', petWindow.getBounds());
+  };
+  petWindow.on('move', sendBounds);
+  petWindow.on('resize', sendBounds);
+  petWindow.webContents.on('did-finish-load', sendBounds);
   dlog('pet window created (hidden)');
   petWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
     dlog(`pet did-fail-load code=${code} desc=${desc} url=${String(url).slice(0, 120)}`);
@@ -312,6 +323,11 @@ function showPetContextMenu(): void {
   menu.popup({ window: petWindow });
 }
 
+ipcMain.on('pet:opacity', (event, opacity: number) => {
+  if (!petWindow || event.sender !== petWindow.webContents || typeof opacity !== 'number') return;
+  petWindow.setOpacity(Math.min(1, Math.max(0.15, opacity)));
+});
+
 ipcMain.on('pet:set-interactive', (event, interactive: boolean) => {
   if (petFloating && interactive) return; // 悬浮态=纯装饰，不允许交互（Ctrl+Alt+A 切回交互态）
   if (!petWindow || event.sender !== petWindow.webContents || typeof interactive !== 'boolean') return;
@@ -326,7 +342,7 @@ const PET_ONLY = process.argv.includes('--pet');
 let visionProc: ChildProcess | null = null;
 let gatewayProc: ChildProcess | null = null;
 let petVisionOn = false;   // 视觉观察状态（右键菜单标签用）
-let petFloating = true;    // 悬浮置顶（联动截图保护：悬浮时不可被截屏）
+let petFloating = false;  // 管家流程：默认非悬浮（可交互），开启屏幕观察后再手动切悬浮
 /** 桌面端文件日志：双击启动时 stdout 丢失，关键事件落盘便于诊断 */
 function dlog(msg: string): void {
   try {

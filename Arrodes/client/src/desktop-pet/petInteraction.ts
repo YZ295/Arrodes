@@ -20,6 +20,10 @@ export interface PetHostBridge {
   notifyVisionState(on: boolean): void;
   /** 订阅右键菜单的视觉开关命令 */
   onVisionToggle(callback: (on: boolean) => void): void;
+  /** 设置窗口整体透明度（0.15~1） */
+  setOpacity(opacity: number): void;
+  /** 订阅窗口边界变化（供观察帧裁剪） */
+  onBounds(callback: (bounds: { x: number; y: number; width: number; height: number }) => void): void;
 }
 
 declare global {

@@ -27,6 +27,12 @@ export default function PetCameraPanel({
 }) {
   const [config, setConfig] = useState<VrmCameraConfig>(() => mergeCameraConfig());
   const [saved, setSaved] = useState(false);
+  const [opacity, setOpacity] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem('arrodes_pet_opacity'));
+      return Number.isFinite(v) && v >= 0.15 && v <= 1 ? Math.round(v * 100) : 100;
+    } catch { return 100; }
+  });
   const [windowWidth, setWindowWidth] = useState(() => {
     try {
       const v = Number(localStorage.getItem('arrodes_pet_window_width'));
@@ -104,6 +110,23 @@ export default function PetCameraPanel({
           }}
         />
         <span className="pet-camera-panel__value">{windowWidth}</span>
+      </label>
+      <label className="pet-camera-panel__row">
+        <span className="pet-camera-panel__label">透明度</span>
+        <input
+          type="range"
+          min={20}
+          max={100}
+          step={5}
+          value={opacity}
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            setOpacity(value);
+            try { localStorage.setItem('arrodes_pet_opacity', String(value / 100)); } catch { /* 忽略 */ }
+            window.arrodesPet?.setOpacity(value / 100);
+          }}
+        />
+        <span className="pet-camera-panel__value">{opacity}%</span>
       </label>
       <footer className="pet-camera-panel__footer">
         <button type="button" data-role="cam-save" onClick={onSave}>{saved ? '已保存 ✓' : '保存'}</button>

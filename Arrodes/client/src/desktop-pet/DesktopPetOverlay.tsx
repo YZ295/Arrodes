@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import avatarUrl from '../assets/arrodes_desktop_pet.png';
-import { sendPetCommand, useDesktopPetSnapshot } from './desktopPetBridge';
+import { sendPetBounds, sendPetCommand, useDesktopPetSnapshot } from './desktopPetBridge';
 import { createDesktopPetViewModel, type DesktopPetSnapshot } from './desktopPetState';
 import { usePetChat } from './usePetChat';
 import { PET_MODEL_URL, startLive2dPet, type Live2dPetController } from './live2dPet';
@@ -180,6 +180,18 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
       const width = Number(localStorage.getItem('arrodes_pet_window_width'));
       if (Number.isFinite(width) && width >= 440 && width <= 990 && width !== 660) {
         window.arrodesPet?.resize(width, Math.round((width * 600) / 660));
+      }
+    } catch { /* 忽略 */ }
+  }, [hostMode]);
+
+  // Electron 模式：窗口边界变化广播给主窗口（观察帧裁剪用）+ 启动时应用保存的透明度
+  useEffect(() => {
+    if (hostMode !== 'electron') return;
+    window.arrodesPet?.onBounds((bounds) => sendPetBounds(bounds));
+    try {
+      const saved = Number(localStorage.getItem('arrodes_pet_opacity'));
+      if (Number.isFinite(saved) && saved >= 0.15 && saved < 1) {
+        window.arrodesPet?.setOpacity(saved);
       }
     } catch { /* 忽略 */ }
   }, [hostMode]);

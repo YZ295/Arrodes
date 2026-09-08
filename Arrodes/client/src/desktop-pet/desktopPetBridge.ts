@@ -12,9 +12,43 @@ const EMPTY_SNAPSHOT: DesktopPetSnapshot = {
 type DesktopPetMessage =
   | { type: 'snapshot'; snapshot: DesktopPetSnapshot }
   | { type: 'request-snapshot' }
-  | { type: 'command'; command: PetCommand };
+  | { type: 'command'; command: PetCommand }
+  | { type: 'pet-bounds'; rect: PetScreenRect };
 
 export type PetCommand = 'vision-toggle';
+
+export interface PetScreenRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+let boundsHandlerRef: ((rect: PetScreenRect) => void) | null = null;
+
+/** 桌宠窗口：广播自身屏幕边界（主窗口用于观察帧裁剪） */
+export function sendPetBounds(rect: PetScreenRect): void {
+  const channel = openChannel();
+  if (!channel) return;
+  channel.postMessage({ type: 'pet-bounds', rect } satisfies DesktopPetMessage);
+  channel.close();
+}
+
+/** 主窗口：订阅管家屏幕边界 */
+export function usePetBoundsListener(handler: (rect: PetScreenRect) => void): void {
+  boundsHandlerRef = handler;
+  useEffect(() => {
+    const channel = openChannel();
+    if (!channel) return;
+    channel.onmessage = (event: MessageEvent<DesktopPetMessage>) => {
+      if (event.data?.type === 'pet-bounds') boundsHandlerRef?.(event.data.rect);
+    };
+    return () => {
+      channel.onmessage = null;
+      channel.close();
+    };
+  }, []);
+}
 
 /** 桌宠窗口 → 主窗口：发送控制命令（视觉开关等） */
 export function sendPetCommand(command: PetCommand): void {

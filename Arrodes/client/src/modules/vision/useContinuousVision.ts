@@ -70,6 +70,13 @@ export interface ContinuousVisionController {
   stop: () => void;
 }
 
+/** 观察帧排除区域（管家窗口屏幕坐标，DIP）：防止管家出现在观察画面中触发自我反馈 */
+let observationExclusion: { x: number; y: number; width: number; height: number } | null = null;
+
+export function setObservationExclusion(rect: { x: number; y: number; width: number; height: number } | null): void {
+  observationExclusion = rect;
+}
+
 export function captureVideoFrame(video: HTMLVideoElement): ScreenFrame | null {
   if (!video.videoWidth || !video.videoHeight) return null;
   const scale = Math.min(1, MAX_FRAME_WIDTH / video.videoWidth);
@@ -81,6 +88,23 @@ export function captureVideoFrame(video: HTMLVideoElement): ScreenFrame | null {
   const context = canvas.getContext('2d');
   if (!context) return null;
   context.drawImage(video, 0, 0, width, height);
+  // 裁掉管家窗口区域：用区域上方的背景色填充，保证观察帧内容恒定（指纹不变化→不触发自我反馈）
+  if (observationExclusion) {
+    const ex = observationExclusion;
+    const sw = typeof screen !== 'undefined' && screen.width ? screen.width : width;
+    const sh = typeof screen !== 'undefined' && screen.height ? screen.height : height;
+    const rx = Math.round((ex.x / sw) * width);
+    const ry = Math.round((ex.y / sh) * height);
+    const rw = Math.round((ex.width / sw) * width);
+    const rh = Math.round((ex.height / sh) * height);
+    if (rw > 0 && rh > 0) {
+      const sampleX = Math.max(0, Math.min(width - 1, rx + Math.round(rw / 2)));
+      const sampleY = Math.max(0, Math.min(height - 1, ry - 8));
+      const sampled = context.getImageData(sampleX, sampleY, 1, 1).data;
+      context.fillStyle = `rgb(${sampled[0]},${sampled[1]},${sampled[2]})`;
+      context.fillRect(rx - 2, ry - 2, rw + 4, rh + 4);
+    }
+  }
 
   const thumbnail = document.createElement('canvas');
   thumbnail.width = THUMBNAIL_SIZE.width;

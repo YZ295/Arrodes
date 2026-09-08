@@ -32,7 +32,8 @@ import CanvasPanel from './components/CanvasPanel';
 import WallpaperBackground from './components/WallpaperBackground';
 import { getWorkspaceLayout } from './ui/layoutPolicy';
 import { useContinuousVision } from './modules/vision/useContinuousVision';
-import { usePetCommandHandler } from './desktop-pet/desktopPetBridge';
+import { usePetBoundsListener, usePetCommandHandler } from './desktop-pet/desktopPetBridge';
+import { setObservationExclusion } from './modules/vision/useContinuousVision';
 import { useDesktopPetPublisher } from './desktop-pet/desktopPetBridge';
 
 const App = memo(function App() {
@@ -47,6 +48,9 @@ const App = memo(function App() {
   const continuousVision = useContinuousVision(voice.isSpeaking);
 
   // 桌宠右键菜单「视觉观察」命令：经 BroadcastChannel 切换主窗口的持续观察
+  // 管家窗口边界 → 观察帧排除区域（观察画面中永远看不到管家本人，防自我反馈）
+  usePetBoundsListener((rect) => setObservationExclusion(rect));
+
   usePetCommandHandler((command) => {
     if (command !== 'vision-toggle' || !continuousVision) return;
     if (continuousVision.active) {

@@ -13,4 +13,8 @@ contextBridge.exposeInMainWorld('arrodesPet', {
   onVisionToggle: (callback: (on: boolean) => void) => {
     ipcRenderer.on('pet:vision-toggle', (_event, on: boolean) => callback(on));
   },
+  setOpacity: (opacity: number) => ipcRenderer.send('pet:opacity', opacity),
+  onBounds: (callback: (bounds: { x: number; y: number; width: number; height: number }) => void) => {
+    ipcRenderer.on('pet:bounds', (_event, bounds) => callback(bounds));
+  },
 });
