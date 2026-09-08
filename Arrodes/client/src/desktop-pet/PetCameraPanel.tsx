@@ -40,6 +40,14 @@ export default function PetCameraPanel({
     } catch { return 660; }
   });
 
+  const applyWidth = (width: number): void => {
+    const clamped = Math.max(280, Math.min(990, Math.round(width / 5) * 5));
+    setWindowWidth(clamped);
+    const height = Math.round((clamped * 600) / 660);
+    try { localStorage.setItem('arrodes_pet_window_width', String(clamped)); } catch { /* 忽略 */ }
+    window.arrodesPet?.resize(clamped, height);
+  };
+
   // 打开面板时同步一次控制器当前生效值（含已保存的 localStorage 配置）
   useEffect(() => {
     setConfig(mergeCameraConfig());
@@ -93,24 +101,30 @@ export default function PetCameraPanel({
           </label>
         );
       })}
-      <label className="pet-camera-panel__row">
+      <div className="pet-camera-panel__row">
         <span className="pet-camera-panel__label">窗口大小</span>
+        <button
+          type="button"
+          className="pet-camera-panel__fine"
+          aria-label="缩小窗口"
+          onClick={() => applyWidth(windowWidth - 20)}
+        >−</button>
         <input
           type="range"
           min={280}
           max={990}
-          step={10}
+          step={5}
           value={windowWidth}
-          onChange={(event) => {
-            const width = Number(event.target.value);
-            setWindowWidth(width);
-            const height = Math.round((width * 600) / 660);
-            try { localStorage.setItem('arrodes_pet_window_width', String(width)); } catch { /* 忽略 */ }
-            window.arrodesPet?.resize(width, height);
-          }}
+          onChange={(event) => applyWidth(Number(event.target.value))}
         />
+        <button
+          type="button"
+          className="pet-camera-panel__fine"
+          aria-label="放大窗口"
+          onClick={() => applyWidth(windowWidth + 20)}
+        >＋</button>
         <span className="pet-camera-panel__value">{windowWidth}</span>
-      </label>
+      </div>
       <label className="pet-camera-panel__row">
         <span className="pet-camera-panel__label">透明度</span>
         <input

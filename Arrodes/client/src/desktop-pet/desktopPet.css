@@ -336,3 +336,20 @@ html.desktop-pet-surface #root {
 .desktop-pet.pet-decorative:hover {
   opacity: 0.4;
 }
+
+/* 窗口大小微调按钮 */
+.pet-camera-panel__fine {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pet-camera-panel__fine:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
