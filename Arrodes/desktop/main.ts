@@ -278,6 +278,10 @@ function showPetContextMenu(): void {
     },
     { type: 'separator' },
     {
+      label: '退出阿罗德斯',
+      click: () => app.quit(),
+    },
+    {
       label: '悬浮于桌面',
       type: 'checkbox',
       checked: petFloating,
