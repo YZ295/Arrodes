@@ -22,7 +22,7 @@ export default function PetCameraPanel({
   controller,
   onClose,
 }: {
-  controller: VrmPetController;
+  controller?: VrmPetController | null;
   onClose: () => void;
 }) {
   const [config, setConfig] = useState<VrmCameraConfig>(() => mergeCameraConfig());
@@ -60,7 +60,7 @@ export default function PetCameraPanel({
     const next = { ...config, [key]: value };
     setConfig(next);
     setSaved(false);
-    controller.setCamera({ [key]: value });
+    controller?.setCamera({ [key]: value });
   };
 
   const onSave = () => {
@@ -70,6 +70,7 @@ export default function PetCameraPanel({
   };
 
   const onReset = () => {
+    if (!controller) return;
     clearStoredCameraConfig();
     setConfig({ ...DEFAULT_CAMERA_CONFIG });
     controller.setCamera(DEFAULT_CAMERA_CONFIG);
@@ -84,10 +85,10 @@ export default function PetCameraPanel({
   return (
     <section className="pet-camera-panel" data-role="camera-panel" aria-label="桌宠机位调试">
       <header className="pet-camera-panel__header">
-        <span>机位调试</span>
+        <span>{controller ? '机位调试' : '管家设置'}</span>
         <button type="button" onClick={onClose} aria-label="关闭机位面板">×</button>
       </header>
-      {keys.map((key) => {
+      {controller && keys.map((key) => {
         const bounds = CAMERA_SLIDER_BOUNDS[key];
         return (
           <label key={key} className="pet-camera-panel__row">

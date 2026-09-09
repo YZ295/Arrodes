@@ -423,7 +423,7 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
         )}
         {PET_VISUAL !== 'vrm' && PET_VISUAL !== 'procedural' && !(PET_VISUAL === 'live2d' && live2dActive) && <img src={avatarUrl} alt="" draggable={false} />}
       </button>
-      {PET_VISUAL === 'vrm' && vrmActive && (
+      {(avatar === 'ball' || (PET_VISUAL === 'vrm' && vrmActive)) && (
         <button
           type="button"
           className="desktop-pet__cam-toggle"
@@ -432,7 +432,7 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
           aria-label={cameraPanelOpen ? '关闭机位调试' : '打开机位调试'}
         >📷</button>
       )}
-      {cameraPanelOpen && vrmRef.current && (
+      {cameraPanelOpen && (
         <PetCameraPanel controller={vrmRef.current} onClose={() => setCameraPanelOpen(false)} />
       )}
       <button
