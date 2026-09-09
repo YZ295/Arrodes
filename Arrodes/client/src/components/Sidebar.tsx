@@ -24,7 +24,7 @@ import { useWorkspaceStore } from '../store/workspaceStore';
 
 export type SidebarView =
   | 'conversation' | 'workspace' | 'canvas' | 'workflow' | 'profile' | 'memory'
-  | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced' | 'wallpaper' | 'activity';
+  | 'vision' | 'skills' | 'settings' | 'mobile' | 'advanced' | 'wallpaper' | 'activity' | 'butler' | 'pet';
 
 interface NavItem {
   id: SidebarView;
@@ -41,6 +41,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'memory', label: '记忆', icon: 'memory' },
   { id: 'vision', label: '视觉', icon: 'vision' },
   { id: 'activity', label: '动态', icon: 'activity' },
+  { id: 'butler', label: '管家', icon: 'butler' },
+  { id: 'pet', label: '桌宠', icon: 'pet' },
   { id: 'settings', label: '配置', icon: 'settings' },
   { id: 'advanced', label: '高级', icon: 'advanced' },
 ];
@@ -128,6 +130,22 @@ function NavIcon({ id }: { id: SidebarView }) {
           <rect x="8" y="9" width="3" height="6" rx="0.5" />
           <rect x="13" y="5" width="3" height="10" rx="0.5" />
           <rect x="18" y="12" width="3" height="3" rx="0.5" />
+        </svg>
+      );
+    case 'pet':
+      return (
+        <svg {...props}>
+          <circle cx="8" cy="7" r="2.2" />
+          <circle cx="16" cy="7" r="2.2" />
+          <path d="M12 11.5c-3.6 0-6.5 2.4-6.5 5.2 0 1.6 1.3 2.3 2.9 2.3h7.2c1.6 0 2.9-.7 2.9-2.3 0-2.8-2.9-5.2-6.5-5.2z" />
+        </svg>
+      );
+    case 'butler':
+      return (
+        <svg {...props}>
+          <path d="M4 4h4l1.5 5h5L16 4h4" />
+          <path d="M6.5 13l1 7h9l1-7" />
+          <circle cx="12" cy="6" r="0.5" />
         </svg>
       );
     case 'settings':

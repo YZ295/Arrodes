@@ -61,6 +61,7 @@ export default memo(function PanelView(props: PanelViewProps) {
             {view === 'profile' ? '人物画像' : view === 'memory' ? '记忆库' : view === 'vision' ? '视觉理解'
             : view === 'skills' ? '智能体技能' : view === 'settings' ? '配置' : view === 'workflow' ? '工作流'
             : view === 'activity' ? '动态'
+            : view === 'pet' ? '桌宠'
             : view === 'butler' ? '管家'
             : view === 'workspace' ? '工作区' : view === 'wallpaper' ? '壁纸' : view === 'mobile' ? '移动端' : '高级'}
           </span>
@@ -72,7 +73,7 @@ export default memo(function PanelView(props: PanelViewProps) {
           {view === 'skills' && <SkillsPanel />}
           {view === 'activity' && <ActivityPanel />}
           {view === 'butler' && <ButlerPanel />}
-          {view === 'butler' && <ButlerPetPanel />}
+          {view === 'pet' && <ButlerPetPanel />}
           {view === 'workspace' && <WorkspacePanel onOpenCanvas={() => onNavigate('canvas')} />}
           {view === 'wallpaper' && <WallpaperPanel onBack={onBack} />}
           {view === 'profile' && <ProfilePanel onNavigate={onNavigate} />}
