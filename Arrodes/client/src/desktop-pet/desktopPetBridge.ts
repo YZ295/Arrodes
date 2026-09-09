@@ -13,7 +13,8 @@ type DesktopPetMessage =
   | { type: 'snapshot'; snapshot: DesktopPetSnapshot }
   | { type: 'request-snapshot' }
   | { type: 'command'; command: PetCommand }
-  | { type: 'pet-bounds'; rect: PetScreenRect };
+  | { type: 'pet-bounds'; rect: PetScreenRect }
+  | { type: 'avatar-set'; mode: 'ball' | 'vrm' | 'image'; ts: number };
 
 export type PetCommand = 'vision-toggle';
 
@@ -31,6 +32,14 @@ export function sendPetBounds(rect: PetScreenRect): void {
   const channel = openChannel();
   if (!channel) return;
   channel.postMessage({ type: 'pet-bounds', rect } satisfies DesktopPetMessage);
+  channel.close();
+}
+
+/** 任意窗口：切换桌宠形象（overlay 收到后持久化并重渲染；ts 用于图片缓存击穿） */
+export function setPetAvatarMode(mode: 'ball' | 'vrm' | 'image', ts = Date.now()): void {
+  const channel = openChannel();
+  if (!channel) return;
+  channel.postMessage({ type: 'avatar-set', mode, ts } satisfies DesktopPetMessage);
   channel.close();
 }
 

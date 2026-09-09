@@ -16,6 +16,7 @@ import {
   type VrmCameraConfig,
 } from './petCamera';
 import type { VrmPetController } from './vrmPet';
+import { setPetAvatarMode } from './desktopPetBridge';
 import './petCameraPanel.css';
 
 export default function PetCameraPanel({
@@ -138,6 +139,7 @@ export default function PetCameraPanel({
             onClick={() => {
               setAvatar('ball');
               try { localStorage.setItem('arrodes_pet_avatar', 'ball'); } catch { /* 忽略 */ }
+              setPetAvatarMode('ball');
               window.dispatchEvent(new CustomEvent('arrodes-pet-avatar', { detail: 'ball' }));
             }}
           >小球</button>
@@ -147,6 +149,7 @@ export default function PetCameraPanel({
             onClick={() => {
               setAvatar('vrm');
               try { localStorage.setItem('arrodes_pet_avatar', 'vrm'); } catch { /* 忽略 */ }
+              setPetAvatarMode('vrm');
               window.dispatchEvent(new CustomEvent('arrodes-pet-avatar', { detail: 'vrm' }));
             }}
           >VRM</button>

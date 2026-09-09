@@ -383,3 +383,14 @@ html.desktop-pet-surface #root {
   color: #fff;
   border-color: transparent;
 }
+
+/* 自定义图片形象（贴人物区右下） */
+.desktop-pet__image {
+  position: absolute;
+  inset: 0 4% 0 36%;
+  width: 60%;
+  height: 96%;
+  object-fit: contain;
+  object-position: bottom;
+  pointer-events: none;
+}

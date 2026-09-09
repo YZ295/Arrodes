@@ -14,6 +14,8 @@ import VisionPanel from '../modules/vision/VisionPanel';
 import WorkspacePanel from './WorkspacePanel';
 import WallpaperPanel from './WallpaperPanel';
 import { ActivityPanel } from './ActivityPanel';
+import { ButlerPetPanel } from './ButlerPetPanel';
+import { ButlerPanel } from './ButlerPanel';
 import type { ContinuousVisionController } from '../modules/vision/useContinuousVision';
 
 interface PanelViewProps {
@@ -59,6 +61,7 @@ export default memo(function PanelView(props: PanelViewProps) {
             {view === 'profile' ? '人物画像' : view === 'memory' ? '记忆库' : view === 'vision' ? '视觉理解'
             : view === 'skills' ? '智能体技能' : view === 'settings' ? '配置' : view === 'workflow' ? '工作流'
             : view === 'activity' ? '动态'
+            : view === 'butler' ? '管家'
             : view === 'workspace' ? '工作区' : view === 'wallpaper' ? '壁纸' : view === 'mobile' ? '移动端' : '高级'}
           </span>
           <div className="w-12" />
@@ -68,6 +71,8 @@ export default memo(function PanelView(props: PanelViewProps) {
         <div className="flex-1 overflow-y-auto">
           {view === 'skills' && <SkillsPanel />}
           {view === 'activity' && <ActivityPanel />}
+          {view === 'butler' && <ButlerPanel />}
+          {view === 'butler' && <ButlerPetPanel />}
           {view === 'workspace' && <WorkspacePanel onOpenCanvas={() => onNavigate('canvas')} />}
           {view === 'wallpaper' && <WallpaperPanel onBack={onBack} />}
           {view === 'profile' && <ProfilePanel onNavigate={onNavigate} />}

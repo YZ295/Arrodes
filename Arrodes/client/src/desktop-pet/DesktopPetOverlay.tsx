@@ -114,9 +114,13 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
   const [vrmFailed, setVrmFailed] = useState(false);
 
   // ===== 形象系统：小球（EmotionBall，默认）/ VRM =====
-  const [avatar, setAvatar] = useState<'ball' | 'vrm'>(() => {
-    try { return localStorage.getItem('arrodes_pet_avatar') === 'vrm' ? 'vrm' : 'ball'; } catch { return 'ball'; }
+  const [avatar, setAvatar] = useState<'ball' | 'vrm' | 'image'>(() => {
+    try {
+      const v = localStorage.getItem('arrodes_pet_avatar');
+      return v === 'vrm' || v === 'image' ? v : 'ball';
+    } catch { return 'ball'; }
   });
+  const [avatarTs, setAvatarTs] = useState(() => Date.now());
   const ballContainerRef = useRef<HTMLDivElement | null>(null);
   const ballRef = useRef<{ setEmotion: (id: string) => void; handleAIMessage: (msg: unknown) => void; setGaze: (x: number, y: number) => void; destroy: () => void } | null>(null);
   const [ballReady, setBallReady] = useState(false);
@@ -130,6 +134,20 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
     };
     window.addEventListener('arrodes-pet-avatar', onChange);
     return () => window.removeEventListener('arrodes-pet-avatar', onChange);
+  }, []);
+
+  // 跨窗口形象切换（管家标签页 / 其他窗口经 BroadcastChannel 派发）
+  useEffect(() => {
+    const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('arrodes-desktop-pet-v1') : null;
+    if (!channel) return;
+    channel.onmessage = (event: MessageEvent) => {
+      const d = event.data as { type?: string; mode?: 'ball' | 'vrm' | 'image'; ts?: number };
+      if (d?.type !== 'avatar-set' || !d.mode) return;
+      setAvatar(d.mode);
+      setAvatarTs(d.ts ?? Date.now());
+      try { localStorage.setItem('arrodes_pet_avatar', d.mode); } catch { /* 忽略 */ }
+    };
+    return () => { channel.onmessage = null; channel.close(); };
   }, []);
 
   // 小球引擎：按序加载 4 个脚本后创建实例（ball 模式才加载）
@@ -411,6 +429,14 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
         aria-label="阿罗德斯桌面助手角色"
       >
         {avatar === 'ball' && <div ref={ballContainerRef} className="desktop-pet__ball" aria-hidden="true" />}
+        {avatar === 'image' && (
+          <img
+            src={`/api/v1/butler-avatar?ts=${avatarTs}`}
+            alt=""
+            className="desktop-pet__image"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        )}
         {PET_VISUAL === 'vrm' && avatar === 'vrm' && <div ref={vrmContainerRef} className="desktop-pet__vrm" aria-hidden="true" />}
         {PET_VISUAL === 'vrm' && !vrmActive && vrmFailed && <ProceduralPet mood={view.tone} />}
         {PET_VISUAL === 'procedural' && <ProceduralPet mood={view.tone} />}

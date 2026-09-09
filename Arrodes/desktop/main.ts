@@ -169,6 +169,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: join(__dirname, 'butlerPreload.cjs'),
     },
   });
 
@@ -330,6 +331,15 @@ function showPetContextMenu(): void {
 ipcMain.on('pet:opacity', (event, opacity: number) => {
   if (!petWindow || event.sender !== petWindow.webContents || typeof opacity !== 'number') return;
   petWindow.setOpacity(Math.min(1, Math.max(0.15, opacity)));
+});
+
+ipcMain.handle('butler:launch-pet', () => {
+  if (petWindow) {
+    if (petWindow.isMinimized()) petWindow.restore();
+    petWindow.showInactive();
+    return { created: false };
+  }
+  return createPetWindow().then(() => ({ created: true }));
 });
 
 ipcMain.on('pet:interactive-toggle', (event) => {
