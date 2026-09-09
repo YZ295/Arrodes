@@ -27,6 +27,9 @@ export default function PetCameraPanel({
 }) {
   const [config, setConfig] = useState<VrmCameraConfig>(() => mergeCameraConfig());
   const [saved, setSaved] = useState(false);
+  const [avatar, setAvatar] = useState<'ball' | 'vrm'>(() => {
+    try { return localStorage.getItem('arrodes_pet_avatar') === 'vrm' ? 'vrm' : 'ball'; } catch { return 'ball'; }
+  });
   const [opacity, setOpacity] = useState(() => {
     try {
       const v = Number(localStorage.getItem('arrodes_pet_opacity'));
@@ -125,6 +128,29 @@ export default function PetCameraPanel({
         >＋</button>
         <span className="pet-camera-panel__value">{windowWidth}</span>
       </div>
+      <label className="pet-camera-panel__row">
+        <span className="pet-camera-panel__label">形象</span>
+        <div className="pet-camera-panel__avatar-toggle">
+          <button
+            type="button"
+            className={avatar === 'ball' ? 'is-active' : ''}
+            onClick={() => {
+              setAvatar('ball');
+              try { localStorage.setItem('arrodes_pet_avatar', 'ball'); } catch { /* 忽略 */ }
+              window.dispatchEvent(new CustomEvent('arrodes-pet-avatar', { detail: 'ball' }));
+            }}
+          >小球</button>
+          <button
+            type="button"
+            className={avatar === 'vrm' ? 'is-active' : ''}
+            onClick={() => {
+              setAvatar('vrm');
+              try { localStorage.setItem('arrodes_pet_avatar', 'vrm'); } catch { /* 忽略 */ }
+              window.dispatchEvent(new CustomEvent('arrodes-pet-avatar', { detail: 'vrm' }));
+            }}
+          >VRM</button>
+        </div>
+      </label>
       <label className="pet-camera-panel__row">
         <span className="pet-camera-panel__label">透明度</span>
         <input

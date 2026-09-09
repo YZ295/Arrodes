@@ -6,6 +6,18 @@ import { usePetChat } from './usePetChat';
 import { PET_MODEL_URL, startLive2dPet, type Live2dPetController } from './live2dPet';
 import ProceduralPet from './ProceduralPet';
 import { startVrmPet, type VrmPetController } from './vrmPet';
+declare global {
+  interface Window {
+    EmotionBall?: {
+      create: (el: HTMLElement, opts?: Record<string, unknown>) => {
+        setEmotion: (id: string) => void;
+        handleAIMessage: (msg: unknown) => void;
+        setGaze: (x: number, y: number) => void;
+        destroy: () => void;
+      };
+    };
+  }
+}
 import PetCameraPanel from './PetCameraPanel';
 import {
   clampPetPosition,
@@ -101,8 +113,88 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
   const [vrmActive, setVrmActive] = useState(false);
   const [vrmFailed, setVrmFailed] = useState(false);
 
+  // ===== 形象系统：小球（EmotionBall，默认）/ VRM =====
+  const [avatar, setAvatar] = useState<'ball' | 'vrm'>(() => {
+    try { return localStorage.getItem('arrodes_pet_avatar') === 'vrm' ? 'vrm' : 'ball'; } catch { return 'ball'; }
+  });
+  const ballContainerRef = useRef<HTMLDivElement | null>(null);
+  const ballRef = useRef<{ setEmotion: (id: string) => void; handleAIMessage: (msg: unknown) => void; setGaze: (x: number, y: number) => void; destroy: () => void } | null>(null);
+  const [ballReady, setBallReady] = useState(false);
+
+  // 面板切换形象：localStorage + 自定义事件
   useEffect(() => {
-    if (PET_VISUAL !== 'vrm') return;
+    const onChange = (e: Event) => {
+      const mode = (e as CustomEvent<'ball' | 'vrm'>).detail;
+      setAvatar(mode);
+      try { localStorage.setItem('arrodes_pet_avatar', mode); } catch { /* 忽略 */ }
+    };
+    window.addEventListener('arrodes-pet-avatar', onChange);
+    return () => window.removeEventListener('arrodes-pet-avatar', onChange);
+  }, []);
+
+  // 小球引擎：按序加载 4 个脚本后创建实例（ball 模式才加载）
+  useEffect(() => {
+    if (avatar !== 'ball') { ballRef.current?.destroy(); ballRef.current = null; setBallReady(false); return; }
+    let cancelled = false;
+    const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.onload = () => resolve();
+      el.onerror = () => reject(new Error(`加载失败: ${src}`));
+      document.head.appendChild(el);
+    });
+    (async () => {
+      try {
+        if (!window.EmotionBall) {
+          for (const f of ['rings', 'emotions', 'ball', 'engine']) {
+            await loadScript(`/emotion-ball/js/${f}.js`);
+          }
+        }
+        if (cancelled || !ballContainerRef.current) return;
+        const EB = window.EmotionBall;
+        if (!EB) throw new Error('EmotionBall 未加载');
+        const instance = EB.create(ballContainerRef.current, {
+          emotion: '02', idle: true, autostart: true,
+        });
+        if (cancelled) { instance.destroy(); return; }
+        ballRef.current = instance as unknown as typeof ballRef.current;
+        setBallReady(true);
+      } catch (cause) {
+        console.warn('[DesktopPet] 小球引擎加载失败，回退 VRM:', cause);
+        if (!cancelled) {
+          setAvatar('vrm');
+          try { localStorage.setItem('arrodes_pet_avatar', 'vrm'); } catch { /* 忽略 */ }
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [avatar]);
+
+  // 状态 → 表情映射
+  useEffect(() => {
+    const ball = ballRef.current;
+    if (avatar !== 'ball' || !ball || !ballReady) return;
+    let id = '02';
+    if (snapshot.error) id = '34';
+    else if (snapshot.analyzing) id = '30';
+    else if (chat?.recording) id = '35';
+    else if (snapshot.active) id = '40';
+    else if (chatVisible && lastReply) id = '39';
+    ball.handleAIMessage({ emotionId: id });
+  }, [avatar, ballReady, snapshot.error, snapshot.analyzing, snapshot.active, chat?.recording, chatVisible, lastReply]);
+
+  // 目标注视：指针位置归一化
+  useEffect(() => {
+    if (avatar !== 'ball') return;
+    const onMove = (e: PointerEvent) => {
+      ballRef.current?.setGaze((e.clientX / window.innerWidth) * 2 - 1, (e.clientY / window.innerHeight) * 2 - 1);
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => window.removeEventListener('pointermove', onMove);
+  }, [avatar]);
+
+  useEffect(() => {
+    if (PET_VISUAL !== 'vrm' || avatar !== 'vrm') return;
     let cancelled = false;
     const container = vrmContainerRef.current;
     if (!container) return;
@@ -127,7 +219,7 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
       vrmRef.current?.destroy();
       vrmRef.current = null;
     };
-  }, []);
+  }, [avatar]);
 
   useEffect(() => () => {
     if (reactionTimer.current) clearTimeout(reactionTimer.current);
@@ -318,7 +410,8 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
         onDoubleClick={() => setChatOpen((prev) => !prev)}
         aria-label="阿罗德斯桌面助手角色"
       >
-        {PET_VISUAL === 'vrm' && <div ref={vrmContainerRef} className="desktop-pet__vrm" aria-hidden="true" />}
+        {avatar === 'ball' && <div ref={ballContainerRef} className="desktop-pet__ball" aria-hidden="true" />}
+        {PET_VISUAL === 'vrm' && avatar === 'vrm' && <div ref={vrmContainerRef} className="desktop-pet__vrm" aria-hidden="true" />}
         {PET_VISUAL === 'vrm' && !vrmActive && vrmFailed && <ProceduralPet mood={view.tone} />}
         {PET_VISUAL === 'procedural' && <ProceduralPet mood={view.tone} />}
         {PET_VISUAL === 'live2d' && (
