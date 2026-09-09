@@ -124,6 +124,11 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
   const ballContainerRef = useRef<HTMLDivElement | null>(null);
   const ballRef = useRef<{ setEmotion: (id: string) => void; handleAIMessage: (msg: unknown) => void; setGaze: (x: number, y: number) => void; destroy: () => void } | null>(null);
   const [ballReady, setBallReady] = useState(false);
+  const [butlerEngineRunning, setButlerEngineRunning] = useState(false);
+  useEffect(() => {
+    if (hostMode !== 'electron') return;
+    window.arrodesPet?.onButlerEngine(setButlerEngineRunning);
+  }, [hostMode]);
 
   // 面板切换形象：localStorage + 自定义事件
   useEffect(() => {
@@ -194,12 +199,13 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
     if (avatar !== 'ball' || !ball || !ballReady) return;
     let id = '02';
     if (snapshot.error) id = '34';
+    else if (butlerEngineRunning) id = '32';
     else if (snapshot.analyzing) id = '30';
     else if (chat?.recording) id = '35';
     else if (snapshot.active) id = '40';
     else if (chatVisible && lastReply) id = '39';
     ball.handleAIMessage({ emotionId: id });
-  }, [avatar, ballReady, snapshot.error, snapshot.analyzing, snapshot.active, chat?.recording, chatVisible, lastReply]);
+  }, [avatar, ballReady, butlerEngineRunning, snapshot.error, snapshot.analyzing, snapshot.active, chat?.recording, chatVisible, lastReply]);
 
   // 目标注视：指针位置归一化
   useEffect(() => {

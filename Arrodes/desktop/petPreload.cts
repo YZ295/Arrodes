@@ -20,5 +20,8 @@ contextBridge.exposeInMainWorld('arrodesPet', {
   onInteractive: (callback: (on: boolean) => void) => {
     ipcRenderer.on('pet:interactive', (_event, on: boolean) => callback(on));
   },
+  onButlerEngine: (callback: (running: boolean) => void) => {
+    ipcRenderer.on('butler:engine', (_event, running: boolean) => callback(running));
+  },
   toggleInteractive: () => ipcRenderer.send('pet:interactive-toggle'),
 });

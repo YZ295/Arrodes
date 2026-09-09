@@ -108,6 +108,7 @@ async function startBackend(): Promise<void> {
   const uiUrl = new URL(devUrl || `http://localhost:${PORT}`);
   const uiOrigin = uiUrl.origin;
   localAccessCookieUrl = uiOrigin;
+  butlerStatusUrl = `${uiUrl.origin}/api/v1/butler/status`;
   localAccessToken = randomBytes(32).toString('base64url');
   const dbPath = process.env.ARRODES_DB_PATH
     ? resolve(process.env.ARRODES_DB_PATH)
@@ -259,6 +260,33 @@ async function createPetWindow() {
   petWindow.on('closed', () => { petWindow = null; });
 }
 
+/** 管家控制台窗口：独立 Electron 窗口，承载管家后端引擎面板 */
+async function createButlerWindow(): Promise<void> {
+  if (butlerWindow) {
+    if (butlerWindow.isMinimized()) butlerWindow.restore();
+    butlerWindow.showInactive();
+    butlerWindow.focus();
+    return;
+  }
+  butlerWindow = new BrowserWindow({
+    width: 860,
+    height: 720,
+    minWidth: 720,
+    minHeight: 560,
+    title: '管家控制台',
+    autoHideMenuBar: true,
+    backgroundColor: '#0f1115',
+    icon: resolve(ROOT, 'client/dist/favicon.svg'),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  butlerWindow.on('closed', () => { butlerWindow = null; });
+  await butlerWindow.loadURL(getUiUrl('butler'));
+}
+
 // 桌宠窗口控制：渲染进程拖拽移动 + 悬停暂停点击穿透
 ipcMain.on('pet:move-by', (event, dx: number, dy: number) => {
   if (!petWindow || event.sender !== petWindow.webContents || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
@@ -307,6 +335,7 @@ function refreshTrayMenu(): void {
   petTray.setContextMenu(Menu.buildFromTemplate([
     { label: petInteractive ? '交互模式：已开启' : '交互模式：已关闭（穿透装饰）', type: 'checkbox', checked: petInteractive, click: () => setPetInteractive(!petInteractive) },
     { label: petVisionOn ? '视觉观察：已开启' : '视觉观察：已关闭', type: 'checkbox', checked: petVisionOn, click: () => petWindow?.webContents.send('pet:vision-toggle') },
+    { label: '管家控制台', click: () => { void createButlerWindow(); } },
     { type: 'separator' },
     { label: '退出阿罗德斯', click: () => app.quit() },
   ]));
@@ -363,6 +392,8 @@ let gatewayProc: ChildProcess | null = null;
 let petVisionOn = false;   // 视觉观察状态（右键菜单标签用）
 let petInteractive = true;  // 交互模式：可点击/右键/拖动/调面板；关闭=装饰模式（穿透+悬停淡出）
 let petTray: Tray | null = null;
+let butlerWindow: BrowserWindow | null = null;
+let butlerStatusUrl = `http://localhost:${PORT}/api/v1/butler/status`;
 let interactiveTimer: ReturnType<typeof setTimeout> | null = null;
 /** 桌面端文件日志：双击启动时 stdout 丢失，关键事件落盘便于诊断 */
 function dlog(msg: string): void {
@@ -473,6 +504,9 @@ app.whenReady().then(async () => {
       petTray.setToolTip('阿罗德斯管家');
       refreshTrayMenu();
       dlog('tray created');
+      if (process.env.ARRODES_OPEN_BUTLER === '1') {
+        void createButlerWindow();
+      }
     } catch (err) {
       console.warn('[Desktop] 托盘创建失败:', err);
     }
@@ -483,6 +517,26 @@ app.whenReady().then(async () => {
         petWindow.setAlwaysOnTop(true, 'screen-saver');
         dlog('watchdog: re-asserted always-on-top');
       }
+    }, 5000);
+
+    // 管家引擎 ↔ 桌宠连接：轮询引擎状态，变化时推送桌宠（采集运行中 → 桌宠忙碌表情）
+    let butlerEngineRunning: boolean | null = null;
+    setInterval(async () => {
+      if (!petWindow) return;
+      try {
+        const res = await fetch(butlerStatusUrl, {
+          headers: { 'x-arrodes-local-token': localAccessToken },
+          signal: AbortSignal.timeout(4000),
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as { engine?: { running?: boolean } };
+        const running = json.engine?.running === true;
+        if (running !== butlerEngineRunning) {
+          butlerEngineRunning = running;
+          petWindow.webContents.send('butler:engine', running);
+          dlog(`butler engine -> pet: ${running}`);
+        }
+      } catch { /* 后端未就绪时静默 */ }
     }, 5000);
 
     await ensureGateway();

@@ -28,6 +28,8 @@ export interface PetHostBridge {
   onInteractive(callback: (on: boolean) => void): void;
   /** 切换交互模式（双击管家触发） */
   toggleInteractive(): void;
+  /** 订阅管家引擎状态（采集运行中 → 桌宠忙碌） */
+  onButlerEngine(callback: (running: boolean) => void): void;
 }
 
 declare global {
