@@ -79,3 +79,16 @@
 - 图像专用桩作为本地包 `arrodes-magevl-image-only-mamba==0.1.0` 纳入仓库，构建和隔离安装通过；`create_block` 明确抛出 NotImplementedError。未覆盖用户已有手工桩，不提供视频功能。
 - 09-05 01:41 server 默认测试碰到本机 SQLite `disk I/O error`（既有 ws/handler 测试导入真实配置）；设置 `DB_PATH` 到项目忽略目录 `.cache/server-validation` 后，01:42 全部 295 项测试及 tsc 通过。client 全部 34 项测试与 TypeScript/Vite 构建通过。未修改实际数据库。
 - 测试侧车/Node 进程已停止，12009/12010 无残留监听；没有提交、push、PR 或 merge。
+
+## 09-08 默认 prompt 拒答出口（防信息不足时编造）
+
+- 问题（用户提出）：两处默认 prompt（`server/src/services/visionService.ts` 与 `vision-sidecar/mage_vl_sidecar.py`）均为强制产出指令，无"我不知道"出口；本记录前文冒烟测试即证据——确定性噪声图被输出"彩色抽象/电视雪花"式描述。信息不足时模型只能围绕仅有像素展开。
+- 修复：统一默认 prompt 为带出口版本（固定短语 `【信息不足】`），TS 侧抽为 `DEFAULT_VISION_PROMPT` 常量（3 处调用点复用：analyze / analyzeStreamWithDeepSeek / analyzeStreamWithOllama），与 sidecar `AnalyzeRequest.prompt` 默认值人工同步（跨进程无共享包）。
+- 实机 prompt 迭代四版（Mage-VL 4B，`do_sample=false`；测试集=确定性噪声 PNG seed(20260908) 320×320 + 管家真实屏幕帧 20260908_220216.jpg）：
+  - v1 出口宽松（"认不出任何具体的物体或文字"）：噪声图拒答 ✓，但真实截图也拒答 ✗（过度拒答）。
+  - v2 收紧（"仅当纯噪声/纯色/全空白"）+ 正向压制（"必须直接描述，不要拒答"）：截图完整描述 ✓（正确读出 Codelab/GitHub Actions 等菜单文字）；噪声图输出"彩色噪点、无主题、无图案"的字面描述——未编造出任何物体/场景/人物/活动。
+  - v3 复合条件+"不要描述噪点本身"：行为回退 v1（截图又拒答）。
+  - v4 拒答规则前置（先判断后描述）：行为回退 v1。
+- 结论：4B 贪心解码下不存在"拒噪声+描述截图"两全措辞；真实截图是核心场景，定稿 v2。噪声图的字面描述（"电视雪花"）不是幻觉编造——真正的危害（解读层把"雪花"曲解为用户行为）由下游聚合 prompt 承担，另行处理。
+- 最终验证：`vision-sidecar/verify_refusal_live.py`（实机脚本，已落库可重复运行；编造判定词表 + 截图过拒答双断言）→ 噪声图 PASS 字面描述（无编造）/ 截图 PASS 正常描述。
+- 回归：server vision 单测 8 项通过、`tsc --noEmit` 通过、sidecar `py_compile` 通过。未提交、push、PR 或 merge；未改真实 `.env`；sidecar 以 v2 prompt 运行于 :12002。

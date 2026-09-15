@@ -1,0 +1,133 @@
+import { useEffect, useRef, useState } from 'react';
+import type { DesktopPetSnapshot } from './desktopPetState';
+
+const CHANNEL_NAME = 'arrodes-desktop-pet-v1';
+const EMPTY_SNAPSHOT: DesktopPetSnapshot = {
+  active: false,
+  analyzing: false,
+  error: null,
+  observation: null,
+};
+
+type DesktopPetMessage =
+  | { type: 'snapshot'; snapshot: DesktopPetSnapshot }
+  | { type: 'request-snapshot' }
+  | { type: 'command'; command: PetCommand }
+  | { type: 'pet-bounds'; rect: PetScreenRect }
+  | { type: 'avatar-set'; mode: 'ball' | 'vrm' | 'image'; ts: number };
+
+export type PetCommand = 'vision-toggle';
+
+export interface PetScreenRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+let boundsHandlerRef: ((rect: PetScreenRect) => void) | null = null;
+
+/** 桌宠窗口：广播自身屏幕边界（主窗口用于观察帧裁剪） */
+export function sendPetBounds(rect: PetScreenRect): void {
+  const channel = openChannel();
+  if (!channel) return;
+  channel.postMessage({ type: 'pet-bounds', rect } satisfies DesktopPetMessage);
+  channel.close();
+}
+
+/** 任意窗口：切换桌宠形象（overlay 收到后持久化并重渲染；ts 用于图片缓存击穿） */
+export function setPetAvatarMode(mode: 'ball' | 'vrm' | 'image', ts = Date.now()): void {
+  const channel = openChannel();
+  if (!channel) return;
+  channel.postMessage({ type: 'avatar-set', mode, ts } satisfies DesktopPetMessage);
+  channel.close();
+}
+
+/** 主窗口：订阅管家屏幕边界 */
+export function usePetBoundsListener(handler: (rect: PetScreenRect) => void): void {
+  boundsHandlerRef = handler;
+  useEffect(() => {
+    const channel = openChannel();
+    if (!channel) return;
+    channel.onmessage = (event: MessageEvent<DesktopPetMessage>) => {
+      if (event.data?.type === 'pet-bounds') boundsHandlerRef?.(event.data.rect);
+    };
+    return () => {
+      channel.onmessage = null;
+      channel.close();
+    };
+  }, []);
+}
+
+/** 桌宠窗口 → 主窗口：发送控制命令（视觉开关等） */
+export function sendPetCommand(command: PetCommand): void {
+  const channel = openChannel();
+  if (!channel) return;
+  channel.postMessage({ type: 'command', command } satisfies DesktopPetMessage);
+  channel.close();
+}
+
+/** 主窗口：注册桌宠命令处理器 */
+export function usePetCommandHandler(handler: (command: PetCommand) => void): void {
+  const latest = useRef(handler);
+  latest.current = handler;
+  useEffect(() => {
+    const channel = openChannel();
+    if (!channel) return;
+    channel.onmessage = (event: MessageEvent<DesktopPetMessage>) => {
+      if (event.data?.type === 'command') latest.current(event.data.command);
+    };
+    return () => {
+      channel.onmessage = null;
+      channel.close();
+    };
+  }, []);
+}
+
+function openChannel(): BroadcastChannel | null {
+  return typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHANNEL_NAME);
+}
+
+export function useDesktopPetPublisher(snapshot: DesktopPetSnapshot): void {
+  const latestRef = useRef(snapshot);
+  latestRef.current = snapshot;
+  const { active, analyzing, error, observation } = snapshot;
+
+  useEffect(() => {
+    const channel = openChannel();
+    if (!channel) return;
+    const publish = () => channel.postMessage({ type: 'snapshot', snapshot: latestRef.current } satisfies DesktopPetMessage);
+    channel.onmessage = (event: MessageEvent<DesktopPetMessage>) => {
+      if (event.data?.type === 'request-snapshot') publish();
+    };
+    publish();
+    return () => channel.close();
+  }, []);
+
+  useEffect(() => {
+    const channel = openChannel();
+    if (!channel) return;
+    channel.postMessage({
+      type: 'snapshot',
+      snapshot: { active, analyzing, error, observation },
+    } satisfies DesktopPetMessage);
+    channel.close();
+  }, [active, analyzing, error, observation]);
+}
+
+export function useDesktopPetSnapshot(initialSnapshot?: DesktopPetSnapshot): DesktopPetSnapshot {
+  const [snapshot, setSnapshot] = useState(initialSnapshot || EMPTY_SNAPSHOT);
+
+  useEffect(() => {
+    if (initialSnapshot) return;
+    const channel = openChannel();
+    if (!channel) return;
+    channel.onmessage = (event: MessageEvent<DesktopPetMessage>) => {
+      if (event.data?.type === 'snapshot') setSnapshot(event.data.snapshot);
+    };
+    channel.postMessage({ type: 'request-snapshot' } satisfies DesktopPetMessage);
+    return () => channel.close();
+  }, [initialSnapshot]);
+
+  return snapshot;
+}

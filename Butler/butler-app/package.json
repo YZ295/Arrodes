@@ -1,0 +1,7 @@
+{
+  "name": "arrodes-butler-app",
+  "version": "1.0.0",
+  "description": "阿罗德斯管家 - 屏幕活动记录引擎控制台",
+  "author": "Arrodes",
+  "main": "main.cjs"
+}

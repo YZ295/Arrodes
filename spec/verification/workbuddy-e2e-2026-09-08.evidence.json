@@ -1,0 +1,43 @@
+{
+  "startedAt": "2026-09-08T14:21:11.649Z",
+  "base": "http://127.0.0.1:8321",
+  "configuredUrl": "http://127.0.0.1:8321",
+  "steps": [
+    {
+      "step": "health",
+      "status": 200,
+      "body": "{\"data\":{\"status\":\"ok\",\"uptime\":19608.9165278,\"platforms\":[\"generic\",\"wecom\",\"wechat-kf\"],\"pid\":32652}}"
+    },
+    {
+      "step": "create",
+      "status": 202,
+      "body": {
+        "data": {
+          "runId": "6eebbf53-1544-4d6f-b120-2156b0dd34f7",
+          "status": "accepted"
+        }
+      }
+    },
+    {
+      "step": "stream",
+      "status": 200
+    },
+    {
+      "step": "final-status",
+      "status": 200,
+      "body": "{\"data\":{\"runId\":\"6eebbf53-1544-4d6f-b120-2156b0dd34f7\",\"active\":false}}"
+    }
+  ],
+  "fixturePath": "E:\\project\\Crow5\\Arrodes\\spec\\verification\\workbuddy-e2e-challenge-2026-09-08.json",
+  "expected": {
+    "nonce": "854afef8-3e5a-4878-9c3d-80c43d2d5947",
+    "sum": 10767
+  },
+  "request": {
+    "id": "d71a5968-69f0-4c42-b21d-e8352e8e7882",
+    "type": "message",
+    "text": "This is a user-authorized Codex to WorkBuddy gateway end-to-end test. Execute one real read-only task: read the local file E:\\project\\Crow5\\Arrodes\\spec\\verification\\workbuddy-e2e-challenge-2026-09-08.json using a file or shell tool, then calculate the sum of its numbers. Reply with only JSON containing nonce (read from the file), sum, and readPath. Do not modify any files, do not spawn agents, do not read memory or unrelated files, do not run git operations. If you cannot access the file, report the actual error instead of guessing. This is not a request to echo this prompt: the nonce and numbers are only in the file."
+  },
+  "runId": "6eebbf53-1544-4d6f-b120-2156b0dd34f7",
+  "finishedAt": "2026-09-08T14:21:20.026Z"
+}

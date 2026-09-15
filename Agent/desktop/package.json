@@ -1,0 +1,103 @@
+{
+  "name": "arrodes-desktop",
+  "version": "1.0.0",
+  "description": "阿罗德斯 - 桌面版",
+  "author": "Arrodes",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "build:assets": "npm --prefix ../server run build && npm --prefix ../client run build",
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron .",
+    "pack": "npm run build:assets && npm run build && electron-builder --dir",
+    "dist": "npm run build:assets && npm run build && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.9.3"
+  },
+  "build": {
+    "appId": "com.arrodes.desktop",
+    "productName": "阿罗德斯",
+    "directories": {
+      "output": "release3"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../server",
+        "to": "server",
+        "filter": [
+          "dist/**",
+          "scripts/**",
+          "package.json"
+        ]
+      },
+      {
+        "from": "../server/node_modules",
+        "to": "server/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../client/dist",
+        "to": "client/dist",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../tts-sidecar",
+        "to": "tts-sidecar",
+        "filter": [
+          "tts_sidecar.py",
+          "custom-voices/**",
+          "requirements.txt"
+        ]
+      },
+      {
+        "from": "../vision-sidecar",
+        "to": "vision-sidecar",
+        "filter": [
+          "qwen_vl_sidecar.py",
+          "requirements.txt",
+          "README.md"
+        ]
+      },
+      {
+        "from": "../shared",
+        "to": "shared",
+        "filter": [
+          "types/**",
+          "package.json"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/@vscode/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Arrodes-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "阿罗德斯"
+    }
+  }
+}

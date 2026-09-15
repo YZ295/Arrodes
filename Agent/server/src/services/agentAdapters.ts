@@ -1,0 +1,127 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { getCommandProvider, type AsyncCommandOutcome } from './commandProvider.js';
+import { WorkBuddyGatewayAdapter } from './workbuddyAdapter.js';
+import { AgentAdapterRegistry, type AgentChatAdapter, type AgentRunOptions } from './agentAdapterTypes.js';
+import { CodexSdkAdapter } from './codexSdkAdapter.js';
+
+export type { AgentChatAdapter, AgentRunOptions };
+export { AgentAdapterRegistry };
+
+/** Agent 调用超时（可配；默认 8 分钟，避免 15 分钟静默被杀） */
+const AGENT_TIMEOUT_MS = Number(process.env.ARRODES_AGENT_TIMEOUT_MS || 8 * 60 * 1000);
+
+/** cmd.exe 双引号参数内仍会展开 %VAR%，^ 是转义符，! 在延迟展开时特殊——统一转义 */
+function escapeCmdArg(s: string): string {
+  return s.replace(/\^/g, '^^').replace(/%/g, '^%').replace(/!/g, '^!');
+}
+
+/** 统一结果汇总：优先 -o 输出文件，其次 stdout；超时/中止显式报告；无输出时透出 stderr 诊断 */
+function summarizeOutcome(
+  outcome: AsyncCommandOutcome,
+  summary: string,
+  label: string,
+): string {
+  if (summary) return summary;
+  const stderrTail = (outcome.stderr || '').trim().slice(-500);
+  const stdout = (outcome.stdout || '').trim();
+  if (outcome.timedOut || outcome.aborted || outcome.exitCode === null) {
+    const why = outcome.timedOut ? '超时' : outcome.aborted ? '被中止' : '异常退出';
+    return `${label} 执行${why}（exit=${outcome.exitCode}）${stderrTail ? `\n诊断信息: ${stderrTail}` : ''}`;
+  }
+  if (stdout) return stdout;
+  if (stderrTail) return `${label} 无输出，诊断信息:\n${stderrTail}`;
+  return `${label} 无输出（exit=${outcome.exitCode}）`;
+}
+
+export class CodexCliAdapter implements AgentChatAdapter {
+  async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
+    const sandbox = process.env.SELF_MODIFY_SANDBOX || 'danger-full-access';
+    const taskFile = join(tmpdir(), `arrodes-agent-chat-task-${Date.now()}.txt`);
+    const outFile = join(tmpdir(), `arrodes-agent-chat-out-${Date.now()}.txt`);
+    writeFileSync(taskFile, task, 'utf-8');
+    const cmd = `codex exec --ephemeral --skip-git-repo-check -C "${opts.cwd}" -s ${sandbox} --color never -o "${outFile}" - < "${taskFile}"`;
+    const provider = getCommandProvider();
+    const outcome = provider.runAsync
+      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024, signal: opts.signal })
+      : {
+          ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }),
+          timedOut: false,
+        };
+    let summary = '';
+    try {
+      if (existsSync(outFile)) summary = readFileSync(outFile, 'utf-8').trim();
+    } catch {
+      // ignore
+    }
+    return summarizeOutcome(outcome, summary, 'codex');
+  }
+}
+
+/** 配置驱动的通用 CLI 适配器：command [args...] "<task>"，用于后续任意 CLI 智能体 */
+export class ConfigCliAdapter implements AgentChatAdapter {
+  constructor(private entry: { command: string; args?: string[]; name?: string }) {}
+
+  async run(task: string, opts: { cwd: string; signal?: AbortSignal }): Promise<string> {
+    const safeTask = task.replace(/[\r\n]+/g, ' ').replace(/"/g, "'").slice(0, 4000);
+    const argStr = (this.entry.args || []).join(' ');
+    const cmd = `"${this.entry.command}" ${argStr} "${escapeCmdArg(safeTask)}"`;
+    const provider = getCommandProvider();
+    const outcome = provider.runAsync
+      ? await provider.runAsync(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024, signal: opts.signal })
+      : {
+          ...provider.run(cmd, { cwd: opts.cwd, timeoutMs: AGENT_TIMEOUT_MS, maxBuffer: 20 * 1024 * 1024 }),
+          timedOut: false,
+        };
+    return summarizeOutcome(outcome, '', this.entry.name || 'agent');
+  }
+}
+
+/** 创建 codex 适配器：默认 SDK；env=cli 或 SDK 初始化失败时回退 CLI */
+export function createCodexAdapter(
+  env: NodeJS.ProcessEnv = process.env,
+  sdkFactory?: () => AgentChatAdapter,
+): AgentChatAdapter {
+  if (env.ARRODES_CODEX_ADAPTER === 'cli') {
+    return new CodexCliAdapter();
+  }
+  try {
+    return sdkFactory ? sdkFactory() : new CodexSdkAdapter({ env });
+  } catch (err) {
+    console.warn(
+      '[CodexSdk] 初始化失败，回退 CLI 适配器:',
+      err instanceof Error ? err.message : err,
+    );
+    return new CodexCliAdapter();
+  }
+}
+
+/** 全局适配器注册表（codex / deepseekHarness / workbuddy，未来 agent 在此追加） */
+export const agentAdapters = new AgentAdapterRegistry();
+agentAdapters.register('codex', createCodexAdapter());
+
+/** 注册配置驱动的自定义智能体（幂等：已存在同名则不覆盖） */
+export function registerCustomAgents(
+  configs: Array<{ id: string; name: string; command: string; args?: string[] }>,
+): void {
+  for (const c of configs) {
+    if (!agentAdapters.get(c.id)) {
+      agentAdapters.register(c.id, new ConfigCliAdapter(c));
+    }
+  }
+}
+
+// DeepSeek Harness（dsh）：本机安装目录可被 DEEPSEEK_HARNESS_DIR 覆盖
+const DSH_DIR = process.env.DEEPSEEK_HARNESS_DIR || 'E:/AI/Deep Seek Harness';
+const DSH_CMD = `${DSH_DIR}/node_modules/.bin/dsh.cmd`;
+if (existsSync(DSH_CMD)) {
+  agentAdapters.register('deepseekHarness', new ConfigCliAdapter({
+    command: DSH_CMD,
+    args: ['--profile', 'headless'],
+    name: 'DeepSeek Harness',
+  }));
+}
+
+// WorkBuddy（CodeBuddy）：通过本地网关对话（无 CLI；网关需 token，见 workbuddyAdapter）
+agentAdapters.register('workbuddy', new WorkBuddyGatewayAdapter());

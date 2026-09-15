@@ -1,0 +1,72 @@
+/**
+ * 命令技能分级授权测试
+ *
+ * 验证 exec_command 走统一 actionGate（高危需确认，不直接执行），
+ * 以及命令黑名单的结构化拦截。
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
+import { executeToolCall } from './registry.js';
+import { actionGate, classifyAction } from '../services/actionGate.js';
+import { blockedCommandReason } from './command.js';
+import { setCommandProvider, LocalCommandProvider, type CommandProvider } from '../services/commandProvider.js';
+import { withActionScope } from '../services/actionContext.js';
+
+function executeInSession(command: string): Promise<string> {
+  return withActionScope({
+    owner: { localUserId: 'local-user', workspaceId: 'workspace-test', sessionId: 'session-test' },
+    getAuthorizedRoots: () => [],
+  }, () => executeToolCall('exec_command', { command }));
+}
+
+describe('命令技能分级授权', () => {
+  beforeEach(() => {
+    for (const item of actionGate.list()) actionGate.deny(item.id);
+  });
+
+  it('exec_command 为高风险', () => {
+    expect(classifyAction('exec_command')).toBe('high');
+  });
+
+  it('exec_command 需确认，不会直接执行', async () => {
+    const result = await executeInSession('echo hello');
+    expect(result).toContain('需要你确认');
+    const pending = actionGate.getLatest();
+    expect(pending?.skill).toBe('exec_command');
+    actionGate.deny(pending!.id);
+  });
+
+  it('结构化拦截：危险命令动词（含扩展名）被拦', () => {
+    expect(blockedCommandReason('format c:')).toContain('安全拦截');
+    expect(blockedCommandReason('format.com c:')).toContain('安全拦截');
+    expect(blockedCommandReason('shutdown /s')).toContain('安全拦截');
+    expect(blockedCommandReason('rd /s /q C:\\tmp')).toContain('安全拦截');
+  });
+
+  it('结构化拦截：无害命令不被误伤', () => {
+    expect(blockedCommandReason('echo shutdown')).toBeNull();
+    expect(blockedCommandReason('git status')).toBeNull();
+    expect(blockedCommandReason('dir')).toBeNull();
+  });
+
+  it('能力 seam：exec_command 消费可替换的 CommandProvider', async () => {
+    let ran = '';
+    const fake: CommandProvider = {
+      run: (command) => {
+        ran = command;
+        return { stdout: 'ok', stderr: '', exitCode: 0 };
+      },
+    };
+
+    setCommandProvider(fake);
+    try {
+      await executeInSession('echo hi');
+      const pending = actionGate.getLatest()!;
+      const result = await pending.executor!(pending.args);
+      expect(result).toBe('ok');
+      expect(ran).toBe('echo hi');
+      actionGate.deny(pending.id);
+    } finally {
+      setCommandProvider(new LocalCommandProvider());
+    }
+  });
+});

@@ -1,0 +1,12 @@
+{
+  "agents": [
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "command": "E:/AI/Cursor/cursor/resources/app/bin/cursor.cmd",
+      "args": ["--no-sandbox"],
+      "probeArgs": ["--version"],
+      "capabilities": ["chat", "code"]
+    }
+  ]
+}

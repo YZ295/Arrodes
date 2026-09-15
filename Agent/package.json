@@ -1,0 +1,17 @@
+{
+  "main": "desktop/dist/main.js",
+  "scripts": {
+    "desktop": "npm run desktop:build && electron .",
+    "desktop:build": "cd desktop && npm run build",
+    "build": "npm --prefix desktop run build:assets && npm --prefix desktop run build",
+    "start": "npm --prefix desktop start",
+    "test": "npm --prefix server test && npm --prefix client test"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "electron": "^43.2.0"
+  },
+  "name": "arrodes-agent",
+  "version": "1.0.0",
+  "private": true
+}

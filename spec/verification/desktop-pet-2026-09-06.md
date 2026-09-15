@@ -29,3 +29,14 @@
 - Real Mage-VL screen-sharing content flowing end-to-end into the pet while observing Arduino IDE or another chosen application.
 - Reliable game title/HUD extraction for any specific game.
 - Tray-based persistence after closing the main window, draggable positioning and multi-display position memory.
+
+## 2026-09-07 WorkBuddy implementation and Codex review
+
+- Scope remained outside the deferred memory, next-step recommendation and chat-experience debts. No Live2D, TTS, camera or automatic desktop action was added.
+- WorkBuddy projected the existing observation diagnostics (`model`, `durationMs`, `observedAt`) into the desktop-pet view model and overlay, with tests for observation and no-observation states.
+- Codex review rejected an always-visible full model name and timestamp in the 224px status row. Review RED: `DesktopPetOverlay.test.tsx` failed because it rendered `microsoft/Mage-VL · 1.2s · 20:00:00` instead of compact `1.2s`. GREEN: duration remains visible while model and raw observation timestamp are retained in the diagnostic tooltip.
+- Targeted desktop-pet tests: 2 files / 9 tests passed.
+- Full client regression: 21 files / 89 tests passed. Production build passed with the existing large-chunk advisory. Lint exited 0 with four pre-existing warnings outside the modified desktop-pet files.
+- Server regression, including the uncommitted WorkBuddy reconnect work: 58 files / 315 tests passed; server typecheck passed.
+- `git diff --check` reported line-ending conversion warnings only and no whitespace errors.
+- This work improves observability of the projection path; it does not prove that a real current Windows screen has flowed through Electron capture and Mage-VL into the pet. That remains a human-visible end-to-end acceptance step.

@@ -1,0 +1,14 @@
+{
+  "name": "arrodes-butler",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix desktop run build:assets && npm --prefix desktop run build",
+    "start": "npm --prefix desktop start",
+    "console": "electron butler-app",
+    "test": "npm --prefix server test && npm --prefix client test"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0"
+  }
+}

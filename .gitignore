@@ -4,9 +4,9 @@ dist/
 *.log
 Arrodes/Plan/
 
-# ����ʱ���ݣ��û�����
+# 运行时数据（用户画像）
 data/
-# һ���� TTS ʵ��ű�
+# 一次性 TTS 实验脚本
 Arrodes/server/ab-test.mts
 Arrodes/server/verify-tts.mts
 Arrodes/server/test-tts-fix.mjs
@@ -22,10 +22,23 @@ TheFool/build*/
 # db backup dirs (data archive)
 data-backup-*/
 
-# Python ����
+# Python 缓存
 __pycache__/
 *.pyc
 
 # 本地运行产物（含凭据，禁止入库）
 .gateway.pid
 start-workbuddy-gateway.cmd
+
+# Migration snapshots and local build/runtime outputs
+.migration-backup/
+.venv/
+release*/
+*.tsbuildinfo
+.env.*.local
+
+.retired*/
+
+# 临时探测 / 解析产物
+_tmp_*
+*.tmp

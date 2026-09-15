@@ -1,0 +1,86 @@
+/* 程序化桌宠角色「小阿」动画 */
+
+.procedural-pet {
+  position: absolute;
+  inset: 0;
+}
+
+.procedural-pet__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* 悬浮 + 呼吸 */
+.procedural-pet__float {
+  animation: pp-float 4.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+@keyframes pp-float {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-7px) scaleY(1.012); }
+}
+
+/* 呆毛摆动（情绪兴奋度越高摆得越欢，由 mood class 微调 duration） */
+.procedural-pet__ahoge {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pp-ahoge 2.6s ease-in-out infinite;
+}
+
+.procedural-pet--ready .procedural-pet__ahoge,
+.procedural-pet--error .procedural-pet__ahoge {
+  animation-duration: 1.1s;
+}
+
+@keyframes pp-ahoge {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(7deg); }
+}
+
+/* 分析中：思考轻晃 */
+.procedural-pet--working .procedural-pet__head {
+  animation: pp-think 3.4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 90%;
+}
+
+@keyframes pp-think {
+  0%, 100% { transform: rotate(-1.6deg); }
+  50% { transform: rotate(1.6deg); }
+}
+
+/* 出错：抖动 */
+.procedural-pet--error .procedural-pet__svg {
+  animation: pp-shake .5s ease-in-out 2;
+}
+
+@keyframes pp-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* 汗滴滑落 */
+.procedural-pet__sweat {
+  animation: pp-sweat 2.2s ease-in infinite;
+}
+
+@keyframes pp-sweat {
+  0% { transform: translateY(0); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateY(26px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .procedural-pet__float,
+  .procedural-pet__ahoge,
+  .procedural-pet__head,
+  .procedural-pet__svg,
+  .procedural-pet__sweat {
+    animation: none;
+  }
+}
