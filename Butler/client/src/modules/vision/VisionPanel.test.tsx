@@ -117,6 +117,84 @@ describe('Vision panel readiness', () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the task session as current state, single next step and previous-step verification', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(online)));
+    const watcher: ContinuousVisionController = {
+      active: true,
+      analyzing: false,
+      error: null,
+      goal: '确认 Arduino 程序是否上传成功',
+      setGoal: vi.fn(),
+      observation: {
+        description: 'Arduino IDE 输出面板显示上传完成',
+        durationMs: 20,
+        model: 'qwen3-vl:4b-instruct',
+        observedAt: '2026-09-06T12:00:00.000Z',
+        visibleText: ['Done uploading.'],
+      },
+      start: vi.fn(),
+      stop: vi.fn(),
+      taskSession: {
+        active: true,
+        phase: 'advancing',
+        state: 'Blink 已上传到开发板',
+        nextAction: '切回摄像头确认板载 LED 每秒亮灭一次',
+        verification: {
+          result: 'confirmed',
+          expected: 'Done uploading.',
+          basis: '画面中出现了上一步期望的「Done uploading.」，上一步已完成。',
+        },
+        observationCount: 3,
+      },
+    };
+
+    await render(watcher);
+
+    // 「当前状态 + 唯一下一步」必须成对出现，用户不需要自己判断哪条是下一步
+    expect(container.textContent).toContain('Blink 已上传到开发板');
+    expect(container.textContent).toContain('切回摄像头确认板载 LED 每秒亮灭一次');
+    // 上一步验证结果要可见，否则用户不知道系统凭什么推进
+    expect(container.textContent).toContain('Done uploading.');
+    expect(container.textContent).toContain('上一步已完成');
+    expect(container.textContent).toContain('第 3 次观察');
+  });
+
+  it('marks structured degradation instead of passing free text off as structured evidence', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(online)));
+    const watcher: ContinuousVisionController = {
+      active: true,
+      analyzing: false,
+      error: null,
+      goal: '识别当前屏幕',
+      setGoal: vi.fn(),
+      observation: {
+        description: '屏幕上似乎是一个代码编辑器，我看不太清楚具体内容。',
+        durationMs: 20,
+        model: 'qwen3-vl:4b-instruct',
+        observedAt: '2026-09-06T12:00:00.000Z',
+        visibleText: [],
+        uncertainties: ['视觉模型未返回结构化字段'],
+        structuredFallback: true,
+      },
+      start: vi.fn(),
+      stop: vi.fn(),
+      taskSession: {
+        active: true,
+        phase: 'waiting-evidence',
+        state: null,
+        nextAction: null,
+        verification: { result: 'none', expected: null, basis: '这是本次任务的第一次观察，还没有上一步可验证。' },
+        observationCount: 1,
+      },
+    };
+
+    await render(watcher);
+
+    // 降级必须显式标注：保留原始摘要，但不能让用户以为这是结构化的屏幕事实
+    expect(container.textContent).toContain('结构化降级');
+    expect(container.textContent).toContain('屏幕上似乎是一个代码编辑器');
+  });
+
   it('checks status on mount and cancels it on unmount', async () => {
     const fetchMock = vi.fn().mockImplementation(() => new Promise(() => {}));
     vi.stubGlobal('fetch', fetchMock);

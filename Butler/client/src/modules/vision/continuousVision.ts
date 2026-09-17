@@ -27,6 +27,12 @@ export interface VisionObservation {
   decision?: GuidanceDecision;
   nextAction?: string | null;
   guidanceProfile?: string | null;
+  /**
+   * 结构化降级标记：模型返回普通文本或坏 JSON 时置真。
+   * 此时 `description` 是原始摘要，其余结构化字段一律为空——
+   * 界面必须显式标注，不能让自由文本冒充屏幕事实。
+   */
+  structuredFallback?: boolean;
 }
 
 export type ScreenContextKind = 'game' | 'development' | 'prompt' | 'general';
@@ -164,6 +170,7 @@ export function parseScreenObservation(
       nextSuggestion: null,
       promptFeedback: null,
       confidence: null,
+      structuredFallback: true,
     });
   }
 

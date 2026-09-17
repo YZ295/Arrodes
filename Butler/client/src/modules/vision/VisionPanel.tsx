@@ -371,8 +371,49 @@ export default function VisionPanel({ continuousVision }: { continuousVision?: C
           </div>
           {continuousVision.analyzing && <p className="mt-2 text-xs text-blue-300">正在理解变化后的画面…</p>}
           {continuousVision.error && <p className="mt-2 text-xs text-red-300">{continuousVision.error}</p>}
+          {continuousVision.taskSession.active && (
+            <div className="mt-3 space-y-2 rounded-lg border border-blue-400/20 bg-blue-400/5 p-3 text-sm">
+              {/* 当前状态 + 唯一下一步：用户只看这两行就知道现在在哪、下一步做什么 */}
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  第 {continuousVision.taskSession.observationCount} 次观察
+                </span>
+                {continuousVision.taskSession.phase === 'blocked' && (
+                  <span className="text-xs text-red-300">需要处理</span>
+                )}
+              </div>
+              {continuousVision.taskSession.state && (
+                <p className="text-[var(--color-text-primary)]">
+                  <span className="text-[var(--color-text-muted)]">当前状态：</span>
+                  {continuousVision.taskSession.state}
+                </p>
+              )}
+              {continuousVision.taskSession.nextAction && (
+                <p className="text-[var(--color-text-primary)]">
+                  <span className="text-[var(--color-text-muted)]">下一步：</span>
+                  {continuousVision.taskSession.nextAction}
+                </p>
+              )}
+              {continuousVision.taskSession.verification.result !== 'none' && (
+                <p className={
+                  continuousVision.taskSession.verification.result === 'confirmed'
+                    ? 'text-xs text-green-300'
+                    : continuousVision.taskSession.verification.result === 'failed'
+                      ? 'text-xs text-red-300'
+                      : 'text-xs text-amber-300'
+                }>
+                  {continuousVision.taskSession.verification.basis}
+                </p>
+              )}
+            </div>
+          )}
           {continuousVision.observation && (
             <div className="mt-3 space-y-2 rounded-lg border border-white/8 bg-black/15 p-3 text-sm text-[var(--color-text-secondary)]">
+              {continuousVision.observation.structuredFallback && (
+                <p className="rounded border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-xs text-amber-300">
+                  结构化降级：模型这次没有返回可解析的字段，下面只是原始描述，不能当作屏幕事实。
+                </p>
+              )}
               <p><span className="text-[var(--color-text-primary)]">最近观察：</span>{continuousVision.observation.description}</p>
               {continuousVision.observation.activeApplication && (
                 <p><span className="text-[var(--color-text-primary)]">当前应用：</span>{continuousVision.observation.activeApplication}</p>

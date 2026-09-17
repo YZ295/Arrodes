@@ -127,7 +127,38 @@ describe('screen observation contract', () => {
       nextSuggestion: null,
       promptFeedback: null,
       confidence: null,
+      structuredFallback: true,
     });
+  });
+
+  it('does not mark a successful structured parse as degraded', () => {
+    expect(typeof parseScreenObservation).toBe('function');
+    if (!parseScreenObservation) return;
+
+    const observation = parseScreenObservation(
+      '{"summary":"Arduino IDE 正在编译","visibleText":["Compiling sketch"],"confidence":0.8}',
+      { durationMs: 10, model: 'mage' },
+      '2026-09-06T12:00:00.000Z',
+    );
+
+    expect(observation.structuredFallback).toBeFalsy();
+    expect(observation.visibleText).toEqual(['Compiling sketch']);
+  });
+
+  it('marks malformed JSON as degraded and keeps the raw text', () => {
+    expect(typeof parseScreenObservation).toBe('function');
+    if (!parseScreenObservation) return;
+
+    const raw = '{"summary": "缺少右花括号的开头';
+    const observation = parseScreenObservation(
+      raw,
+      { durationMs: 10, model: 'mage' },
+      '2026-09-06T12:00:00.000Z',
+    );
+
+    expect(observation.structuredFallback).toBe(true);
+    expect(observation.description).toBe(raw);
+    expect(observation.visibleText).toEqual([]);
   });
 
   it('recovers fields when the model leaves quotes unescaped inside a value', () => {
