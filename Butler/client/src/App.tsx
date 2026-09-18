@@ -49,7 +49,7 @@ const App = memo(function App() {
 
   // 桌宠右键菜单「视觉观察」命令：经 BroadcastChannel 切换主窗口的持续观察
   // 管家窗口边界 → 观察帧排除区域（观察画面中永远看不到管家本人，防自我反馈）
-  usePetBoundsListener((rect) => setObservationExclusion(rect));
+  usePetBoundsListener((rect) => setObservationExclusion('pet', rect));
 
   usePetCommandHandler((command) => {
     if (command !== 'vision-toggle' || !continuousVision) return;

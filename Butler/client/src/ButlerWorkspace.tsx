@@ -1,16 +1,49 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ButlerPanel } from './components/ButlerPanel';
 import { ButlerPetPanel } from './components/ButlerPetPanel';
 import ModelSettings from './components/ModelSettings';
 import VisionPanel from './modules/vision/VisionPanel';
-import { useContinuousVision, setObservationExclusion } from './modules/vision/useContinuousVision';
+import {
+  useContinuousVision,
+  setObservationExclusion,
+  setExclusionReporter,
+  setSelfWindowVisible,
+  setVisionTickReporter,
+} from './modules/vision/useContinuousVision';
 import { useDesktopPetPublisher, usePetBoundsListener, usePetCommandHandler } from './desktop-pet/desktopPetBridge';
 
 /** Owns screen capture for the standalone Butler. Hiding this window keeps observation alive. */
 export default function ButlerWorkspace() {
   const [tab, setTab] = useState<'records' | 'vision' | 'pet' | 'models'>('records');
   const vision = useContinuousVision(false);
-  usePetBoundsListener(setObservationExclusion);
+  usePetBoundsListener((rect) => setObservationExclusion('pet', rect));
+
+  // 排除区诊断：让「遮罩到底有没有生效」可被观察。
+  // 只写进 desktop.log，绝不上屏——诊断文案上屏就成了一段可被视觉读回的文本。
+  useEffect(() => {
+    setExclusionReporter((report) => {
+      window.arrodesButler?.logDiagnostic('exclusion', JSON.stringify(report));
+    });
+    setVisionTickReporter((tick) => {
+      window.arrodesButler?.logDiagnostic('vision-tick', JSON.stringify({ tick }));
+    });
+    return () => {
+      setExclusionReporter(null);
+      setVisionTickReporter(null);
+    };
+  }, []);
+
+  // 本窗口可见性：隐藏时不该进排除区（--pet 下管家窗口 show:false，
+  // 但仍能读到 outerWidth/outerHeight，白遮屏幕约 30%）
+  useEffect(() => {
+    let cancelled = false;
+    void window.arrodesButler?.getSelfVisible().then((visible) => {
+      if (!cancelled) setSelfWindowVisible(visible);
+    });
+    window.arrodesButler?.onSelfVisible(setSelfWindowVisible);
+    return () => { cancelled = true; };
+  }, []);
+
   usePetCommandHandler((command) => {
     if (command !== 'vision-toggle') return;
     if (vision.active) vision.stop(); else void vision.start();

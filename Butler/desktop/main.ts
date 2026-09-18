@@ -276,6 +276,17 @@ function stopGazePolling() {
   }
 }
 
+/**
+ * 把管家窗口的可见性告诉它自己。
+ *
+ * 隐藏窗口不该进观察帧排除区——它根本不在屏幕上，遮它只会白遮一块观察区域。
+ * 渲染进程无法自行判断：管家窗口设了 backgroundThrottling:false，
+ * 该开关同时让 Page Visibility API 失效，隐藏时仍报 visible。
+ */
+function syncButlerVisibility(): void {
+  butlerWindow?.webContents.send('butler:self-visible', butlerWindow.isVisible());
+}
+
 /** 管家控制台窗口：独立 Electron 窗口，承载管家后端引擎面板 */
 async function createButlerWindow(): Promise<void> {
   if (butlerWindow) {
@@ -304,6 +315,12 @@ async function createButlerWindow(): Promise<void> {
   });
   butlerWindow.on('close', (event) => { if (!quitting) { event.preventDefault(); butlerWindow?.hide(); } });
   butlerWindow.on('closed', () => { butlerWindow = null; });
+  // 可见性同步：隐藏窗口不该进观察帧排除区（它根本不在屏幕上，遮它只会白遮一块）
+  butlerWindow.on('show', syncButlerVisibility);
+  butlerWindow.on('hide', syncButlerVisibility);
+  butlerWindow.on('minimize', syncButlerVisibility);
+  butlerWindow.on('restore', syncButlerVisibility);
+  butlerWindow.webContents.on('did-finish-load', syncButlerVisibility);
   await butlerWindow.loadURL(getUiUrl('butler'));
 }
 
@@ -390,6 +407,17 @@ ipcMain.handle('butler:launch-pet', () => {
   }
   return createPetWindow().then(() => ({ created: true }));
 });
+
+// 渲染进程诊断落盘（观察帧排除区等）。限制长度，避免日志被刷爆。
+ipcMain.on('diag:log', (_event, tag: unknown, payload: unknown) => {
+  const name = typeof tag === 'string' ? tag.slice(0, 40) : 'unknown';
+  const body = typeof payload === 'string' ? payload.slice(0, 800) : String(payload).slice(0, 800);
+  dlog(`[diag:${name}] ${body}`);
+});
+
+// 管家窗口启动时主动取一次可见性：did-finish-load 的那次广播可能早于
+// 渲染进程注册监听，用 invoke 拿权威初值可以避开这个竞态。
+ipcMain.handle('butler:self-visible', () => butlerWindow?.isVisible() ?? false);
 
 ipcMain.on('pet:interactive-toggle', (event) => {
   if (!petWindow || event.sender !== petWindow.webContents) return;

@@ -11,6 +11,16 @@ declare global {
   interface Window {
     arrodesButler?: {
       launchPet: () => Promise<{ created: boolean }>;
+      /**
+       * 诊断落盘（写进主进程的 desktop.log），**只落盘不上屏**。
+       * 诊断文案若渲染到屏幕上，自己就成了一段可被视觉观察读回的文本，
+       * 正好踩中它要排查的那个坑。
+       */
+      logDiagnostic: (tag: string, payload: string) => void;
+      /** 本窗口当前可见性（权威初值） */
+      getSelfVisible: () => Promise<boolean>;
+      /** 订阅本窗口可见性变化 */
+      onSelfVisible: (callback: (visible: boolean) => void) => void;
     };
   }
 }

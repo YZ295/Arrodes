@@ -191,9 +191,50 @@ export function parseScreenObservation(
   });
 }
 
+/**
+ * 带超时的 fetch。
+ *
+ * 为什么必须有：采样器用 `inFlight` 闩锁防止并发推理，而闩锁只在
+ * `analyze()` 真正 settle 时才解开（`finally`）。推理请求一旦挂住不返回，
+ * 闩锁就永远保持 true，观察循环从此**静默停摆**——面板还显示「观察中」，
+ * 却再也不更新，也没有任何报错。给它一个超时是唯一的恢复手段。
+ *
+ * 顺带修掉一个真实场景：用户切到别的应用后，面板长时间停留在旧内容上，
+ * 让人以为系统还在看当前屏幕。
+ */
+export async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (cause) {
+    // 只有"是我们主动中断的"才改写成超时；其他错误（503、网络断开）原样抛出，
+    // 否则真因会被超时文案盖掉
+    if (controller.signal.aborted) throw new Error(timeoutMessage);
+    throw cause;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 一轮采样的结果，供诊断使用：让「观察循环到底在不在跑」可被观察 */
+export type SampleOutcome =
+  | 'analyzed'
+  | 'skipped-speaking'
+  | 'skipped-inflight'
+  | 'skipped-unchanged'
+  | 'failed';
+
 interface ContinuousVisionSamplerOptions {
   analyze: (imageBase64: string) => Promise<VisionObservation>;
   threshold?: number;
+  /** 每轮采样的结果（含被跳过与失败），用于诊断；异常不应影响主流程 */
+  onOutcome?: (outcome: SampleOutcome) => void;
 }
 
 /**
@@ -238,18 +279,29 @@ export class ContinuousVisionSampler {
   private inFlight = false;
   private readonly analyze: ContinuousVisionSamplerOptions['analyze'];
   private readonly threshold: number;
+  private readonly report: (outcome: SampleOutcome) => void;
 
   constructor(options: ContinuousVisionSamplerOptions) {
     this.analyze = options.analyze;
     this.threshold = options.threshold ?? 6;
+    this.report = options.onOutcome ?? (() => {});
   }
 
   async sample(frame: ScreenFrame, isSpeaking: boolean): Promise<VisionObservation | null> {
-    if (isSpeaking || this.inFlight) return null;
+    if (isSpeaking) {
+      this.report('skipped-speaking');
+      return null;
+    }
+    if (this.inFlight) {
+      // 这一条若持续出现，说明上一次推理一直没 settle（配合超时应当能自愈）
+      this.report('skipped-inflight');
+      return null;
+    }
     if (
       this.previousSuccessfulFrame
       && measureSceneDifference(this.previousSuccessfulFrame, frame.fingerprint) < this.threshold
     ) {
+      this.report('skipped-unchanged');
       return null;
     }
 
@@ -257,7 +309,11 @@ export class ContinuousVisionSampler {
     try {
       const observation = await this.analyze(frame.imageBase64);
       this.previousSuccessfulFrame = frame.fingerprint.slice();
+      this.report('analyzed');
       return observation;
+    } catch (cause) {
+      this.report('failed');
+      throw cause;
     } finally {
       this.inFlight = false;
     }

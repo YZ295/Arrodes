@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as continuousVision from './continuousVision';
 
-const { ContinuousVisionSampler, measureSceneDifference } = continuousVision;
+const { ContinuousVisionSampler, measureSceneDifference, fetchWithTimeout } = continuousVision;
 
 type ParseScreenObservation = (
   description: string,
@@ -30,6 +30,85 @@ type ParseScreenObservation = (
 const parseScreenObservation = (continuousVision as unknown as {
   parseScreenObservation: ParseScreenObservation;
 }).parseScreenObservation;
+
+describe('推理请求超时（防观察循环静默停摆）', () => {
+  it('正常返回时原样透传响应，且不留悬挂定时器', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await fetchWithTimeout('/api/x', { method: 'POST' }, 1_000, '超时');
+
+    expect(response.status).toBe(200);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('请求挂住时按超时中断，抛出可读原因而不是永远等待', async () => {
+    // 真实故障：视觉推理偶发不返回。采样器用 inFlight 闩锁防并发，
+    // 没有超时的话这个闩锁永远解不开，观察循环从此静默停摆——
+    // 面板还显示"观察中"，却再也不更新，也不报错。
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('aborted')));
+    })));
+
+    const pending = fetchWithTimeout('/api/x', { method: 'POST' }, 1_000, '视觉分析超时');
+    const assertion = expect(pending).rejects.toThrow('视觉分析超时');
+    await vi.advanceTimersByTimeAsync(1_000);
+    await assertion;
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('非超时错误原样抛出，不被改写成超时', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('视觉服务 503')));
+
+    await expect(fetchWithTimeout('/api/x', {}, 1_000, '视觉分析超时')).rejects.toThrow('视觉服务 503');
+
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('采样结果上报（让观察循环是否在跑可被观察）', () => {
+  const frame = (fingerprint: number[]) => ({
+    imageBase64: 'png-data',
+    fingerprint: new Uint8Array(fingerprint),
+  });
+
+  it('按原因上报：分析了 / 画面没变 / 播报中', async () => {
+    const outcomes: string[] = [];
+    const sampler = new ContinuousVisionSampler({
+      analyze: vi.fn().mockResolvedValue({ description: 'x', durationMs: 1, model: 'm' }),
+      onOutcome: (outcome) => outcomes.push(outcome),
+    });
+
+    await sampler.sample(frame([10, 20, 30]), false);
+    await sampler.sample(frame([10, 20, 30]), false);   // 没变化
+    await sampler.sample(frame([200, 200, 200]), true); // 播报中
+
+    expect(outcomes).toEqual(['analyzed', 'skipped-unchanged', 'skipped-speaking']);
+  });
+
+  it('推理失败时上报失败原因，下一帧仍可重试', async () => {
+    const outcomes: string[] = [];
+    const analyze = vi.fn()
+      .mockRejectedValueOnce(new Error('视觉分析超时'))
+      .mockResolvedValue({ description: '恢复', durationMs: 1, model: 'm' });
+    const sampler = new ContinuousVisionSampler({ analyze, onOutcome: (o) => outcomes.push(o) });
+
+    // 失败向上抛（调用方负责 setError），但闩锁必须解开，同一画面才能重试
+    await expect(sampler.sample(frame([10, 20, 30]), false)).rejects.toThrow('视觉分析超时');
+    await expect(sampler.sample(frame([10, 20, 30]), false)).resolves.toMatchObject({ description: '恢复' });
+
+    expect(outcomes).toEqual(['failed', 'analyzed']);
+  });
+});
 
 describe('continuous vision scene policy', () => {
   it('treats identical fingerprints as unchanged and opposite frames as fully changed', () => {
