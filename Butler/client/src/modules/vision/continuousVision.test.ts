@@ -252,4 +252,98 @@ describe('screen observation contract', () => {
     });
     expect(observation.expectedEvidence).toContain('Done compiling.');
   });
+
+  it('separates an upload failure from a compile failure when the sketch compiled fine', () => {
+    // 真实帧（2026-09-18 用户实测，Arduino IDE 2.3.10 + Arduino Uno）：
+    // 编译统计正常输出，随后 COM5 打不开导致上传失败。
+    // 这不是编译失败——代码是好的，让用户去改代码是误导。
+    expect(typeof parseScreenObservation).toBe('function');
+    if (!parseScreenObservation) return;
+
+    const realFrame = {
+      summary: 'Arduino IDE 编译统计正常，但上传因串口打不开失败',
+      activeApplication: 'Arduino IDE',
+      visibleText: [
+        'Sketch uses 2004 bytes (6%) of program storage space. Maximum is 32256 bytes.',
+        'Global variables use 188 bytes (6%) of dynamic memory, leaving 1860 bytes for local variables. Maximum is 2048 bytes.',
+        'Error: cannot open port \\.\COM5',
+        'Error: unable to open port COM5 for programmer arduino',
+        'Failed uploading: uploading error: exit status 1',
+      ],
+      uncertainties: [],
+      confidence: 0.9,
+    };
+
+    const observation = parseScreenObservation(
+      JSON.stringify(realFrame),
+      { durationMs: 12_300, model: 'qwen3-vl:4b-instruct' },
+    );
+
+    expect(observation).toMatchObject({
+      guidanceProfile: 'arduino-ide',
+      currentStep: '上传失败',
+      decision: 'blocked',
+    });
+    // 代码没问题，绝不能给出「改代码」的下一步
+    expect(observation.nextAction ?? '').not.toContain('修正代码');
+    expect(observation.nextAction ?? '').toMatch(/端口|开发板|USB/);
+  });
+
+  it('does not treat a successful upload frame as an upload failure', () => {
+    // 守门：新增的上传失败分支不能误伤正常成功帧
+    expect(typeof parseScreenObservation).toBe('function');
+    if (!parseScreenObservation) return;
+
+    const realFrame = {
+      summary: 'Arduino IDE 编译并上传成功',
+      activeApplication: 'Arduino IDE',
+      visibleText: [
+        'Sketch uses 924 bytes (2%) of program storage space. Maximum is 32256 bytes.',
+        'Global variables use 9 bytes (0%) of dynamic memory',
+        'avrdude done. Thank you.',
+        'Done uploading.',
+      ],
+      uncertainties: [],
+      confidence: 0.9,
+    };
+
+    const observation = parseScreenObservation(
+      JSON.stringify(realFrame),
+      { durationMs: 9_000, model: 'qwen3-vl:4b-instruct' },
+    );
+
+    expect(observation.decision).toBe('advance');
+    expect(observation.currentStep).not.toBe('上传失败');
+    expect(observation.currentStep).not.toBe('编译失败');
+  });
+
+  it('still reports a compile failure as a code problem when no upload was attempted', () => {
+    // 反向保护：把上传失败拆出去之后，真编译错误不能被漏判成上传问题
+    expect(typeof parseScreenObservation).toBe('function');
+    if (!parseScreenObservation) return;
+
+    const realFrame = {
+      summary: 'Arduino IDE 编译报错',
+      activeApplication: 'Arduino IDE',
+      visibleText: [
+        'Blink.ino:5:3: error: setupp was not declared in this scope',
+        'exit status 1',
+        'Compilation error: setupp was not declared in this scope',
+      ],
+      uncertainties: [],
+      confidence: 0.9,
+    };
+
+    const observation = parseScreenObservation(
+      JSON.stringify(realFrame),
+      { durationMs: 8_000, model: 'qwen3-vl:4b-instruct' },
+    );
+
+    expect(observation).toMatchObject({
+      guidanceProfile: 'arduino-ide',
+      currentStep: '编译失败',
+      decision: 'blocked',
+    });
+    expect(observation.nextAction ?? '').toContain('修正代码');
+  });
 });

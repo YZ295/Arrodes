@@ -6,6 +6,26 @@ function includesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
 
+/**
+ * 上传阶段失败的特征。
+ *
+ * 必须与编译失败分开判：编译成功但串口打不开时，输出面板会**同时**出现
+ * 编译统计行（`Sketch uses N bytes`）和 `exit status 1`——后者在编译失败里
+ * 也出现，光看它无法区分。只有这些上传专有字样才是不歧义的证据。
+ *
+ * 判错的代价不对称：把上传失败说成编译失败，会让用户去改本来没问题的代码。
+ */
+const UPLOAD_FAILURE_PATTERNS = [
+  /failed uploading/i,
+  /uploading error/i,
+  /unable to open port/i,
+  /cannot open port/i,
+  /can't open (device|port)/i,
+  /ser_open\(\)/i,
+  /programmer is not responding/i,
+  /上传失败/,
+];
+
 export function applyScreenGuidancePolicy(observation: VisionObservation): VisionObservation {
   const visible = observation.visibleText || [];
   const evidenceText = visible.join('\n');
@@ -25,6 +45,22 @@ export function applyScreenGuidancePolicy(observation: VisionObservation): Visio
       decision: uncertain ? 'ask' : observation.nextSuggestion ? 'advance' : 'wait',
       nextAction: uncertain ? null : observation.nextSuggestion || null,
       guidanceProfile: null,
+    };
+  }
+
+  // 先判上传失败：此时代码往往已经编译通过，指引方向与编译错误完全不同
+  if (includesAny(evidenceText, UPLOAD_FAILURE_PATTERNS)) {
+    const advice = '开发板或串口没连上：确认 USB 线已插好、开发板已上电，'
+      + '并在开发板选择器里选中正确端口后重新上传。代码本身没有问题，不用改。';
+    return {
+      ...observation,
+      currentState: '上传失败',
+      nextSuggestion: advice,
+      currentStep: '上传失败',
+      expectedEvidence: ['Done uploading.'],
+      decision: 'blocked',
+      nextAction: advice,
+      guidanceProfile: 'arduino-ide',
     };
   }
 
