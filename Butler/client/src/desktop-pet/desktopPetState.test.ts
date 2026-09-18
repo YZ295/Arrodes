@@ -155,3 +155,60 @@ describe('desktop pet presentation policy', () => {
     expect(view.verification).toBeNull();
   });
 });
+
+describe('观察新鲜度：面板必须如实说明这是什么时候看到的内容', () => {
+  // 用户真实困惑：切到 WorkBuddy 后，面板仍显示 Arduino 的内容，
+  // 且没有任何线索表明"这是旧内容"。根因是面板只持有最后一次观察，
+  // 却把它呈现得像当前状态。
+  const T0 = '2026-09-18T14:00:00.000Z';
+  const at = (seconds: number) => Date.parse(T0) + seconds * 1000;
+  const frame = { description: 'Arduino IDE 输出面板', durationMs: 100, model: 'qwen3-vl', observedAt: T0 };
+  const observing = { active: true, analyzing: false, error: null };
+
+  it('刚看到的算「刚刚」', () => {
+    const view = createDesktopPetViewModel(frame, observing, at(20));
+    expect(view.freshness).toEqual({ level: 'live', label: '刚刚' });
+  });
+
+  it('几分钟前的标明分钟数', () => {
+    const view = createDesktopPetViewModel(frame, observing, at(3 * 60));
+    expect(view.freshness).toEqual({ level: 'recent', label: '3 分钟前' });
+  });
+
+  it('超过五分钟明确提示可能已过期', () => {
+    const view = createDesktopPetViewModel(frame, observing, at(12 * 60));
+    expect(view.freshness.level).toBe('stale');
+    expect(view.freshness.label).toContain('12 分钟前');
+    expect(view.freshness.label).toContain('可能已过期');
+  });
+
+  it('观察已停止时直说停止，并交代上次是多久以前', () => {
+    // 这正是用户遇到的情形：循环不跑了，界面却还在展示旧结论
+    const view = createDesktopPetViewModel(frame, { active: false, analyzing: false, error: null }, at(4 * 60));
+    expect(view.freshness.level).toBe('stopped');
+    expect(view.freshness.label).toContain('观察已停止');
+    expect(view.freshness.label).toContain('4 分钟前');
+  });
+
+  it('从未观察到过时只说停止，不编造时间', () => {
+    const view = createDesktopPetViewModel(null, { active: false, analyzing: false, error: null }, at(600));
+    expect(view.freshness).toEqual({ level: 'stopped', label: '观察已停止' });
+  });
+
+  it('观察中但还没有第一帧时说等待画面，而不是当成旧内容', () => {
+    const view = createDesktopPetViewModel(null, observing, at(60));
+    expect(view.freshness).toEqual({ level: 'live', label: '等待画面' });
+  });
+
+  it('观察中断的错误态也带上新鲜度，不留下无时间线索的面板', () => {
+    const view = createDesktopPetViewModel(frame, { active: true, analyzing: false, error: '视觉分析超时' }, at(30));
+    expect(view.freshness.level).toBe('live');
+    expect(view.freshness.label).toBe('刚刚');
+  });
+
+  it('时间戳不可解析时不假装新鲜', () => {
+    const broken = { ...frame, observedAt: 'not-a-date' };
+    const view = createDesktopPetViewModel(broken, observing, at(30));
+    expect(view.freshness).toEqual({ level: 'live', label: '等待画面' });
+  });
+});

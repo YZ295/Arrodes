@@ -26,6 +26,21 @@ export interface DesktopPetViewModel {
   diagnostics: DesktopPetDiagnostics | null;
   /** 上一步验证结果；没有上一步（或任务未开始）时为 null */
   verification: DesktopPetVerification | null;
+  /** 这份内容有多新。面板只持有「最后一次观察」，必须说清它是什么时候的 */
+  freshness: DesktopPetFreshness;
+}
+
+/**
+ * 内容新鲜度。
+ *
+ * 为什么必须有：面板只持有最后一次观察，没有任何东西会清空它，
+ * 于是「循环没在跑」和「循环在跑但内容很旧」在界面上长得一模一样——
+ * 用户切到别的应用后，仍看到上一个应用的结论，且无从判断它有多旧。
+ */
+export interface DesktopPetFreshness {
+  /** live=接近实时 recent=几分钟前 stale=可能已过期 stopped=观察已停止 */
+  level: 'live' | 'recent' | 'stale' | 'stopped';
+  label: string;
 }
 
 export interface DesktopPetDiagnostics {
@@ -61,10 +76,48 @@ function toVerification(observation: VisionObservation | null): DesktopPetVerifi
   };
 }
 
+/** 一帧之内算「刚刚」；超过这个窗就标分钟数 */
+const LIVE_WINDOW_MS = 60_000;
+/** 超过这个窗就明确提示「可能已过期」，避免用户把它当当前状态 */
+const STALE_WINDOW_MS = 5 * 60_000;
+
+function ageLabel(ageMs: number): string {
+  const minutes = Math.floor(ageMs / 60_000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes} 分钟前`;
+  return `${Math.floor(minutes / 60)} 小时前`;
+}
+
+/**
+ * 时间戳 → 新鲜度。
+ * 观察已停止时一律按 stopped 处理，并交代上次是多久以前——
+ * 用户遇到"显示的还是 Arduino"时，缺的正是这一句。
+ */
+function toFreshness(
+  observation: VisionObservation | null,
+  active: boolean,
+  now: number,
+): DesktopPetFreshness {
+  const parsed = observation?.observedAt ? Date.parse(observation.observedAt) : Number.NaN;
+  const ageMs = Number.isFinite(parsed) ? Math.max(0, now - parsed) : null;
+
+  if (!active) {
+    return { level: 'stopped', label: ageMs === null ? '观察已停止' : `观察已停止 · 上次 ${ageLabel(ageMs)}` };
+  }
+  // 观察中却拿不到可用时间戳：只说在等画面，不假装新鲜、也不编造时间
+  if (ageMs === null) return { level: 'live', label: '等待画面' };
+  if (ageMs < LIVE_WINDOW_MS) return { level: 'live', label: '刚刚' };
+  if (ageMs < STALE_WINDOW_MS) return { level: 'recent', label: ageLabel(ageMs) };
+  return { level: 'stale', label: `${ageLabel(ageMs)}·可能已过期` };
+}
+
 export function createDesktopPetViewModel(
   observation: VisionObservation | null,
   runtime: Omit<DesktopPetSnapshot, 'observation'>,
+  now: number = Date.now(),
 ): DesktopPetViewModel {
+  const freshness = toFreshness(observation, runtime.active, now);
+
   if (runtime.error) {
     return {
       title: '屏幕观察中断',
@@ -76,6 +129,7 @@ export function createDesktopPetViewModel(
       confidence: null,
       diagnostics: null,
       verification: null,
+      freshness,
     };
   }
 
@@ -90,6 +144,7 @@ export function createDesktopPetViewModel(
       confidence: observation?.confidence ?? null,
       diagnostics: toDiagnostics(observation),
       verification: toVerification(observation),
+      freshness,
     };
   }
 
@@ -104,6 +159,7 @@ export function createDesktopPetViewModel(
       confidence: null,
       diagnostics: null,
       verification: null,
+      freshness,
     };
   }
 
@@ -118,6 +174,7 @@ export function createDesktopPetViewModel(
       confidence: null,
       diagnostics: null,
       verification: null,
+      freshness,
     };
   }
 
@@ -151,5 +208,6 @@ export function createDesktopPetViewModel(
     confidence,
     diagnostics: toDiagnostics(observation),
     verification: toVerification(observation),
+    freshness,
   };
 }

@@ -37,7 +37,14 @@ const PET_VISUAL = (import.meta.env.VITE_PET_VISUAL || 'vrm') as 'vrm' | 'proced
 export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot?: DesktopPetSnapshot }) {
   const snapshot = useDesktopPetSnapshot(initialSnapshot);
   const [interactive, setInteractive] = useState(true);
-  const view = createDesktopPetViewModel(snapshot.observation, snapshot);
+  // 新鲜度要会走：面板只持有最后一次观察，时间标签必须自己更新，
+  // 否则「3 分钟前」会永远停在 3 分钟前
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const view = createDesktopPetViewModel(snapshot.observation, snapshot, now);
   const confidence = view.confidence === null ? null : Math.round(view.confidence * 100);
 
   const hostMode = resolvePetHostMode();
@@ -423,12 +430,21 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
       <section
         className={`desktop-pet__bubble${bubbleVisible ? '' : ' desktop-pet__bubble--hidden'}`}
         data-visible={bubbleVisible ? 'true' : 'false'}
+        data-freshness={view.freshness.level}
         aria-hidden={!bubbleVisible}
         aria-live="polite"
         aria-atomic="true"
       >
         <div className="desktop-pet__meta">
           <span className="desktop-pet__status"><i aria-hidden="true" />{view.status}</span>
+          {/* 新鲜度：面板只持有最后一次观察，必须说清它是什么时候的 */}
+          <span
+            className="desktop-pet__freshness"
+            data-role="freshness"
+            data-level={view.freshness.level}
+          >
+            {view.freshness.label}
+          </span>
           {view.diagnostics && (
             <span
               className="desktop-pet__diagnostics"

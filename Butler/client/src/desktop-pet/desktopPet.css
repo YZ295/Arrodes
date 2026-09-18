@@ -436,3 +436,34 @@ html.desktop-pet-surface #root {
   margin: 0;
   min-height: 100vh;
 }
+
+/* 新鲜度：让「这是什么时候看到的」紧挨状态，不被 space-between 推到中间 */
+.desktop-pet__freshness {
+  margin-right: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .06);
+  color: #aeb8c8;
+  white-space: nowrap;
+}
+
+.desktop-pet__freshness[data-level='stale'] {
+  background: rgba(226, 180, 93, .16);
+  color: #e2b45d;
+}
+
+.desktop-pet__freshness[data-level='stopped'] {
+  background: rgba(255, 255, 255, .04);
+  color: #8b94a3;
+}
+
+/* 内容过期或观察已停止：把正文降权，避免被读成"现在就是这样"。
+   刻意只降正文不隐藏——用户仍要能读到上次结论是什么。 */
+.desktop-pet__bubble[data-freshness='stale'] h1,
+.desktop-pet__bubble[data-freshness='stale'] .desktop-pet__state,
+.desktop-pet__bubble[data-freshness='stale'] .desktop-pet__action,
+.desktop-pet__bubble[data-freshness='stopped'] h1,
+.desktop-pet__bubble[data-freshness='stopped'] .desktop-pet__state,
+.desktop-pet__bubble[data-freshness='stopped'] .desktop-pet__action {
+  opacity: .6;
+}
