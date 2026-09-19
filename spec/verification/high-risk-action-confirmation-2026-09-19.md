@@ -31,7 +31,7 @@ node node_modules/vitest/vitest.mjs run src/components/ConfirmDialog.test.tsx
 - Butler 客户端全量测试：32 个测试文件、210 项测试全部通过。
 - Butler 服务端会话隔离测试：`src/routes/actions.test.ts`，1 项通过。
 - 客户端 Vite 生产构建：通过，490 个模块完成转换。
-- 客户端完整 `npm run build`：未通过；TypeScript 在既有 `continuousVision.test.ts` 第 223、238 行报告 `structuredFallback` 类型缺失，与本次确认弹窗无关。
+- 客户端完整 `npm run build`：通过。原有 `continuousVision.test.ts` 自定义返回类型遗漏 `structuredFallback`，补齐测试契约后 TypeScript 与 Vite 均通过。
 - `oxlint`：退出码 0；保留仓库既有警告，本次文件不再新增 hook 依赖警告。
 - Impeccable UI 检测：`ConfirmDialog.tsx` 返回空问题列表。
 

@@ -64,4 +64,23 @@ describe('动作确认 API 的会话归属', () => {
     });
     expect(cancelA.status).toBe(200);
   });
+
+  it('执行失败时保留待确认动作，以便用户修正环境后重试', async () => {
+    const pending = actionGate.request(
+      'uninstall_software',
+      { packageId: 'Vendor.Product' },
+      '卸载 Vendor.Product',
+      async () => { throw new Error('卸载后仍检测到软件'); },
+      { localUserId: 'local-user', workspaceId: 'workspace-a', sessionId: sessionA },
+    ).pending!;
+
+    const response = await fetch(`${base}/${pending.id}/confirm`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: sessionA }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(actionGate.getForOwner(pending.id, {
+      localUserId: 'local-user', workspaceId: 'workspace-a', sessionId: sessionA,
+    })).toBeTruthy();
+  });
 });

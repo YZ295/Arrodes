@@ -3,6 +3,13 @@
  */
 import { registerSkill } from './registry.js';
 import { getCommandProvider } from '../services/commandProvider.js';
+import {
+  getSoftwareProvider,
+  setSoftwareProvider,
+  type SoftwareProvider,
+} from '../services/softwareProvider.js';
+
+export { setSoftwareProvider, type SoftwareProvider };
 
 const BLOCKED_SUBSTRINGS = [
   'rm -rf', 'del /s', 'del /f', 'reg delete', 'sc delete',
@@ -61,4 +68,42 @@ registerSkill({
   risk: 'high',
   describe: (args) => `执行命令 ${String(args.command ?? '').trim() || '(空)'}`,
   execute: runExecCommand,
+});
+
+function exactPackageId(input: unknown): string {
+  const packageId = String(input ?? '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._+-]{1,199}$/.test(packageId)) {
+    throw new Error('软件 ID 格式无效；请使用 winget 的精确 package ID');
+  }
+  return packageId;
+}
+
+async function uninstallSoftware(args: Record<string, unknown>): Promise<string> {
+  const packageId = exactPackageId(args.packageId);
+  const provider = getSoftwareProvider();
+  if (!provider.isInstalled(packageId)) {
+    return `未检测到软件 ${packageId}，未执行卸载。`;
+  }
+
+  const outcome = provider.uninstall(packageId);
+  if (outcome.exitCode !== 0) {
+    throw new Error(`卸载命令失败（exit ${outcome.exitCode}）：${outcome.output.slice(0, 500)}`);
+  }
+  // Winget 的卸载器可能在父进程退出后短暂异步清理注册信息。
+  // 最多复查三次；真实 provider 的每次 winget 查询本身会提供短暂等待。
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!provider.isInstalled(packageId)) return `已卸载并核验：${packageId}`;
+  }
+  throw new Error(`卸载后仍检测到软件 ${packageId}，不能判定任务完成`);
+}
+
+registerSkill({
+  name: 'uninstall_software',
+  description: '按 winget 精确软件 ID 卸载软件；执行后会重新查询，确认软件确实不存在。',
+  args: [
+    { name: 'packageId', type: 'string', required: true, description: 'winget 精确软件 ID，例如 Vendor.Product' },
+  ],
+  risk: 'high',
+  describe: (args) => `卸载软件 ${String(args.packageId ?? '').trim() || '(未指定)'}`,
+  execute: uninstallSoftware,
 });

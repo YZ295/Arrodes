@@ -24,6 +24,7 @@ type ParseScreenObservation = (
   nextAction: string | null;
   guidanceProfile: string | null;
   observedAt: string;
+  structuredFallback?: boolean;
 };
 
 // 该模块并未被 mock，导出一定存在；这里只是绕开 vitest 的模块命名空间类型推断

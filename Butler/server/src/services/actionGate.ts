@@ -44,6 +44,7 @@ export const ACTION_INTENTS: Record<string, string> = {
   clipboard_set: 'clipboard.write', close_window: 'desktop.window.close',
   lock_screen: 'system.session.lock', mcp_list_tools: 'mcp.inspect',
   mcp_call_tool: 'mcp.execute', exec_command: 'system.command.execute',
+  uninstall_software: 'software.uninstall',
   write_file: 'filesystem.write', read_file: 'filesystem.read',
   minimax_tts: 'speech.synthesize', list_directory: 'filesystem.read',
   get_file_info: 'filesystem.read', create_file: 'filesystem.create',
@@ -58,6 +59,7 @@ export const INTENT_RISK_RULES: Record<string, Risk> = {
   'mcp.inspect': 'low', 'filesystem.read': 'low', 'speech.synthesize': 'low',
   'desktop.input.write': 'high', 'clipboard.write': 'high', 'desktop.window.close': 'high',
   'system.session.lock': 'high', 'mcp.execute': 'high', 'system.command.execute': 'high',
+  'software.uninstall': 'high',
   'filesystem.write': 'high', 'filesystem.create': 'high', 'filesystem.delete': 'high',
   'filesystem.move': 'high', 'filesystem.copy': 'high',
 };

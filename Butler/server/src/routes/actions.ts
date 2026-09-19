@@ -56,7 +56,7 @@ export function createActionsRouter(): Router {
   router.post('/:id/confirm', async (req, res) => {
     const owner = requireOwner(req.body?.sessionId, res);
     if (!owner) return;
-    const item = actionGate.confirmForOwner(String(req.params.id), owner);
+    const item = actionGate.getForOwner(String(req.params.id), owner);
     if (!item) {
       res.status(404).json({ error: '待确认操作不存在或已过期', code: 'ACTION_NOT_FOUND' });
       return;
@@ -65,6 +65,7 @@ export function createActionsRouter(): Router {
       const result = item.executor
         ? await item.executor(item.args)
         : await executeToolCall(item.skill, item.args);
+      actionGate.confirmForOwner(item.id, owner);
       res.json({ ok: true, skill: item.skill, result });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : '动作执行失败', code: 'ACTION_EXECUTION_FAILED' });
