@@ -1,8 +1,8 @@
 /**
  * 高风险操作确认弹窗
  *
- * 视觉语言：与全局「深空 + 玻璃 + 金色」一致——深蓝玻璃底、金色描边与光晕、
- * 盾形图标、金色主按钮，避免普通暗色弹窗的廉价感。
+ * 视觉语言：与全局「深空 + 玻璃 + 蓝色」一致——深蓝玻璃底、蓝色描边与光晕、
+ * 盾形图标与蓝色主按钮。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Message } from '@shared/types';
@@ -12,7 +12,6 @@ interface PendingAction {
   id: string;
   skill: string;
   description: string;
-  args: Record<string, unknown>;
   risk: 'low' | 'high';
   createdAt: number;
 }
@@ -26,11 +25,14 @@ interface ConfirmDialogProps {
 export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }: ConfirmDialogProps) {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const handled = useRef<Set<string>>(new Set());
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
   const refresh = useCallback(async () => {
     if (!sessionId) {
       setPending(null);
+      setError(null);
       return;
     }
     try {
@@ -38,9 +40,13 @@ export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }
       const list = data.pending ?? [];
       const latest = list[list.length - 1] ?? null;
       if (latest && !handled.current.has(latest.id)) {
-        setPending(latest);
+        setPending((current) => {
+          if (current?.id !== latest.id) setError(null);
+          return latest;
+        });
       } else if (!latest) {
         setPending(null);
+        setError(null);
       }
     } catch {
       // 无待确认项或接口暂不可用时静默
@@ -53,17 +59,22 @@ export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }
     refresh();
   }, [lastMessageId, lastMessageLen, refresh]);
 
+  const pendingId = pending?.id;
+  useEffect(() => {
+    if (pendingId) cancelButtonRef.current?.focus();
+  }, [pendingId]);
+
   const confirm = async () => {
     if (!pending || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const data = await api.post<{ result: string }>(`/actions/${pending.id}/confirm`, { sessionId });
       handled.current.add(pending.id);
       setPending(null);
       onAppendAssistant(data.result || '已执行');
     } catch (err) {
-      onAppendAssistant(`确认失败: ${err instanceof Error ? err.message : String(err)}`);
-      setPending(null);
+      setError(`确认失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }
@@ -72,13 +83,14 @@ export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }
   const cancel = async () => {
     if (!pending || busy) return;
     setBusy(true);
+    setError(null);
     try {
       await api.post(`/actions/${pending.id}/cancel`, { sessionId });
       handled.current.add(pending.id);
       setPending(null);
       onAppendAssistant('已取消该操作。');
-    } catch {
-      setPending(null);
+    } catch (err) {
+      setError(`取消失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }
@@ -88,8 +100,14 @@ export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#02040a]/60 backdrop-blur-md px-4 animate-fade-in">
-      <div className="w-full max-w-[420px] rounded-2xl overflow-hidden border border-blue-400/25 bg-[#0b1022]/90 backdrop-blur-xl shadow-[0_24px_80px_-28px_rgba(59,130,246,0.45)]">
-        {/* 顶部金色光带 */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="action-confirm-title"
+        aria-describedby="action-confirm-description"
+        className="w-full max-w-[420px] rounded-2xl overflow-hidden border border-blue-400/25 bg-[#0b1022]/90 backdrop-blur-xl shadow-[0_24px_80px_-28px_rgba(59,130,246,0.45)]"
+      >
+        {/* 顶部蓝色光带 */}
         <div className="h-0.5 bg-gradient-to-r from-transparent via-blue-400/80 to-transparent" />
 
         <div className="p-6">
@@ -101,17 +119,26 @@ export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }
               </svg>
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-blue-200/95">需要你的确认</h3>
+              <h3 id="action-confirm-title" className="text-base font-semibold text-blue-200/95">需要你的确认</h3>
               <p className="text-[13px] text-white/35 mt-0.5">高风险操作 · 确认后才会执行</p>
             </div>
           </div>
 
           <div className="mt-4 rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3.5">
-            <p className="text-[15px] text-white/85 leading-relaxed break-words">{pending.description}</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-blue-300/70">操作：{pending.skill}</p>
+            <p id="action-confirm-description" className="mt-1.5 text-[15px] text-white/85 leading-relaxed break-words">{pending.description}</p>
           </div>
+
+          {error && (
+            <p role="alert" className="mt-3 rounded-lg border border-red-400/25 bg-red-400/10 px-3 py-2 text-[13px] leading-relaxed text-red-200">
+              {error}
+            </p>
+          )}
 
           <div className="mt-5 flex justify-end gap-2.5">
             <button
+              ref={cancelButtonRef}
+              data-role="action-cancel"
               onClick={cancel}
               disabled={busy}
               className="px-4 py-2 rounded-lg text-[14px] text-white/60 hover:text-white/90 bg-white/5 hover:bg-white/10 border border-white/10 transition-all"
@@ -119,6 +146,7 @@ export default function ConfirmDialog({ messages, sessionId, onAppendAssistant }
               取消
             </button>
             <button
+              data-role="action-confirm"
               onClick={confirm}
               disabled={busy}
               className="px-5 py-2 rounded-lg text-[14px] font-medium text-white bg-gradient-to-br from-blue-400 to-blue-600 hover:from-blue-300 hover:to-blue-500 shadow-[0_8px_24px_-8px_rgba(59,130,246,0.75)] transition-all disabled:opacity-60 disabled:cursor-not-allowed"

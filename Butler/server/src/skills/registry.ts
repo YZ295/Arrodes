@@ -8,8 +8,9 @@
  *   当需要执行操作时，输出：<tool_call>{ "name": "skill_name", "args": {...} }</tool_call>
  *   执行结果会自动注入为：系统通知: 技能执行结果: ...
  */
-import { actionGate, classifyAction } from '../services/actionGate.js';
+import { actionGate, classifyAction, intentForAction } from '../services/actionGate.js';
 import { getActionScope, withActionScope } from '../services/actionContext.js';
+import type { ExecutionRequest, ExecutionResult } from '../services/executionProtocol.js';
 
 // ===== 技能接口 =====
 
@@ -172,21 +173,103 @@ export async function executeToolCall(
   name: string,
   args: Record<string, unknown>,
 ): Promise<string> {
+  const outcome = await runToolCall(name, args);
+  if (outcome.error?.code === 'POLICY_BLOCKED') return outcome.error.message;
+  return outcome.output ?? `错误: ${outcome.error?.message ?? '执行失败'}`;
+}
+
+type ToolCallOutcome = Pick<ExecutionResult, 'status' | 'output' | 'error'>;
+
+async function runToolCall(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<ToolCallOutcome> {
   const skill = skills.get(name);
-  if (!skill) return `错误: 未找到技能 "${name}"`;
-  if (disabledSkills.has(name)) return `错误: 技能 "${name}" 已禁用`;
+  if (!skill) {
+    return {
+      status: 'failed',
+      error: { code: 'SKILL_NOT_FOUND', message: `未找到技能 "${name}"`, retryable: false },
+    };
+  }
+  if (disabledSkills.has(name)) {
+    return {
+      status: 'failed',
+      error: { code: 'SKILL_DISABLED', message: `技能 "${name}" 已禁用`, retryable: false },
+    };
+  }
 
   try {
     for (const hook of preHooks) {
       const stopped = await hook(skill, args);
-      if (stopped != null) return stopped;
+      if (stopped != null) {
+        return stopped.startsWith('⚠️ 需要你确认')
+          ? { status: 'pending', output: stopped }
+          : {
+              status: 'failed',
+              error: { code: 'POLICY_BLOCKED', message: stopped, retryable: false },
+            };
+      }
     }
     const result = await skill.execute(args);
     for (const hook of postHooks) {
       await hook(skill, args, result);
     }
-    return result;
+    return { status: 'completed', output: result };
   } catch (err) {
-    return `错误: ${err instanceof Error ? err.message : '执行失败'}`;
+    return {
+      status: 'failed',
+      error: {
+        code: 'EXECUTION_FAILED',
+        message: err instanceof Error ? err.message : '执行失败',
+        retryable: true,
+      },
+    };
   }
+}
+
+/** Adapt the existing local skill pipeline to Arrodes' backend-neutral execution protocol. */
+export async function executeLocalSkillRequest(request: ExecutionRequest): Promise<ExecutionResult> {
+  const startedAt = new Date().toISOString();
+  if (request.backend !== 'local-skill') {
+    return {
+      requestId: request.id,
+      backend: request.backend,
+      status: 'failed',
+      error: {
+        code: 'BACKEND_MISMATCH',
+        message: `本地技能执行器不支持后端 ${request.backend}`,
+        retryable: false,
+      },
+      evidence: [],
+      startedAt,
+      finishedAt: new Date().toISOString(),
+    };
+  }
+
+  const expectedIntent = intentForAction(request.operation);
+  if (request.intent !== expectedIntent) {
+    return {
+      requestId: request.id,
+      backend: request.backend,
+      status: 'failed',
+      error: {
+        code: 'INTENT_MISMATCH',
+        message: `操作 ${request.operation} 必须使用意图 ${expectedIntent}`,
+        retryable: false,
+      },
+      evidence: [],
+      startedAt,
+      finishedAt: new Date().toISOString(),
+    };
+  }
+
+  const outcome = await runToolCall(request.operation, request.input);
+  return {
+    requestId: request.id,
+    backend: request.backend,
+    ...outcome,
+    evidence: [],
+    startedAt,
+    finishedAt: new Date().toISOString(),
+  };
 }

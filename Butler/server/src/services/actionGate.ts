@@ -33,40 +33,49 @@ export interface ActionRequestOutcome {
 
 export const DEFAULT_RISK: Risk = 'high';
 
-export const RISK_RULES: Record<string, Risk> = {
-  open_app: 'low',
-  open_url: 'low',
-  web_search_direct: 'low',
-  web_search: 'low',
-  list_windows: 'low',
-  focus_window: 'low',
-  get_foreground: 'low',
-  system_stats: 'low',
-  volume_control: 'low',
-  media_control: 'low',
-  clipboard_get: 'low',
-  screenshot: 'low',
-  type_text: 'high',
-  send_hotkey: 'high',
-  clipboard_set: 'high',
-  close_window: 'high',
-  lock_screen: 'high',
-  mcp_list_tools: 'low',
-  mcp_call_tool: 'high',
-  exec_command: 'high',
-  write_file: 'high',
-  read_file: 'low',
-  minimax_tts: 'low',
-  list_directory: 'low',
-  get_file_info: 'low',
-  create_file: 'high',
-  delete_file: 'high',
-  move_file: 'high',
-  copy_file: 'high',
+export const ACTION_INTENTS: Record<string, string> = {
+  open_app: 'desktop.application.open', open_url: 'desktop.url.open',
+  web_search_direct: 'web.search', web_search: 'web.search',
+  list_windows: 'desktop.window.inspect', focus_window: 'desktop.window.focus',
+  get_foreground: 'desktop.window.inspect', system_stats: 'system.inspect',
+  volume_control: 'desktop.media.control', media_control: 'desktop.media.control',
+  clipboard_get: 'clipboard.read', screenshot: 'screen.capture',
+  type_text: 'desktop.input.write', send_hotkey: 'desktop.input.write',
+  clipboard_set: 'clipboard.write', close_window: 'desktop.window.close',
+  lock_screen: 'system.session.lock', mcp_list_tools: 'mcp.inspect',
+  mcp_call_tool: 'mcp.execute', exec_command: 'system.command.execute',
+  write_file: 'filesystem.write', read_file: 'filesystem.read',
+  minimax_tts: 'speech.synthesize', list_directory: 'filesystem.read',
+  get_file_info: 'filesystem.read', create_file: 'filesystem.create',
+  delete_file: 'filesystem.delete', move_file: 'filesystem.move',
+  copy_file: 'filesystem.copy',
 };
 
+export const INTENT_RISK_RULES: Record<string, Risk> = {
+  'desktop.application.open': 'low', 'desktop.url.open': 'low', 'web.search': 'low',
+  'desktop.window.inspect': 'low', 'desktop.window.focus': 'low', 'system.inspect': 'low',
+  'desktop.media.control': 'low', 'clipboard.read': 'low', 'screen.capture': 'low',
+  'mcp.inspect': 'low', 'filesystem.read': 'low', 'speech.synthesize': 'low',
+  'desktop.input.write': 'high', 'clipboard.write': 'high', 'desktop.window.close': 'high',
+  'system.session.lock': 'high', 'mcp.execute': 'high', 'system.command.execute': 'high',
+  'filesystem.write': 'high', 'filesystem.create': 'high', 'filesystem.delete': 'high',
+  'filesystem.move': 'high', 'filesystem.copy': 'high',
+};
+
+export function intentForAction(action: string): string {
+  return ACTION_INTENTS[action] ?? `action.${action}`;
+}
+
+export function classifyIntent(intent: string): Risk {
+  return INTENT_RISK_RULES[intent] ?? DEFAULT_RISK;
+}
+
+export const RISK_RULES: Record<string, Risk> = Object.fromEntries(
+  Object.entries(ACTION_INTENTS).map(([action, intent]) => [action, classifyIntent(intent)]),
+);
+
 export function classifyAction(skill: string): Risk {
-  return RISK_RULES[skill] ?? DEFAULT_RISK;
+  return classifyIntent(intentForAction(skill));
 }
 
 export class ActionGate {

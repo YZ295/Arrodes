@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import * as actionGateModule from './actionGate.js';
 import { ActionGate, classifyAction, matchConfirmIntent, DEFAULT_RISK } from './actionGate.js';
 
 const ownerA = { localUserId: 'local-user', workspaceId: 'workspace-a', sessionId: 'session-a' };
@@ -9,6 +10,17 @@ function makeGate(now: () => number = () => 1000): ActionGate {
 }
 
 describe('actionGate 分级授权', () => {
+  it('按稳定业务意图分类风险，未知意图默认高风险', () => {
+    const api = actionGateModule as typeof actionGateModule & {
+      classifyIntent?: (intent: string) => 'low' | 'high';
+      intentForAction?: (action: string) => string;
+    };
+    expect(api.classifyIntent!('filesystem.read')).toBe('low');
+    expect(api.classifyIntent!('filesystem.delete')).toBe('high');
+    expect(api.classifyIntent!('unknown.intent')).toBe('high');
+    expect(api.intentForAction!('exec_command')).toBe('system.command.execute');
+  });
+
   beforeEach(() => {});
 
   it('低风险技能直接放行，不产生待确认', () => {
