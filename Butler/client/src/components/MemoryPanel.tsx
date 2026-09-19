@@ -10,6 +10,22 @@ import { useState, useEffect, useCallback } from 'react';
 import type { MemoryNode, MemoryType } from '@shared/types';
 import { eventBus, EVENTS } from '../shared/events/EventBus';
 
+type CandidateMemory = {
+  id: string;
+  content: string;
+  type: string;
+  source?: string;
+  sourceAgent?: string;
+  evidence?: string;
+  confidence?: number;
+  createdAt: string;
+};
+
+const candidateTypeLabels: Record<string, string> = {
+  fact: '事实', preference: '偏好', decision: '决策', event: '事件',
+  goal: '目标', task: '任务', note: '笔记',
+};
+
 /* ============================================================
  * MemoryCard — 单条记忆卡片
  * ============================================================ */
@@ -47,7 +63,7 @@ function MemoryCard({
           <button
             onClick={() => onDelete(memory.id)}
             className="shrink-0 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100
-              hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-all"
+              hover:bg-red-500/20 text-red-200/60 hover:text-red-200 transition-all"
             title="删除记忆"
           >
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -69,9 +85,13 @@ interface MemoryPanelProps {
 
 export default function MemoryPanel({ onClose }: MemoryPanelProps) {
   const [memories, setMemories] = useState<MemoryNode[]>([]);
+  const [candidates, setCandidates] = useState<CandidateMemory[]>([]);
   const [persons, setPersons] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<MemoryType | 'all'>('all');
   const [currentSessionOnly, setCurrentSessionOnly] = useState(true);
@@ -107,6 +127,40 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
   useEffect(() => {
     loadMemories();
   }, [loadMemories]);
+
+  const loadCandidates = useCallback(async () => {
+    setCandidatesLoading(true);
+    setReviewError(null);
+    try {
+      const res = await fetch('/api/v1/workspace/memories/pending');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `加载候选记忆失败: ${res.status}`);
+      setCandidates(data.memories || []);
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : '加载候选记忆失败');
+    } finally {
+      setCandidatesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadCandidates(); }, [loadCandidates]);
+
+  const reviewCandidate = useCallback(async (id: string, action: 'confirm' | 'reject') => {
+    setReviewingId(id);
+    setReviewError(null);
+    try {
+      const res = await fetch(`/api/v1/workspace/memories/${encodeURIComponent(id)}/${action}`, {
+        method: 'POST',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || (action === 'confirm' ? '确认失败' : '拒绝失败'));
+      setCandidates((items) => items.filter((item) => item.id !== id));
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : '审核失败');
+    } finally {
+      setReviewingId(null);
+    }
+  }, []);
 
   // 人物卡点击人物 → 自动填入搜索词（事件驱动，避免跨组件耦合）
   useEffect(() => {
@@ -203,6 +257,77 @@ export default function MemoryPanel({ onClose }: MemoryPanelProps) {
 
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto">
+        <section className="mx-3 mt-2 mb-3 rounded-xl border border-blue-400/15 bg-blue-400/[0.04] overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+            <div>
+              <h3 className="text-sm font-medium text-blue-100">待审核</h3>
+              <p className="text-[11px] text-white/35 mt-0.5">确认后才会进入长期记忆</p>
+            </div>
+            <span className="min-w-6 h-6 px-1.5 rounded-full bg-blue-400/10 text-blue-200 text-xs flex items-center justify-center">
+              {candidates.length}
+            </span>
+          </div>
+
+          {reviewError && (
+            <div role="alert" className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-lg bg-red-500/10 border border-red-400/15 px-3 py-2 text-xs text-red-200">
+              <span className="min-w-0 break-words">{reviewError}</span>
+              <button onClick={() => void loadCandidates()} className="shrink-0 rounded-md px-2 py-1 text-red-100 hover:bg-red-400/10">
+                重试
+              </button>
+            </div>
+          )}
+
+          {candidatesLoading ? (
+            <div className="px-3 py-5 text-center text-xs text-white/35">正在加载候选记忆…</div>
+          ) : candidates.length === 0 ? (
+            <div className="px-3 py-5 text-center text-xs text-white/35">暂无待审核记忆</div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {candidates.map((candidate) => {
+                const busy = reviewingId === candidate.id;
+                const source = candidate.source || candidate.sourceAgent || '未知来源';
+                return (
+                  <article key={candidate.id} className="p-3">
+                    <div className="flex items-center gap-2 text-[11px] text-white/40">
+                      <span className="rounded-full bg-white/5 px-2 py-0.5 text-blue-200/80">
+                        {candidateTypeLabels[candidate.type] || candidate.type}
+                      </span>
+                      <span>来源：{source}</span>
+                      {typeof candidate.confidence === 'number' && (
+                        <span>可信度 {Math.round(candidate.confidence * 100)}%</span>
+                      )}
+                    </div>
+                    <p className="mt-2 break-words text-sm leading-relaxed text-white/80">{candidate.content}</p>
+                    {candidate.evidence && (
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-white/35">证据：{candidate.evidence}</p>
+                    )}
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button
+                        data-role="memory-reject"
+                        aria-label={`拒绝记忆：${candidate.content}`}
+                        disabled={busy}
+                        onClick={() => void reviewCandidate(candidate.id, 'reject')}
+                        className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/55 hover:bg-white/5 hover:text-white disabled:opacity-40"
+                      >
+                        拒绝
+                      </button>
+                      <button
+                        data-role="memory-confirm"
+                        aria-label={`确认记忆：${candidate.content}`}
+                        disabled={busy}
+                        onClick={() => void reviewCandidate(candidate.id, 'confirm')}
+                        className="rounded-lg bg-blue-500/20 border border-blue-400/20 px-3 py-1.5 text-xs text-blue-100 hover:bg-blue-500/30 disabled:opacity-40"
+                      >
+                        {busy ? '处理中…' : '确认记住'}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* 人物卡区块（阶段2：记忆中出现的人物实体） */}
         {!loading && !error && persons.length > 0 && (
           <div className="px-3 pt-2 pb-1">
