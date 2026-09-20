@@ -456,24 +456,31 @@ export default function DesktopPetOverlay({ initialSnapshot }: { initialSnapshot
           )}
           {confidence !== null && <span className="desktop-pet__confidence">把握 {confidence}%</span>}
         </div>
-        {!chatVisible && <h1>{view.title}</h1>}
-        <p className="desktop-pet__state" data-role="bubble-line">{bubbleLine}</p>
-        {!chatVisible && view.action && (
-          <div className="desktop-pet__action" data-role="next-action">
-            <span>下一步</span>
-            <p>{view.action}</p>
-          </div>
-        )}
-        {!chatVisible && view.verification && (
-          <p className="desktop-pet__verification" data-role="verification">
-            <span aria-hidden="true">
-              {view.verification.result === 'confirmed' ? '✓' : view.verification.result === 'failed' ? '✗' : '…'}
-            </span>
-            {view.verification.text}
-          </p>
-        )}
-        {!chatVisible && view.note && <p className="desktop-pet__note">{view.note}</p>}
-        {chatVisible && chat.error && <p className="desktop-pet__note" data-role="chat-error">{chat.error}</p>}
+        <div
+          className="desktop-pet__bubble-scroll"
+          data-role="bubble-scroll"
+          tabIndex={0}
+          aria-label="桌宠回复内容"
+        >
+          {!chatVisible && <h1>{view.title}</h1>}
+          <p className="desktop-pet__state" data-role="bubble-line">{bubbleLine}</p>
+          {!chatVisible && view.action && (
+            <div className="desktop-pet__action" data-role="next-action">
+              <span>下一步</span>
+              <p>{view.action}</p>
+            </div>
+          )}
+          {!chatVisible && view.verification && (
+            <p className="desktop-pet__verification" data-role="verification">
+              <span aria-hidden="true">
+                {view.verification.result === 'confirmed' ? '✓' : view.verification.result === 'failed' ? '✗' : '…'}
+              </span>
+              {view.verification.text}
+            </p>
+          )}
+          {!chatVisible && view.note && <p className="desktop-pet__note">{view.note}</p>}
+          {chatVisible && chat.error && <p className="desktop-pet__note" data-role="chat-error">{chat.error}</p>}
+        </div>
         {chatVisible && (
           <div className="desktop-pet__chatbar" data-role="chatbar">
             <input

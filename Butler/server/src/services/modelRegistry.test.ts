@@ -20,6 +20,47 @@ afterEach(() => {
 });
 
 describe('自定义模型 registry', () => {
+  it('默认使用无需 API Key 的本地 Ollama Qwen3-VL', async () => {
+    const {
+      initModelRegistry,
+      getCurrentModel,
+      getCurrentModelId,
+      getApiKeyForModel,
+      setCurrentModel,
+    } = await import('./modelRegistry.js');
+    const previous = process.env.ACTIVE_MODEL;
+    delete process.env.ACTIVE_MODEL;
+    try {
+      initModelRegistry();
+
+      expect(getCurrentModelId()).toBe('ollama-qwen3-vl-4b');
+      expect(getCurrentModel()).toMatchObject({
+        provider: 'Ollama（本地）',
+        baseUrl: 'http://127.0.0.1:11434/v1',
+        modelName: 'qwen3-vl:4b-instruct',
+        requiresKey: false,
+      });
+      expect(getApiKeyForModel('ollama-qwen3-vl-4b')).toBeNull();
+      expect(setCurrentModel('ollama-qwen3-vl-4b')).toEqual({ success: true });
+    } finally {
+      if (previous === undefined) delete process.env.ACTIVE_MODEL;
+      else process.env.ACTIVE_MODEL = previous;
+    }
+  });
+
+  it('ACTIVE_MODEL 无效时安全回退到本地 Ollama', async () => {
+    const previous = process.env.ACTIVE_MODEL;
+    process.env.ACTIVE_MODEL = 'missing-model';
+    try {
+      const { initModelRegistry, getCurrentModelId } = await import('./modelRegistry.js');
+      initModelRegistry();
+      expect(getCurrentModelId()).toBe('ollama-qwen3-vl-4b');
+    } finally {
+      if (previous === undefined) delete process.env.ACTIVE_MODEL;
+      else process.env.ACTIVE_MODEL = previous;
+    }
+  });
+
   it('添加自定义模型并可在列表中查到', async () => {
     const { addCustomModel, loadCustomModelsIntoRegistry, getModels } = await import('./modelRegistry.js');
     const r = addCustomModel({ label: '我的中转站', baseUrl: 'https://proxy.example.com/v1', modelName: 'gpt-4o', apiKey: 'sk-test-1234567890' });

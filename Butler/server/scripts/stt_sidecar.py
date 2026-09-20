@@ -9,7 +9,7 @@ Endpoints:
     POST /transcribe   -> JSON {audio_base64, filename} -> {text}
 
 If faster-whisper is not installed, /health returns status=error and
-/transcribe returns 503; the Arrodes server falls back to online mode.
+/transcribe returns 503. The desktop-pet local mode does not fall back online.
 """
 
 import argparse
@@ -38,7 +38,9 @@ def ensure_model():
     if WhisperModel is None:
         return False
     if MODEL is None:
-        MODEL = WhisperModel(MODEL_NAME, device="auto", compute_type="auto")
+        # Always-on pet audio must stay off the GPU so the vision model keeps
+        # its limited VRAM budget. int8 is the supported faster-whisper CPU path.
+        MODEL = WhisperModel(MODEL_NAME, device="cpu", compute_type="int8")
     LOADED = True
     return True
 
@@ -96,11 +98,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    global MODEL_NAME
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=12002)
     parser.add_argument("--model", default=MODEL_NAME)
     args = parser.parse_args()
-    global MODEL_NAME
     MODEL_NAME = args.model
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"[STT-sidecar] listening on http://127.0.0.1:{args.port} (model={MODEL_NAME})", flush=True)

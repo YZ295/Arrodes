@@ -13,6 +13,8 @@ import { AgentDefinition, AgentInput } from '../agent.js';
 import { MessageRepository } from '../../db/message-repo.js';
 import { SessionRepository } from '../../db/session-repo.js';
 import { LlmService, SYSTEM_PROMPT, mergeWithPromptShell } from '../../services/llmService.js';
+import { formatLlmFailure } from '../../services/llmProvider.js';
+import { getCurrentModel } from '../../services/modelRegistry.js';
 import { retrieveContext } from '../../services/MemoryGateway.js';
 import { assembleModelMessages } from '../../services/modelHistory.js';
 import { buildSkillsPrompt, parseToolCall, executeToolCall } from '../../skills/registry.js';
@@ -107,7 +109,7 @@ export const mainAgent: AgentDefinition = {
             return;
           }
           console.error('[MainAgent] LLM 错误:', error);
-          fullReply = '愚者大人，阿罗德斯此刻无法连通命运之网，请稍后再试。';
+          fullReply = formatLlmFailure(getCurrentModel().provider, error);
           resolve();
         },
       }, input.signal, persona ? { systemPrompt: persona } : undefined);

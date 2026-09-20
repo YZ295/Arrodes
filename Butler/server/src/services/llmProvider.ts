@@ -49,6 +49,15 @@ export interface LlmProvider {
   ): Promise<void>;
 }
 
+/** 将底层连接错误转换为不隐藏根因、又不会无限展开响应体的用户提示。 */
+export function formatLlmFailure(providerName: string, error: string): string {
+  const detail = String(error || '未知错误').replace(/\s+/g, ' ').trim().slice(0, 240);
+  if (providerName.includes('Ollama')) {
+    return `本地模型连接失败：${detail}。请确认 Ollama 已启动，并已安装 qwen3-vl:4b-instruct。`;
+  }
+  return `模型连接失败（${providerName}）：${detail}`;
+}
+
 export class DeepSeekLlmProvider implements LlmProvider {
   async request(
     messages: LlmMessage[],

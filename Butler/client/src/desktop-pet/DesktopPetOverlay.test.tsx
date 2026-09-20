@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DesktopPetOverlay from './DesktopPetOverlay';
 
 const chatMock = vi.hoisted(() => ({
+  messages: { current: [] as Array<{ id: string; role: 'user' | 'pet'; content: string }> },
   speaking: { current: false },
   micMuted: { current: false },
   interrupt: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock('./ParticleAura', () => ({
 }));
 
 vi.mock('./usePetChat', () => ({ usePetChat: () => ({
-  messages: [], draft: '', thinking: false, error: null, recording: false,
+  messages: chatMock.messages.current, draft: '', thinking: false, error: null, recording: false,
   speaking: chatMock.speaking.current,
   micMuted: chatMock.micMuted.current, handsFree: true, listening: false, vadLevel: 0,
   lastVoiceActivityAt: null,
@@ -35,6 +36,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   chatMock.speaking.current = false;
   chatMock.micMuted.current = false;
+  chatMock.messages.current = [];
   chatMock.interrupt.mockClear();
   chatMock.toggleMicMuted.mockClear();
   chatMock.auraSetState.mockClear();
@@ -56,6 +58,22 @@ describe('DesktopPetOverlay', () => {
     await act(async () => (container.querySelector('[data-role="chat-toggle"]') as HTMLButtonElement).click());
     expect(container.querySelector('input[aria-label="桌宠对话输入"]')).not.toBeNull();
     expect(container.querySelector('[data-role="pet-mic"]')).not.toBeNull();
+  });
+
+  it('keeps a long reply in a keyboard-scrollable region above the composer', async () => {
+    const longReply = '很长的本地模型回复。'.repeat(80);
+    chatMock.messages.current = [{ id: 'long-reply', role: 'pet', content: longReply }];
+
+    await act(async () => root.render(<DesktopPetOverlay />));
+    await act(async () => (container.querySelector('[data-role="chat-toggle"]') as HTMLButtonElement).click());
+
+    const scrollRegion = container.querySelector('[data-role="bubble-scroll"]') as HTMLElement | null;
+    const composer = container.querySelector('[data-role="chatbar"]');
+    expect(scrollRegion).not.toBeNull();
+    expect(scrollRegion?.getAttribute('tabindex')).toBe('0');
+    expect(scrollRegion?.getAttribute('aria-label')).toBe('桌宠回复内容');
+    expect(scrollRegion?.textContent).toContain(longReply);
+    expect(scrollRegion?.contains(composer)).toBe(false);
   });
 
   it('moves from the original position without accumulating total displacement', async () => {

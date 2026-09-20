@@ -32,7 +32,21 @@ export interface ModelConfig {
 
 // ===== 默认模型列表 =====
 
+export const DEFAULT_MODEL_ID = 'ollama-qwen3-vl-4b';
+
 const DEFAULT_MODELS: ModelConfig[] = [
+  {
+    id: DEFAULT_MODEL_ID,
+    label: 'Qwen3-VL 4B（本地）',
+    provider: 'Ollama（本地）',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    modelName: 'qwen3-vl:4b-instruct',
+    apiKeyEnv: '',
+    supportsStreaming: true,
+    isFree: true,
+    description: '复用本机视觉模型，无需 API Key，音频与对话数据不出本机',
+    requiresKey: false,
+  },
   {
     id: 'deepseek-v4-flash',
     label: 'DeepSeek V4 Flash',
@@ -42,7 +56,7 @@ const DEFAULT_MODELS: ModelConfig[] = [
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     supportsStreaming: true,
     isFree: false,
-    description: '快速轻量（约 67B），默认模型',
+    description: '快速轻量（约 67B）',
   },
   {
     id: 'deepseek-v4-pro',
@@ -111,11 +125,10 @@ export function initModelRegistry(): void {
   _models = [...DEFAULT_MODELS];
   // 4.2 自定义 Provider：并入自定义模型（存在时前置）
   loadCustomModelsIntoRegistry();
-  // 默认 DeepSeek V4 Flash（用户要求：不使用本地/GLM 作为默认）
-  _currentModelId = process.env.ACTIVE_MODEL || 'deepseek-v4-flash';
+  _currentModelId = process.env.ACTIVE_MODEL || DEFAULT_MODEL_ID;
   // 验证当前模型存在
   if (!_models.find((m) => m.id === _currentModelId)) {
-    _currentModelId = 'deepseek-v4-flash';
+    _currentModelId = DEFAULT_MODEL_ID;
   }
 }
 
