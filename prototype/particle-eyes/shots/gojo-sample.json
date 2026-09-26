@@ -1,0 +1,50 @@
+{
+  "z": {
+    "x0": 417,
+    "x1": 584,
+    "y0": 346,
+    "y1": 514
+  },
+  "normal": {
+    "n": 28056,
+    "p25": "#283e70",
+    "p50": "#2872e4",
+    "p75": "#3090ff",
+    "p90": "#5fb7ff",
+    "p97": "#83e6ff",
+    "peak": "#ffffff",
+    "cyanN": 20841,
+    "cyanTop": [
+      "#b6ffff",
+      "#b6ffff",
+      "#b6ffff",
+      "#b3ffff"
+    ],
+    "cyanMid": "#2c80ff"
+  },
+  "observe": {
+    "n": 28056,
+    "p25": "#0eadff",
+    "p50": "#12d7ff",
+    "p75": "#29efff",
+    "p90": "#33ffff",
+    "p97": "#4fffff",
+    "peak": "#ffffff",
+    "cyanN": 27276,
+    "cyanTop": [
+      "#b5ffff",
+      "#b2ffff",
+      "#b1ffff",
+      "#b1ffff"
+    ],
+    "cyanMid": "#11d7ff"
+  },
+  "ref": {
+    "p90": "#08bfff",
+    "p97": "#2eeaf5",
+    "p905": "#a7d8f0",
+    "main": "#0db7ff",
+    "mid": "#4f719b",
+    "dark": "#141d29"
+  }
+}

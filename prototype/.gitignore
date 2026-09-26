@@ -1,0 +1,11 @@
+# 验证产物：可由 shoot-face.cjs / check-bg-overlay.cjs / check-board.cjs 重新生成，不入库。
+# 保留 .txt / .json（体积小、是判读依据），只排除图片。
+particle-eyes/shots/*.png
+particle-eyes/shots/*.jpg
+particle-eyes/shots/*.jpeg
+
+# 设计稿页面的自检截图（check-board.cjs 产物）
+arrodes-face/board-preview.png
+
+# arrodes-face/img/ 里的图**不排除** —— 它们是设计稿本体，
+# index.html 与 HANDOFF.md 都直接引用，必须随仓库走。
