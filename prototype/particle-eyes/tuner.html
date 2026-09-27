@@ -1,0 +1,1593 @@
+<!doctype html>
+<html lang="zh-CN" data-page-node-id="oyrkQzAS1CCYo6D5XwbRWe">
+<head data-page-node-id="EFrg9GcUYK3vK7y7HPNGC0">
+<meta charset="utf-8" data-page-node-id="3NojCRcqOJarMVYJ14tLHY" />
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="FGfjJMet3aCSb4HpyPr0jm" />
+<title>阿罗德斯 · 粒子之眼 捏脸台</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #02040a; }
+  body {
+    display: flex;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #c2d2ea;
+  }
+  #stage-wrap { position: relative; flex: 1; min-width: 0; }
+  #bg {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 62% at 50% 48%, #0d1a2c 0%, #070d19 36%, #03050c 72%, #010206 100%);
+  }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #vig {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 64% 60% at 50% 50%, rgba(0,0,0,0) 44%, rgba(0,0,0,.52) 100%);
+  }
+  #badge {
+    position: absolute; left: 16px; top: 14px; pointer-events: none;
+    font-size: 11px; color: #5f7699; letter-spacing: .05em;
+  }
+  #badge b { color: #9fb4d6; font-weight: 500; }
+
+  #panel {
+    width: 336px; flex: 0 0 336px; height: 100%; overflow-y: auto;
+    background: rgba(9,14,25,.92);
+    border-left: 1px solid rgba(120,170,255,.14);
+    display: flex; flex-direction: column;
+    transition: width .2s, flex-basis .2s, opacity .2s;
+  }
+  #panel.folded { width: 0; flex-basis: 0; opacity: 0; overflow: hidden; border: 0; }
+  #panel::-webkit-scrollbar { width: 8px; }
+  #panel::-webkit-scrollbar-thumb { background: rgba(120,170,255,.18); border-radius: 4px; }
+
+  #fold {
+    position: absolute; right: 12px; top: 12px; z-index: 20;
+    padding: 6px 11px; border-radius: 7px; cursor: pointer;
+    font-family: inherit; font-size: 11.5px;
+    background: rgba(10,16,28,.8); color: #9fb4d6;
+    border: 1px solid rgba(120,170,255,.22);
+  }
+  #fold:hover { background: rgba(120,170,255,.16); color: #dce9ff; }
+
+  .tabs { display: flex; gap: 4px; padding: 12px 14px 0; flex-wrap: wrap; }
+  .tabs button {
+    padding: 5px 9px; border-radius: 6px; cursor: pointer;
+    font-family: inherit; font-size: 11.5px;
+    background: transparent; color: #7f95b6;
+    border: 1px solid transparent;
+  }
+  .tabs button:hover { color: #cfe0f8; }
+  .tabs button.on {
+    background: rgba(90,175,255,.16); color: #d9ecff;
+    border-color: rgba(120,200,255,.45);
+  }
+
+  .group { padding: 10px 14px 4px; }
+  .group h2 {
+    margin: 0 0 8px; font-size: 11px; font-weight: 500;
+    color: #6d84a8; letter-spacing: .08em;
+  }
+  .item { margin-bottom: 9px; }
+  .item .line { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; }
+  .item .line .n { color: #93a9c9; }
+  .item .line .v { color: #6d9fd0; font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 3px; border-radius: 2px; outline: none;
+    background: rgba(120,170,255,.18); cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #74c2ff; border: 0; cursor: grab;
+  }
+  input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; }
+
+  .rowbtns { display: flex; gap: 5px; padding: 4px 14px 12px; flex-wrap: wrap; }
+  .rowbtns button {
+    flex: 1; min-width: 68px; padding: 6px 4px; border-radius: 7px; cursor: pointer;
+    font-family: inherit; font-size: 11px;
+    background: rgba(120,170,255,.07); color: #9fb4d6;
+    border: 1px solid rgba(120,170,255,.18);
+  }
+  .rowbtns button:hover { background: rgba(120,170,255,.16); color: #dce9ff; }
+  .rowbtns button.on {
+    background: rgba(90,175,255,.20); color: #dbf0ff;
+    border-color: rgba(120,200,255,.55);
+  }
+  .rowbtns button.blue.on {
+    background: rgba(60,205,255,.22); color: #e2faff;
+    border-color: rgba(110,225,255,.75);
+  }
+  .hr { height: 1px; margin: 6px 14px; background: rgba(120,170,255,.10); }
+  #foot {
+    margin-top: auto; padding: 10px 14px 12px;
+    border-top: 1px solid rgba(120,170,255,.12);
+    font-size: 10.5px; color: #5d7396; line-height: 1.7;
+  }
+  #foot b { color: #93a9c9; font-weight: 500; }
+  #log {
+    display: block; width: 100%; height: 52px; margin-top: 6px; resize: none;
+    background: rgba(0,0,0,.35); color: #6d9fd0; font-size: 10px;
+    border: 1px solid rgba(120,170,255,.16); border-radius: 6px;
+    padding: 5px 6px; font-family: ui-monospace, Consolas, monospace;
+  }
+</style>
+</head>
+<body data-page-node-id="mNBb9zgxKKyyHKyjGM4jok">
+  <div id="stage-wrap" data-page-node-id="n0TgNN6z3ezGg6ZhysUBUY">
+    <div id="bg" data-page-node-id="gDjCWyF3wKXQ2LL6pvlYBh"></div>
+    <canvas id="stage" data-page-node-id="1v20APWBL4QTBl61gg53ed"></canvas>
+    <div id="vig" data-page-node-id="SYYrelz0vDQzu8R7SEErjh"></div>
+    <div id="badge" data-page-node-id="JM6TwAaj5xpZDOI1AfZYAZ">按住 <b data-page-node-id="f5AEsckkIsAS4qxfcgChPm">空格</b> 唤起 / 松开退下　·　<b data-page-node-id="4aFm0qdjBZEgimbYVo0AO0">拖动左侧滑杆</b>实时生效</div>
+    <button id="fold" data-page-node-id="3MU5rW16ATWFFZl3BkaMl7">收起面板</button>
+  </div>
+
+  <aside id="panel" data-page-node-id="xW06aVbSK8uquZFQpaJ1s8">
+    <div class="tabs" id="tabs" data-page-node-id="WHfq8yDIOySmj2csrDBhDk"></div>
+    <div id="body" data-page-node-id="PhYTg3Ep5aFARnySHC8mdM"></div>
+
+    <div class="group" data-page-node-id="QlE8k4vahA9FuaGYwspIGG">
+      <h2 data-page-node-id="xEIxwFH54UuCswXKdV14E6">状态</h2>
+      <div class="rowbtns" style="padding:0 0 8px" data-page-node-id="1c29PWA4AiuQunTAikkED3">
+        <button data-s="void" data-page-node-id="hahUsODl5X2eAmAGjhBRVE">虚空</button>
+        <button data-s="eyes" class="on" data-page-node-id="VK2826ZOGQOA4kCt6Nl0Br">星瞳</button>
+        <button data-s="observe" class="blue" data-page-node-id="52qizw2m8XFIe0UcvpIll2">冰蓝</button>
+      </div>
+      <div class="item" data-page-node-id="NvfdNA1I2NBelmjDWR580g">
+        <div class="line" data-page-node-id="3A11IHqprvUD1uRcLaUV2E"><span class="n" data-page-node-id="mEhi7pKIiymtP5RgCfD8Ts">合聚进度（手动拖）</span><span class="v" id="v-summon" data-page-node-id="zcv7OlKqsGtV1Wisy4BDes">1.00</span></div>
+        <input type="range" id="scrub-summon" min="0" max="1" step="0.005" value="1" data-page-node-id="1NTmVabeBnDD1RZ9vrB5Ed" />
+      </div>
+      <div class="item" data-page-node-id="CexeSs5Crhxfi8zxCDuzwV">
+        <div class="line" data-page-node-id="h7GF2crxcoSDF3OgdaAcfM"><span class="n" data-page-node-id="5RJFwgDpln4E1fDs3JPYqo">观察强度（手动拖）</span><span class="v" id="v-observe" data-page-node-id="WA9E5HCm52IzxAdV9jYIMr">0.00</span></div>
+        <input type="range" id="scrub-observe" min="0" max="1" step="0.005" value="0" data-page-node-id="Qx1H3FZuwfBkUrH0YyBtiN" />
+      </div>
+    </div>
+
+    <div class="hr" data-page-node-id="Em8bLUKehVIBmMUHw4EeHg"></div>
+    <div class="rowbtns" data-page-node-id="KL2MBXEzs66omb924FGwJ3">
+      <button id="btn-random" data-page-node-id="BMsuU8as1J7LD6AGnhLN8g">随机一版</button>
+      <button id="btn-reset" data-page-node-id="sq2FKWd6pMXeYM6sgMIUWG">恢复默认</button>
+    </div>
+    <div class="group" style="padding-top:0" data-page-node-id="pFPVvZtyHvKTNgUnKwJc0I">
+      <h2 data-page-node-id="g1IYcMNLdIXfOjYvXeSBFD">预设</h2>
+      <div class="rowbtns" id="presets" style="padding:0" data-page-node-id="3W3IdZfoFslTbBv3b1PVwb"></div>
+    </div>
+
+    <div id="foot" data-page-node-id="K512IHfv3NO7R10GvMdaGo">
+      粒子 <b id="stat-count" data-page-node-id="dqlEYHUTcnbC5Ka5PLEG71">--</b>　·　<b id="stat-fps" data-page-node-id="PAq6CJxizdqMwbiaZ38S70">--</b> fps　·　属性 <b id="stat-attr" data-page-node-id="8kJflnH3rRgN5Xhz3krexA">--</b>/16<br  data-page-node-id="1xuWGFY5xlBZ6sD2jLCJOt"/>
+      <span style="color:#4d6284" data-page-node-id="prL5EEXcIBTjvfW7ak1idJ">改动自动存在浏览器本地，关掉再开还在</span>
+      <textarea id="log" readonly></textarea>
+      <div class="rowbtns" style="padding:8px 0 0" data-page-node-id="9EEEZygfQFBlKtwyn6qKbk">
+        <button id="btn-copy" data-page-node-id="ZCCcHheOI90rBVCXoj7i5M">复制配置</button>
+        <button id="btn-png" data-page-node-id="2VZmHp2YJPwn6KzLrKwhrr">存一张图</button>
+      </div>
+    </div>
+  </aside>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+   * 默认参数（与 index.html 的定稿一致）
+   * ============================================================ */
+  var DEFAULTS = {
+    // 眼型必须比虹膜大出一圈，否则虹膜铺满整个眼裂 → 看出来是"两个圆盘"不是眼睛。
+    // 参考图的眼裂 ≈ 2.2:1，虹膜直径约为眼裂高的 80%，上下各留一条眼白。
+    eyeSep: 1.58, eyeScale: 0.46,
+    lidH: 0.70, lidP: 0.60, lowerK: 0.64,
+    irisR: 0.420, irisCy: 0.00, pupilR: 0.115,
+    starRatio: 0.70, starPow: 5.0, starAlphaPow: 3.2,
+    hueBase: 0, satBase: 1, hueObs: 0, satObs: 1,
+    summonDur: 1.50, fpsCap: 60,
+    counts: { voidDust: 3200, lid: 1700, iris: 2600, pupil: 160, halo: 380, highlight: 170, glow: 320 },
+    u: {
+      twkMul: 1, swirlMul: 1, arcMul: 1,
+      ringMul: 1, glowMul: 1, haloMul: 1,
+      hiltMul: 1, hiltSize: 1, lidMul: 1, lidSize: 1
+    },
+    // 实体眼（解析式 SDF，不走粒子）—— 游戏捏脸那种"实心、线条干净"的观感
+    look: {
+      solid: 1,          // 实体眼强度 0＝纯粒子 1＝纯实体
+      dust: 0.32,        // 实体接管后粒子退成星尘的残留量
+      // —— 眼型 ——
+      cornerT: 0.55,     // 外眼角上扬（对称椭圆没有"眼型"）
+      cornerI: 0.45,     // 内眼角收尖
+      // —— 着色 ——
+      voidEye: 1.00,     // 眼白虚空化（1＝眼白完全透明，背景虚空透出）
+      sclera: 1.10,      // 眼白亮度（voidEye 为 0 时才可见）
+      lidShadow: 0.55,   // 上睑在眼白上的投影
+      irisLid: 0.55,     // 上睑在虹膜上的投影（球体感）
+      irisRim: 0.30,     // 瞳孔缘亮环
+      // —— 睑线 / 睫毛 ——
+      // 眼白虚空化后，可见的"眼型"只剩睑线；参考图里上睑是一条明确的暗边，
+      // 睫毛从这条暗边长出来。lidLineW=0 会让睫毛悬空，看不出长在眼皮上。
+      lidLineW: 0.014,   // 睑线粗细
+      lidLineLum: 0.20,  // 睑线明度（低＝乌黑，高＝亮线）
+      lashLen: 0.22, lashN: 13, lashW: 0.0095,  // lashN=0 → 不画睫毛；lashW 是"根部的半宽"
+      lashCurl: 1.35,    // 睫毛弯曲程度
+      lashSpread: 1.00,  // 睫毛外张（扇形开合）
+      // —— 虹膜 ——
+      limbalDark: 0.40,  // 角膜缘暗环（>0.6 会在虹膜外圈压出一圈"贴上去的黑边"）
+      fiber: 0.22,       // 虹膜放射纤维
+      hiltSize: 0.062,   // 高光半径
+      // —— 边缘 ——
+      glow: 0.26,        // 眼型外发光
+      glowFall: 55,      // 外发光衰减（越大越贴轮廓）
+      pupilSoft: 0.045,  // 瞳孔边缘柔化
+      // —— 观察态专属（六眼）：走 uniform 热更，不重烘 ——
+      pupilShrink: 0.46, // 观察态瞳孔收缩（参考图瞳孔只占眼高 15~20%）
+      irisEmis: 0.40,    // 观察态虹膜自发光（给过头会把 #0db7ff 冲成白青）
+      limbalLum: 0.45,   // 观察态角膜缘亮环（常态是暗环）
+
+      // —— 螺旋眼白（参考图的灵魂：眼白不是组织，是"涂满螺旋"的虚空）——
+      spiralOn: 0.95,    // 螺旋光纹强度
+      spiralScale: 6.60, // 螺旋密度（每单位几个）
+      spiralDens: 1.00,  // 每朵螺旋的瓣数
+      // 圈数必须够大：rc 在单格里只走到 0.64，turn=9 时相位才 5.8rad ≈ 0.92 圈 ——
+      // 不满一圈的"螺旋"看起来是个逗号，必须 ≥ 2 圈才认得出是螺旋。
+      spiralTurn: 22.0,
+      // 线宽幂也别省：w 在中位数 0.5 处 pow(0.5,1.55)=0.34，
+      // 等于半个格子都带 alpha，整块眼白会糊成一层灰纱。≥3 才收成细线。
+      spiralW: 3.00,
+
+      // —— 星系虹膜 ——
+      neb: 0.42,         // 星云旋臂强度
+      galaxy: 0.48,      // 星团亮点强度（过高会变雪花噪点）
+      flare: 0.90,       // 十字星芒
+
+      // —— 虚空星云（背景层）——
+      voidNeb: 0.22,     // 星云浓度
+      voidStar: 0.55,    // 背景星点
+      lashGlow: 0.34     // 睫毛柔光
+    }
+  };
+
+  var CFG = clone(DEFAULTS);
+  // v8：眼型/虹膜几何整体改了（虹膜必须小于眼裂），旧存档会盖掉新默认值 → 换 key
+  var STORE_KEY = 'arrodes-eyes-tuner-v8';
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function getPath(obj, path) {
+    var p = path.split('.'), cur = obj;
+    for (var i = 0; i < p.length; i++) cur = cur[p[i]];
+    return cur;
+  }
+  function setPath(obj, path, v) {
+    var p = path.split('.'), cur = obj;
+    for (var i = 0; i < p.length - 1; i++) cur = cur[p[i]];
+    cur[p[p.length - 1]] = v;
+  }
+
+  /* ---------- 颜色工具 ---------- */
+  function hueRotate(rgb, deg) {
+    if (!deg) return rgb.slice();
+    var a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    var r = rgb[0], g = rgb[1], b = rgb[2];
+    return [
+      (0.213 + c * 0.787 - s * 0.213) * r + (0.715 - c * 0.715 - s * 0.715) * g + (0.072 - c * 0.072 + s * 0.928) * b,
+      (0.213 - c * 0.213 + s * 0.143) * r + (0.715 + c * 0.285 + s * 0.140) * g + (0.072 - c * 0.072 - s * 0.283) * b,
+      (0.213 - c * 0.213 - s * 0.787) * r + (0.715 - c * 0.715 + s * 0.715) * g + (0.072 + c * 0.928 + s * 0.072) * b
+    ].map(clampColor);
+  }
+  function saturate(rgb, s) {
+    if (s === 1) return rgb.slice();
+    var l = 0.213 * rgb[0] + 0.715 * rgb[1] + 0.072 * rgb[2];
+    return [l + (rgb[0] - l) * s, l + (rgb[1] - l) * s, l + (rgb[2] - l) * s].map(clampColor);
+  }
+  function clampColor(v) { return v < 0 ? 0 : (v > 1.6 ? 1.6 : v); }
+  function tint(rgb) { return hueRotate(saturate(rgb, CFG.satBase), CFG.hueBase); }
+  function tintObs(rgb) { return hueRotate(saturate(rgb, CFG.satObs), CFG.hueObs); }
+
+  /* ---------- 参考调色板 ---------- */
+  var STAR_TINTS = [
+    [0.88, 0.94, 1.00], [0.88, 0.94, 1.00], [0.88, 0.94, 1.00],
+    [1.00, 0.88, 0.66], [0.96, 0.82, 0.60],
+    [0.76, 0.68, 1.00], [0.68, 0.78, 1.00]
+  ];
+  var OBS = {
+    voidDust: [0.34, 0.50, 0.92], lidUp: [0.44, 0.88, 1.00], lidLo: [0.32, 0.76, 1.00],
+    fiber: [0.06, 0.40, 1.00], sky: [0.12, 0.52, 1.00], star: [0.26, 0.74, 1.00],
+    ring: [0.58, 0.96, 1.00], pupil: [0.01, 0.20, 0.90], halo: [0.16, 0.60, 1.00],
+    highlight: [0.82, 1.00, 1.00], glow: [0.08, 0.48, 1.00]
+  };
+
+  /* ---------- 实体眼调色板（常态 / 观察态） ---------- */
+  var LOOK_BASE = {
+    sclera:  [0.88, 0.92, 1.00],
+    irisIn:  [0.58, 0.86, 1.00],
+    irisMid: [0.16, 0.48, 0.98],
+    irisOut: [0.03, 0.10, 0.34],
+    pupil:   [0.015, 0.020, 0.060],
+    line:    [0.62, 0.86, 1.00],
+    hilt:    [1.00, 1.00, 1.00],
+    glow:    [0.35, 0.72, 1.00],
+    spiral:  [0.62, 0.78, 1.00],
+    neb:     [0.30, 0.48, 0.98],
+    flare:   [1.00, 1.00, 1.00],
+    voidA:   [0.34, 0.28, 0.62],
+    voidB:   [0.72, 0.66, 1.00]
+  };
+  // 观察态（六眼）色值直接取自参考图取样，不是目测：
+  //   主色 #0db7ff / #0cbbff → B−G ≈ 72，是"蓝青"不是"纯青"
+  //   亮部 #2eeaf5 → (0.18, 0.92, 0.96)   ·   过曝 #aae9e8 → (0.67, 0.91, 0.91)
+  //   ⚠️ irisMid 的 G 必须留出余量：后续还有 irisEmis 乘性提亮，
+  //      G 给到 0.72 会连 B 一起溢出饱和，结果变成 B−G≈2 的青绿，跟参考图不是一回事。
+  var LOOK_OBS = {
+    sclera:  [0.78, 0.93, 1.00],
+    irisIn:  [0.22, 0.90, 0.98],
+    irisMid: [0.04, 0.52, 1.00],
+    irisOut: [0.03, 0.30, 0.80],
+    pupil:   [0.010, 0.050, 0.200],
+    line:    [0.30, 0.90, 1.00],
+    hilt:    [1.00, 1.00, 1.00],
+    glow:    [0.10, 0.60, 1.00],
+    spiral:  [0.35, 0.88, 1.00],
+    neb:     [0.10, 0.55, 1.00],
+    flare:   [0.90, 1.00, 1.00],
+    voidA:   [0.20, 0.32, 0.72],
+    voidB:   [0.55, 0.72, 1.00]
+  };
+
+  var TAU = Math.PI * 2;
+  function rnd() { return Math.random(); }
+  function rr(a, b) { return a + Math.random() * (b - a); }
+  function gauss() { return (rnd() + rnd() + rnd() - 1.5) * 1.1547; }
+  function lidY(t, upper) {
+    var u = Math.min(1, Math.abs(t));
+    return (upper ? 1 : -CFG.lowerK) * CFG.lidH * Math.pow(Math.max(0, 1 - u * u), CFG.lidP);
+  }
+
+  /* ============================================================
+   * 烘焙：8 组 attribute，STRIDE = 21
+   *   0 a_void | 2 a_home | 4 a_arc | 6 a_tint | 9 a_tintB
+   *  12 a_p0(seed,role,size,alpha) | 16 a_p1(delay,swirl,rad,twk) | 20 a_side
+   * ============================================================ */
+  var STRIDE = 21;
+
+  var ROLE_HIST = {};
+
+  function bake() {
+    var C = CFG.counts;
+    var N = C.voidDust + (C.lid + C.iris + C.pupil + C.halo + C.highlight + C.glow) * 2;
+    var arr = new Float32Array(N * STRIDE);
+    var i = 0;
+    ROLE_HIST = {};
+
+    function put(p) {
+      var b = i * STRIDE;
+      arr[b] = p.vx; arr[b + 1] = p.vy;
+      arr[b + 2] = p.hx; arr[b + 3] = p.hy;
+      arr[b + 4] = p.ax; arr[b + 5] = p.ay;
+      arr[b + 6] = p.t[0]; arr[b + 7] = p.t[1]; arr[b + 8] = p.t[2];
+      arr[b + 9] = p.tb[0]; arr[b + 10] = p.tb[1]; arr[b + 11] = p.tb[2];
+      arr[b + 12] = p.seed; arr[b + 13] = p.role; arr[b + 14] = p.size; arr[b + 15] = p.alpha;
+      arr[b + 16] = p.delay; arr[b + 17] = p.swirl; arr[b + 18] = p.rad; arr[b + 19] = p.twk;
+      arr[b + 20] = p.side;
+      ROLE_HIST[p.role] = (ROLE_HIST[p.role] || 0) + 1;
+      i++;
+    }
+    function voidPos(side) {
+      var a = rnd() * TAU, rad = Math.pow(rnd(), 0.62);
+      var vx = Math.cos(a) * rad * 1.02, vy = Math.sin(a) * rad * 0.94;
+      if (side) vx = Math.abs(vx) * side;
+      return { vx: vx, vy: vy };
+    }
+
+    for (var k = 0; k < C.voidDust; k++) {
+      var v0 = voidPos(0);
+      put({
+        vx: v0.vx, vy: v0.vy, hx: 0, hy: 0, ax: 0, ay: 0,
+        t: tint([0.55, 0.62, 0.88]), tb: tintObs(OBS.voidDust),
+        seed: rnd(), role: 0, size: 0.0022 + rnd() * 0.0026, alpha: 0.13 + rnd() * 0.10,
+        delay: 0, swirl: 0, rad: 0, twk: 0.85, side: 0
+      });
+    }
+
+    for (var s = 0; s < 2; s++) {
+      var side = s === 0 ? -1 : 1;
+      var cx0 = side * CFG.eyeSep, cy0 = CFG.irisCy;
+
+      for (var n = 0; n < C.lid; n++) {
+        var upper = rnd() < 0.58;
+        var t = rnd() * 2 - 1;
+        var innerOff = rnd() < 0.18 ? (upper ? -1 : 1) * rr(0.012, 0.038) : 0;
+        var hx = cx0 + t + rr(-0.004, 0.004);
+        var hy = lidY(t, upper) + rr(-0.004, 0.004) + innerOff;
+        var dist = Math.sqrt((hx - cx0) * (hx - cx0) + hy * hy);
+        var vv = voidPos(side);
+        put({
+          vx: vv.vx, vy: vv.vy, hx: hx, hy: hy,
+          ax: rr(-1, 1), ay: rr(-1, 1),
+          t: upper ? tint([0.82, 0.89, 1.00]) : tint([0.58, 0.70, 0.96]),
+          tb: upper ? tintObs(OBS.lidUp) : tintObs(OBS.lidLo),
+          seed: rnd(), role: 1,
+          size: (upper ? 0.0086 : 0.0068) * rr(0.85, 1.20),
+          alpha: (upper ? 0.95 : 0.62) * rr(0.80, 1.15),
+          delay: 0.10 + Math.min(1, dist / 2.1) * 0.18 + rnd() * 0.06,
+          swirl: rr(-1, 1) * 1.25, rad: 0, twk: 0.22, side: side
+        });
+      }
+
+      var rest = C.iris - Math.round(C.iris * CFG.starRatio);
+      var nStar = C.iris - rest;
+      var nFiber = Math.round(rest * 0.40);
+      var nSky = Math.round(rest * 0.27);
+      var nRing = rest - nFiber - nSky;
+      var FIBER_DIRS = 96;
+
+      function irisPut(role, ang, r, t, tb, size, alpha, twk, delayBase) {
+        var vv2 = voidPos(side);
+        put({
+          vx: vv2.vx, vy: vv2.vy,
+          hx: cx0 + Math.cos(ang) * r, hy: cy0 + Math.sin(ang) * r,
+          ax: rr(-1, 1) * 0.85, ay: rr(-1, 1) * 0.85,
+          t: t, tb: tb, seed: rnd(), role: role, size: size, alpha: alpha,
+          delay: delayBase + rnd() * 0.05, swirl: rr(-1, 1) * 1.05,
+          rad: r / CFG.irisR, twk: twk, side: side
+        });
+      }
+
+      for (var f = 0; f < nFiber; f++) {
+        var kd = Math.floor(rnd() * FIBER_DIRS);
+        var angF = (kd / FIBER_DIRS) * TAU + rr(-0.008, 0.008);
+        var rF = CFG.pupilR + (CFG.irisR * 0.96 - CFG.pupilR) * Math.pow(rnd(), 0.72);
+        irisPut(2, angF, rF, tint([0.44, 0.58, 1.00]), tintObs(OBS.fiber),
+          0.0020 + rnd() * 0.0014, 0.10 + rnd() * 0.10, 0.40, rF * 0.10);
+      }
+      for (var y2 = 0; y2 < nSky; y2++) {
+        var angS = rnd() * TAU;
+        var rS = CFG.irisR * 0.95 * Math.sqrt(rnd());
+        if (rS < CFG.pupilR) rS = CFG.pupilR + rnd() * 0.02;
+        irisPut(2, angS, rS, tint([0.62, 0.72, 1.00]), tintObs(OBS.sky),
+          0.0024 + rnd() * 0.0020, 0.16 + rnd() * 0.16, 0.70, rS * 0.12);
+      }
+      for (var st = 0; st < nStar; st++) {
+        var angT = rnd() * TAU;
+        var rT = CFG.irisR * (0.26 + 0.70 * Math.pow(rnd(), 0.72));
+        var sw = STAR_TINTS[Math.floor(rnd() * STAR_TINTS.length)];
+        var big = Math.pow(rnd(), CFG.starPow);
+        irisPut(2, angT, rT, tint(sw), tintObs(OBS.star),
+          0.0018 + big * 0.0145,
+          0.26 + Math.pow(rnd(), CFG.starAlphaPow) * 0.74,
+          1.00, 0.0);
+      }
+      for (var rg = 0; rg < nRing; rg++) {
+        var angR = rnd() * TAU;
+        var rR = CFG.irisR * rr(0.955, 1.005);
+        irisPut(2, angR, rR, tint([0.66, 0.80, 1.00]), tintObs(OBS.ring),
+          0.0034 + rnd() * 0.0022, 0.62 + rnd() * 0.38, 0.24, 0.0);
+      }
+      for (var pu = 0; pu < C.pupil; pu++) {
+        var angP = rnd() * TAU, rP = CFG.pupilR * Math.sqrt(rnd());
+        var vp = voidPos(side);
+        put({
+          vx: vp.vx, vy: vp.vy,
+          hx: cx0 + Math.cos(angP) * rP, hy: cy0 + Math.sin(angP) * rP,
+          ax: rr(-1, 1) * 0.7, ay: rr(-1, 1) * 0.7,
+          t: tint([0.10, 0.13, 0.30]), tb: tintObs(OBS.pupil),
+          seed: rnd(), role: 3, size: 0.0024 + rnd() * 0.0014,
+          alpha: 0.14 + rnd() * 0.10, delay: rnd() * 0.04,
+          swirl: rr(-1, 1) * 0.9, rad: rP / CFG.irisR, twk: 0.06, side: side
+        });
+      }
+      for (var hl = 0; hl < C.highlight; hl++) {
+        var main = rnd() < 0.76;
+        var angH = main ? 2.34 + gauss() * 0.22 : -0.92 + gauss() * 0.26;
+        var rH = CFG.irisR * (main ? 0.52 + gauss() * 0.10 : 0.58 + gauss() * 0.12);
+        var vh = voidPos(side);
+        put({
+          vx: vh.vx, vy: vh.vy,
+          hx: cx0 + Math.cos(angH) * rH, hy: cy0 + Math.sin(angH) * rH,
+          ax: rr(-1, 1) * 0.7, ay: rr(-1, 1) * 0.7,
+          t: [1.00, 1.00, 1.00], tb: tintObs(OBS.highlight),
+          seed: rnd(), role: 5,
+          size: (main ? 0.0125 : 0.0060) * rr(0.5, 1.4),
+          alpha: (main ? 0.80 : 0.42) * rr(0.5, 1.0),
+          delay: rnd() * 0.06, swirl: rr(-1, 1) * 0.9,
+          rad: rH / CFG.irisR, twk: 0.14, side: side
+        });
+      }
+      for (var gw = 0; gw < C.glow; gw++) {
+        var angW = rnd() * TAU, rW = CFG.irisR * Math.pow(rnd(), 1.35);
+        var vw = voidPos(side);
+        put({
+          vx: vw.vx, vy: vw.vy,
+          hx: cx0 + Math.cos(angW) * rW, hy: cy0 + Math.sin(angW) * rW,
+          ax: rr(-1, 1) * 0.6, ay: rr(-1, 1) * 0.6,
+          t: tint([0.42, 0.52, 0.95]), tb: tintObs(OBS.glow),
+          seed: rnd(), role: 6, size: 0.016 + rnd() * 0.030,
+          alpha: 0.020 + rnd() * 0.024, delay: 0.02 + rnd() * 0.05,
+          swirl: rr(-1, 1) * 1.0, rad: rW / CFG.irisR, twk: 0.10, side: side
+        });
+      }
+      for (var ha = 0; ha < C.halo; ha++) {
+        var angG = rnd() * TAU;
+        var rG = CFG.irisR * rr(1.02, 2.05) * Math.pow(rnd(), 0.5);
+        var vg = voidPos(side);
+        put({
+          vx: vg.vx, vy: vg.vy,
+          hx: cx0 + Math.cos(angG) * rG * 1.05, hy: cy0 + Math.sin(angG) * rG * 0.88,
+          ax: rr(-1, 1) * 0.6, ay: rr(-1, 1) * 0.6,
+          t: tint([0.38, 0.56, 1.00]), tb: tintObs(OBS.halo),
+          seed: rnd(), role: 4, size: 0.028 + rnd() * 0.052,
+          alpha: 0.010 + rnd() * 0.010, delay: 0.22 + rnd() * 0.12,
+          swirl: rr(-1, 1) * 0.8, rad: 0, twk: 0.40, side: side
+        });
+      }
+    }
+    return { data: arr, count: N };
+  }
+
+  /* ============================================================
+   * 着色器（几何全部走 uniform，滑动不重编译）
+   * ============================================================ */
+  var VERT = [
+    'attribute vec2 a_void; attribute vec2 a_home; attribute vec2 a_arc;',
+    'attribute vec3 a_tint; attribute vec3 a_tintB;',
+    'attribute vec4 a_p0; attribute vec4 a_p1; attribute float a_side;',
+    'uniform float u_time, u_summon, u_observe, u_aspect, u_eyeScale, u_eyeSep, u_px, u_sizeBoost;',
+    'uniform vec2  u_gaze;',
+    'uniform float u_lidH, u_lidP, u_lidLo;',
+    'uniform float u_twkMul, u_swirlMul, u_arcMul;',
+    'uniform float u_ringMul, u_glowMul, u_haloMul, u_hiltMul, u_hiltSize, u_lidMul, u_lidSize;',
+    'uniform float u_solid, u_dust;',
+    'varying vec3 v_col; varying float v_alpha; varying float v_role;',
+    '#define PI 3.14159265',
+    'vec2 rot2(vec2 p, float a){ float c=cos(a), s=sin(a); return vec2(c*p.x-s*p.y, s*p.x+c*p.y); }',
+    'float easeOut(float t){ float u=1.0-t; return 1.0-u*u*u; }',
+    'void main(){',
+    '  float seed=a_p0.x, role=a_p0.y, psize=a_p0.z, baseA=a_p0.w;',
+    '  float delay=a_p1.x, swirl=a_p1.y, rad=a_p1.z, twk=a_p1.w;',
+    '  float isVoid = 1.0 - step(0.5, role);',
+    '  float isLid  = step(0.5, role) * (1.0 - step(1.5, role));',
+    '  float isIris = step(1.5, role) * (1.0 - step(2.5, role));',
+    '  float isHalo = step(3.5, role) * (1.0 - step(4.5, role));',
+    '  float isHilt = step(4.5, role) * (1.0 - step(5.5, role));',
+    '  float isGlow = step(5.5, role);',
+    '  float inIris = step(1.5, role) * (1.0 - step(3.5, role)) + step(4.5, role);',
+    '  float raw = isVoid > 0.5 ? 0.0 : clamp((u_summon - delay) / 0.58, 0.0, 1.0);',
+    '  float e   = isVoid > 0.5 ? 0.0 : easeOut(raw);',
+    '  vec2 eyeC = vec2(a_side * u_eyeSep, 0.0) * u_eyeScale;',
+    '  vec2 eyeL = vec2(a_side * u_eyeSep, 0.0);',
+    '  float breathe = 1.0 + 0.014 * sin(u_time * 1.05) * u_summon;',
+    '  vec2 ll = a_home * breathe;',
+    '  ll = eyeL + rot2(ll - eyeL, u_time * 0.024 * isIris);',
+    '  ll += u_gaze * 0.060 * inIris * u_summon;',
+    '  vec2 homeW = ll * u_eyeScale;',
+    '  vec2 voidW = vec2(a_void.x * u_aspect, a_void.y);',
+    '  vec2 p = mix(voidW, homeW, e);',
+    '  p += a_arc * sin(PI * e) * 0.22 * u_arcMul;',
+    '  p = eyeC + rot2(p - eyeC, (1.0 - e) * swirl * u_swirlMul);',
+    '  p += vec2(sin(u_time*0.11 + seed*6.2831), cos(u_time*0.083 + seed*9.4248)) * (0.004 + 0.010*seed);',
+    '  gl_Position = vec4(p.x / u_aspect, p.y, 0.0, 1.0);',
+    '  float tw = 0.5 + 0.5 * sin(u_time * (0.9 + seed * 3.3) + seed * 6.2831);',
+    '  float twkEff = clamp(twk * u_twkMul, 0.0, 1.0);',
+    '  float szF = (1.0 - twkEff*0.35) + twkEff*0.70*tw;',
+    '  float sz = psize * u_px * u_sizeBoost * szF;',
+    '  sz *= mix(1.0, u_lidSize, isLid);',
+    '  sz *= mix(1.0, u_hiltSize, isHilt);',
+    '  sz *= 1.0 + 0.55 * sin(PI * e);',
+    '  sz *= 1.0 + 0.34 * u_observe * isIris;',
+    '  gl_PointSize = clamp(sz, 0.9, 130.0);',
+    '  vec2 rel = ll - eyeL;',
+    '  float lx = clamp(rel.x, -1.0, 1.0);',
+    '  float lidPow = pow(max(0.0, 1.0 - lx*lx), u_lidP);',
+    '  float inside = clamp((u_lidH*lidPow - rel.y) / 0.013, 0.0, 1.0)',
+    '               * clamp((rel.y + u_lidLo*lidPow) / 0.013, 0.0, 1.0);',
+    '  float a = mix(0.055, baseA, max(e, isVoid));',
+    '  a *= szF;',
+    '  a *= 1.0 + 0.5 * sin(PI * e);',
+    '  a *= mix(1.0, inside, inIris * u_summon);',
+    '  a *= mix(1.0, u_lidMul, isLid);',
+    '  a *= mix(1.0, u_haloMul, isHalo);',
+    '  a *= mix(1.0, u_hiltMul, isHilt);',
+    '  a *= mix(1.0, u_glowMul, isGlow);',
+    '  a *= mix(1.0, u_ringMul, isIris * step(0.90, rad));',
+    '  a *= mix(1.0, 1.0 - 0.60 * rad, isGlow);',
+    '  a *= 1.0 + 1.6 * u_observe * isGlow;',
+    '  a *= 1.0 + 0.35 * u_observe * inIris;',
+    '  a *= 1.0 + 1.8 * u_observe * isHalo;',
+    '  float rings = 0.68 + 0.32 * sin(rad * 34.0 - u_time * 1.6);',
+    '  a *= mix(1.0, rings, u_observe * isIris);',
+    // 实体眼接管：粒子落位后逐颗让位。睑线整层交出去（实体眼自己画），
+    // 虹膜/光晕/高光退成 u_dust 强度的"星尘"，留住星空感。
+    '  float solidOn = u_solid * smoothstep(0.80, 1.0, e);',
+    '  a *= mix(1.0, mix(u_dust, 0.0, isLid), solidOn);',
+    '  v_alpha = clamp(a, 0.0, 1.0);',
+    '  vec3 col = mix(a_tint, a_tintB, u_observe);',
+    '  col *= 1.0 + 0.70 * sin(PI * e);',
+    '  col += vec3(0.35) * pow(tw, 4.0) * isIris;',
+    '  v_col = col; v_role = role;',
+    '}'
+  ].join('\n');
+
+  var FRAG = [
+    'precision mediump float;',
+    'varying vec3 v_col; varying float v_alpha; varying float v_role;',
+    'void main(){',
+    '  vec2 d = gl_PointCoord - vec2(0.5);',
+    '  float r = length(d) * 2.0;',
+    '  if (r > 1.0) discard;',
+    '  float a = pow(smoothstep(1.0, 0.0, r), 1.7);',
+    '  float noCore = step(3.6, v_role) * (1.0 - step(4.4, v_role)) + step(5.4, v_role);',
+    '  float core = pow(smoothstep(0.55, 0.0, r), 2.0) * (1.0 - noCore);',
+    '  vec3 col = v_col * (1.0 + core * 0.95);',
+    '  float alpha = a * v_alpha;',
+    '  gl_FragColor = vec4(col * alpha, alpha);',
+    '}'
+  ].join('\n');
+
+  /* ============================================================
+   * 实体眼：全屏四边形 + 解析式 SDF
+   *
+   * 为什么不继续用粒子堆：要"游戏捏脸那种实心眼"，粒子得堆到 5~10 万颗
+   * 才勉强没有颗粒感，而且边缘永远是毛的。解析式求交一次就得到抗锯齿的
+   * 干净曲线、连续渐变和精确的虹膜/瞳孔边界 —— 成本还低得多。
+   * 粒子只负责"合聚"这一段叙事，落位后交棒。
+   * ============================================================ */
+  var SOLID_VERT = [
+    'attribute vec2 a_uv;',
+    'varying vec2 v_uv;',
+    'void main(){ v_uv = a_uv; gl_Position = vec4(a_uv, 0.0, 1.0); }'
+  ].join('\n');
+
+  var SOLID_FRAG = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
+    'precision mediump float;',
+    '#endif',
+    'varying vec2 v_uv;',
+    'uniform float u_aspect, u_eyeScale, u_eyeSep;',
+    'uniform float u_lidH, u_lidP, u_lidLo, u_lidPlo, u_cornerT, u_cornerI;',
+    'uniform float u_irisR, u_irisCy, u_pupilR, u_pupilSoft;',
+    'uniform vec2  u_gaze;',
+    'uniform float u_aa, u_alpha;',
+    'uniform float u_sclera, u_lidShadow, u_lidLineW, u_lidLineLum;',
+    'uniform float u_lashLen, u_lashN, u_lashW, u_lashCurl, u_lashSpread;',
+    'uniform float u_limbalDark, u_fiber, u_hiltSize, u_glow, u_irisLid, u_irisRim, u_glowFall;',
+    'uniform float u_observe, u_pupilShrink, u_irisEmis, u_limbalLum, u_voidEye;',
+    'uniform float u_time;',
+    'uniform float u_spiralOn, u_spiralScale, u_spiralDens, u_spiralTurn, u_spiralW;',
+    'uniform float u_neb, u_galaxy, u_flare, u_voidNeb, u_voidStar, u_lashGlow;',
+    'uniform vec3  u_cSclera, u_cIrisIn, u_cIrisMid, u_cIrisOut, u_cPupil, u_cLine, u_cHilt, u_cGlow;',
+    'uniform vec3  u_cSpiral, u_cNeb, u_cFlare, u_cVoidA, u_cVoidB;',
+    '',
+    'float capsule(vec2 p, vec2 a, vec2 b, float r) {',
+    '  vec2 pa = p - a, ba = b - a;',
+    '  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);',
+    '  return length(pa - ba * h) - r;',
+    '}',
+    'vec2 bez(vec2 a, vec2 c, vec2 b, float t) {',
+    '  float m = 1.0 - t;',
+    '  return m * m * a + 2.0 * m * t * c + t * t * b;',
+    '}',
+    '',
+    /* ---- 噪声：星云与螺旋都要用 ---- */
+    'float h21(vec2 p) {',
+    '  p = fract(p * vec2(123.34, 456.21));',
+    '  p += dot(p, p + 45.32);',
+    '  return fract(p.x * p.y);',
+    '}',
+    'float vnoise(vec2 p) {',
+    '  vec2 i = floor(p), f = fract(p);',
+    '  vec2 u = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), u.x),',
+    '             mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), u.x), u.y);',
+    '}',
+    // 3 个倍频就够：再多在 SwiftShader 下会掉到个位数帧率，而星云本来就是低频
+    'float fbm3(vec2 p) {',
+    '  float v = 0.0, a = 0.5;',
+    '  for (int i = 0; i < 3; i++) { v += a * vnoise(p); p = p * 2.07 + 13.7; a *= 0.5; }',
+    '  return v;',
+    '}',
+    /* 螺旋场：把平面切成网格，每格画一朵「玫瑰螺旋」（角向 dens 瓣 × 径向 turn 圈）。
+     * 三个随机量缺一不可 —— 旋转 s1 / 缩放 s2 / 圈数 s3。
+     * 只随机旋转的话，每朵形状完全一致，仍会拼成一整张规则墙纸（第一版就是这样）。
+     * 另外先做一次低频 domain warp，把规则的网格本身揉歪。 */
+    'float spiralField(vec2 p, float dens, float turn, float sc) {',
+    '  vec2 wp = p + vec2(vnoise(p * 2.6), vnoise(p * 2.6 + 17.0)) * 0.22;',
+    '  vec2 g = wp * sc;',
+    '  vec2 id = floor(g);',
+    '  vec2 f = fract(g) - 0.5;',
+    '  float s1 = h21(id + 4.13);',
+    '  float s2 = h21(id + 8.71);',
+    '  float s3 = h21(id + 1.29);',
+    '  float a = atan(f.y, f.x) + s1 * 6.2831;',
+    '  float rc = length(f) * (0.70 + 0.58 * s2);',
+    '  float w = 0.5 + 0.5 * sin(a * (dens + s2 * 1.6) + rc * turn * (0.58 + 0.84 * s3));',
+    '  return pow(w, 3.0) * (1.0 - smoothstep(0.22, 0.50, length(f)));',
+    '}',
+    '',
+    /* 关键：轮廓函数在 |q.x|>1 处会塌陷（1-x²<=0 → yT=yB=0）。
+     * 少了 lim 门控，inEye 会在 |q.y|<E 的整条水平带上恒为正，
+     * 在深色背景上画出一条贯穿全屏的亮线。glow 的 dy 同理退化。 */
+    'vec4 eyeAt(vec2 q, float side) {',
+    '  float E = u_aa * 1.6;',
+    '  float xo = clamp(q.x, -1.0, 1.0);',
+    '  float lim = max(1.0 - xo * xo, 0.0);',
+    '  float outer = clamp(q.x * side, 0.0, 1.0);',
+    '  float inner = clamp(-q.x * side, 0.0, 1.0);',
+    '',
+    // 上睑：外眼角更平（上扬），内眼角更快收 —— 对称椭圆没有"眼型"
+    '  float yT = u_lidH * pow(lim, u_lidP * mix(1.24, 0.70, outer));',
+    '  float yB = -u_lidLo * pow(lim, u_lidPlo);',
+    // 眼角要"上提"而不是"上下撑开"：上下睑同向上移，且上睑幅度更大
+    '  float rise = u_cornerT * outer * outer * u_lidH;',
+    '  yT += rise * 0.42;',
+    '  yB += rise * 0.20;',
+    '  float sink = u_cornerI * inner * inner * u_lidH;',
+    '  yT -= sink * 0.30;',
+    '  yB += sink * 0.14;',
+    '',
+    /* 门控必须是 smoothstep(0, 2E, lim) 而不是 smoothstep(-E, E, lim)：
+     * lim 在 |q.x|>1 处恒为 0，而 x=0 恰好落在 -E..E 的中点 → 返回 0.5 而非 0，
+     * 门控等于没生效，眼外会残留一条 alpha≈0.125 的亮线。 */
+    '  float inEye = smoothstep(-E, E, yT - q.y)',
+    '              * smoothstep(-E, E, q.y - yB)',
+    '              * smoothstep(0.0, 2.0 * E, lim);',
+    '',
+    '  vec2 ip = q - vec2(0.0, u_irisCy) - u_gaze;',
+    '  float r = length(ip);',
+    '  float ang = atan(ip.y, ip.x);',
+    '  float invR = 1.0 / max(u_irisR, 1e-4);',
+    '  float t = clamp(r * invR, 0.0, 1.0);',
+    '',
+    '  float iris = 1.0 - smoothstep(u_irisR - E, u_irisR + E, r);',
+    // 观察态瞳孔收缩 —— 参考图里瞳孔只有眼睛高度的 15~20%，是"六眼"最强的形态线索
+    '  float pupR = u_pupilR * (1.0 - u_pupilShrink * u_observe);',
+    '  float pup  = 1.0 - smoothstep(pupR - u_pupilSoft, pupR + E, r);',
+    '',
+    // 虹膜底色：瞳孔缘亮 → 中段本色 → 外圈深
+    '  vec3 icol = mix(u_cIrisMid, u_cIrisIn, 1.0 - smoothstep(0.0, 0.55, t));',
+    '  icol = mix(icol, u_cIrisOut, smoothstep(0.55, 0.95, t));',
+    // 观察态整体自发光必须是**乘在底色上、加在星云之前**。
+    // 放在星云/星团之后乘，会把星系细节一起放大到饱和，虹膜退化成一个平的亮盘，
+    // 参考图里那些星点就全没了。
+    '  icol *= 1.0 + u_irisEmis * u_observe * (1.0 - smoothstep(0.58, 1.02, t));',
+    /* 星系：把极坐标旋涡后送进 fbm。直接用平面噪声只会得到一团均匀雾气，
+     * 必须让采样坐标本身绕心旋转（ang + t*k），才会出现"旋臂"。 */
+    '  float sw = ang + t * 2.6 - u_time * 0.055;',
+    '  vec2 nq = vec2(cos(sw), sin(sw)) * (t * 3.6) + vec2(u_time * 0.02, 0.0);',
+    '  float nb = fbm3(nq * 2.2 + 5.0);',
+    '  float nbBand = smoothstep(0.06, 0.55, t) * (1.0 - smoothstep(0.72, 1.02, t));',
+    '  icol += u_cNeb * u_neb * nb * nbBand;',
+    /* 星团：稀疏亮点。阈值必须很高（pow 26），否则整片虹膜会变成噪点雪花。 */
+    '  vec2 sg = ip * 26.0;',
+    '  vec2 sid = floor(sg);',
+    '  float sh = pow(h21(sid + 3.71), 26.0);',
+    '  float spk = 1.0 - smoothstep(0.04, 0.30, length(fract(sg) - 0.5));',
+    '  float gal = sh * spk * (1.0 - smoothstep(0.80, 1.02, t));',
+    '  icol += u_cHilt * u_galaxy * gal * 2.4;',
+    // 放射纤维：密度别太高、扰动要够大，否则会变成规则的"轮辐"
+    '  float fib = 0.5 + 0.5 * sin(ang * 72.0 + sin(ang * 9.0) * 3.8);',
+    '  icol *= 1.0 + u_fiber * fib * smoothstep(0.18, 0.98, t) * (1.0 + 1.15 * u_observe);',
+    // 角膜缘：常态压暗成环；观察态反过来发亮（参考图外圈是一圈亮青，不是暗环）
+    // 虚空化时暗环必须减弱：它乘完 (1-0.98) 后接近纯黑，比 #070d19 的虚空还暗，
+    // 会在虹膜与虚空交界处显出一圈脏污的暗月牙。
+    '  float limbal = smoothstep(0.68, 0.88, t) * (1.0 - smoothstep(0.90, 1.0, t));',
+    '  float limbalK = u_limbalDark * (1.0 - 0.62 * u_voidEye);',
+    '  icol = mix(icol, u_cIrisOut * (1.0 - limbalK * 1.15), limbal * (1.0 - u_observe));',
+    '  icol += u_cIrisIn * u_limbalLum * u_observe * limbal;',
+    // 瞳孔缘亮环 —— 游戏眼睛几乎都有一圈，是很强的"锐利"线索
+    '  float tPup = pupR * invR;',
+    '  float rim = 1.0 - smoothstep(0.0, tPup * 0.44, abs(t - tPup));',
+    '  icol += u_cIrisIn * u_irisRim * rim * iris;',
+    // 球体感：上睑投影压暗 + 下缘环境反光提亮
+    '  float ny = ip.y * invR;',
+    '  icol *= 1.0 - u_irisLid * smoothstep(-0.12, 0.94, ny);',
+    '  icol *= 1.0 + 0.17 * (1.0 - smoothstep(-0.95, 0.10, ny));',   // 反向用 1-ss，不可写 smoothstep(大,小,·)：GLSL 里 edge0>=edge1 结果未定义
+    '',
+    // 眼白底色：上睑投影 + 眼角收暗 + 下睑轻压，避免"死白塑料球"。
+    // 虚空化时它其实看不见（alpha 归零），但螺旋光纹要垫在它上面才显形。
+    '  vec3 scleraCol = u_cSclera * u_sclera;',
+    '  scleraCol *= 1.0 - u_lidShadow * smoothstep(-0.10, u_lidH * 0.95, q.y);',
+    '  scleraCol *= 1.0 - 0.44 * smoothstep(0.52, 1.0, abs(q.x));',
+    '  scleraCol *= 1.0 - 0.20 * smoothstep(0.05, u_lidLo * 0.85, -q.y);',
+    // 瞳孔必须并进 icol 之后再压高光 —— 顺序反了，高光会被瞳孔涂掉
+    '  vec3 pcol = u_cPupil + u_cIrisOut * 0.30 * (1.0 - smoothstep(0.0, pupR * 0.8, r));',
+    '  icol = mix(icol, pcol, pup);',
+    // 高光：左上主光 + 右下副光，是"这是一只眼睛"最强的单点线索
+    '  float hs = u_hiltSize;',
+    '  float m1 = 1.0 - smoothstep(hs * 0.55, hs, length(ip - vec2(-0.30, 0.56) * u_irisR));',
+    '  float m2 = 1.0 - smoothstep(hs * 0.24, hs * 0.42, length(ip - vec2(0.46, -0.40) * u_irisR));',
+    '  vec3 irisCol = mix(icol, u_cHilt, m1 * 0.96);',
+    '  irisCol = mix(irisCol, u_cHilt, m2 * 0.44);',
+    '',
+    // 螺旋眼白：光纹只活在眼白里（被虹膜盖住的部分自然让位），整体随视线中心缓慢自转
+    /* spFade 只在「眼裂边缘」收束，绝不能在虹膜半径附近收 —— 虹膜已经由 (1-iris) 让位，
+     * 若这里再乘一个 smoothstep(irisR*0.26, irisR*0.58, r) 做下限，
+     * 螺旋就只剩 irisR*0.24 ~ irisR*0.86 这一条 0.12 宽的环，肉眼看等于没有。 */
+    '  float spFade = (1.0 - smoothstep(0.80, 1.02, abs(q.x)))',
+    '               * (1.0 - 0.60 * smoothstep(0.55, 1.05, abs(q.y) / max(u_lidH, 1e-3)));',
+    '  float ca = cos(u_time * 0.035), sa = sin(u_time * 0.035);',
+    '  vec2 sr = mat2(ca, -sa, sa, ca) * ip;',
+    '  float spv = spiralField(sr, u_spiralDens, u_spiralTurn, u_spiralScale);',
+    '  float spiralA = pow(spv, u_spiralW) * u_spiralOn * spFade * inEye * (1.0 - iris);',
+    // 十字星芒：参考图 2 虹膜里那束四角星，是"神性"最直接的符号。
+    // 衰减系数不能太大：62 的话十字只有 3px 宽、28px 长，等于没画。30/4.5 才是"星芒"。
+    '  vec2 fp = ip - vec2(-0.26, 0.34) * u_irisR;',
+    '  float flare = exp(-abs(fp.x) * 30.0) * exp(-abs(fp.y) * 4.5)',
+    '              + exp(-abs(fp.y) * 30.0) * exp(-abs(fp.x) * 4.5)',
+    '              + exp(-length(fp) * 40.0) * 0.85;',
+    '  float flareA = flare * u_flare;',
+    '',
+    // 睑线：上睑粗、下睑细；用 lim 收敛，避免画出眼型外
+    '  float wU = u_lidLineW * (1.0 + 0.60 * outer);',
+    '  float lineU = (1.0 - smoothstep(wU * 0.35, wU, abs(q.y - yT))) * pow(lim, 0.22);',
+    '  float wL = u_lidLineW * 0.45;',
+    '  float lineL = (1.0 - smoothstep(wL * 0.35, wL * 1.35, abs(q.y - yB))) * pow(lim, 0.38);',
+    '  float line = max(lineU, lineL) * smoothstep(0.0, 2.0 * E, lim);',
+    '',
+    /* 睫毛 v2 —— 旧版做砸的真正原因：宽度挂在 u_lidLineW 上，
+     * 而默认 u_lidLineW = 0 → w ≡ 0，画出来是一排等粗黑梳齿。
+     * 现在：自带宽度参数 + 根粗梢尖收成 0 + 长度/方向/粗细三重抖动 + 亮色 + 柔光。
+     * 单段胶囊会让睫毛变成"金属直棍"，必须按贝塞尔采样切 3 段、半径逐段递减。
+     * 扇向必须是「内眼角朝上、外眼角朝外」——
+     * rot 随 uc 递减才叫扇形；递增的话内短外长会全部交叉挤成一绺。
+     * 睫毛长在眼型之外，所以不能被 inEye 门控。 */
+    '  float lash = 0.0;',
+    '  float lashGlowV = 0.0;',
+    '  if (u_lashN > 0.5 && q.y > -0.60 && q.y < yT + u_lashLen * 2.4) {',
+    '    for (int i = 0; i < 18; i++) {',
+    '      float fi = float(i);',
+    '      float on = step(fi, u_lashN - 0.5);',
+    '      float u = fi / max(u_lashN - 1.0, 1.0);',
+    '      float r1 = h21(vec2(fi + 1.0, side * 3.3));',
+    '      float r2 = h21(vec2(fi + 7.0, side * 9.1));',
+    '      float uc = u * u * (3.0 - 2.0 * u);',
+    // 必须先判 on：on=0 时 w0=0，smoothstep(0,0,d) 在 GLSL 里是未定义行为（可能返回 1）
+    '      if (on > 0.5) {',
+    '      float xl = side * (-0.18 + 1.06 * uc);',
+    '      float yl = u_lidH * pow(max(1.0 - xl * xl, 0.0), u_lidP)',
+    '               + u_cornerT * uc * uc * u_lidH * 0.36;',
+    '      vec2 base = vec2(xl, yl);',
+    '      float rot = 1.32 - 0.66 * uc * u_lashSpread + (r1 - 0.5) * 0.30;',
+    '      vec2 dir = vec2(side * cos(rot), sin(rot));',
+    '      float len = u_lashLen * (0.40 + 0.92 * uc) * (0.70 + 0.62 * r1);',
+    '      vec2 tip = base + dir * len;',
+    '      vec2 ctl = base + dir * (len * 0.40) + vec2(side * len * 0.52, len * 0.46) * u_lashCurl;',
+    '      float w0 = u_lashW * (1.0 - 0.40 * uc) * (0.72 + 0.52 * r2);',
+    '      vec2 q1 = bez(base, ctl, tip, 0.34);',
+    '      vec2 q2 = bez(base, ctl, tip, 0.68);',
+    '      float d = min(capsule(q, base, q1, w0 * 0.78), capsule(q, q1, q2, w0 * 0.46));',
+    '      d = min(d, capsule(q, q2, tip, w0 * 0.18));',
+    '      lash = max(lash, 1.0 - smoothstep(-w0 * 0.35, w0 * 1.10, d));',
+    '      lashGlowV = max(lashGlowV, 1.0 - smoothstep(w0 * 1.2, w0 * 6.0, d));',
+    '      }',
+    '    }',
+    '  }',
+    '',
+    // 眼型外发光：贴轮廓一圈。截断要够紧，否则会沿 y=0 拉成一道长余光
+    '  float dx = max(0.0, abs(q.x) - 1.0);',
+    '  float dy = max(0.0, -min(yT - q.y, q.y - yB));',
+    // 虚空化后眼型已不可见，外发光须改锚在虹膜边缘，否则会浮出一圈"空的眼眶光"
+    '  float outside = mix(length(vec2(dx, dy)), max(r - u_irisR, 0.0), u_voidEye);',
+    '  float glow = exp(-outside * u_glowFall) * clamp(outside / 0.020, 0.0, 1.0);',
+    '  glow *= 1.0 - smoothstep(0.045, 0.20, outside);',
+    '',
+    '  vec3 lineCol = u_cLine * mix(0.05, 1.10, u_lidLineLum);',
+    '  vec3 lashCol = u_cLine * mix(0.45, 1.35, u_lidLineLum);',
+    '  float irisMask = max(iris, pup);',
+    '  float eyeA = inEye * mix(1.0, irisMask, u_voidEye);',
+    '  float glowA = glow * u_glow * 0.85 * (1.0 + 0.9 * u_observe);',
+    '  vec3 c = scleraCol;',
+    '  float A = eyeA;',
+    '  c = u_cSpiral * spiralA + c * (1.0 - spiralA);',
+    '  A = max(A, spiralA);',
+    '  float irisA = inEye * irisMask;',
+    '  c = irisCol * irisA + c * (1.0 - irisA);',
+    '  A = max(A, irisA);',
+    '  float fA = clamp(flareA, 0.0, 1.0) * inEye;',
+    '  c = u_cFlare * fA + c * (1.0 - fA);',
+    '  A = max(A, fA);',
+    '  c = lineCol * line + c * (1.0 - line);',
+    '  A = max(A, line);',
+    '  c = lashCol * lash + c * (1.0 - lash);',
+    '  A = max(A, lash);',
+    '  float lgA = lashGlowV * u_lashGlow;',
+    '  c += lashCol * lgA;',
+    '  A = max(A, lgA * 0.55);',
+    '  c += u_cGlow * glowA;',
+    '  A = max(A, glowA);',
+    '  return vec4(c, clamp(A, 0.0, 1.0));',
+    '}',
+    '',
+    'void main() {',
+    '  vec2 world = vec2(v_uv.x * u_aspect, v_uv.y);',
+    '  vec2 qL = (world - vec2(-u_eyeSep, 0.0) * u_eyeScale) / u_eyeScale;',
+    '  vec2 qR = (world - vec2( u_eyeSep, 0.0) * u_eyeScale) / u_eyeScale;',
+    '  vec4 a = eyeAt(qL, -1.0);',
+    '  vec4 b = eyeAt(qR,  1.0);',
+    '  vec4 e = a.a >= b.a ? a : b;',
+    '',
+    // ---- 虚空星云（背景层）----
+    '  vec3 c = vec3(0.0);',
+    '  float A = 0.0;',
+    '  vec2 np = world * 1.75;',
+    '  float n1 = fbm3(np + u_time * 0.010);',
+    '  float n2 = fbm3(np * 2.4 - 21.0);',
+    '  float nd = smoothstep(0.40, 0.94, n1 * 0.78 + n2 * 0.46);',
+    // 眼睛附近提亮：参考图里星云是围着双眼最亮，远处才散掉
+    '  float eg = exp(-length(world) * 1.15);',
+    '  float nebA = nd * u_voidNeb * (0.42 + 0.85 * eg);',
+    '  c = mix(u_cVoidA, u_cVoidB, n2);',
+    '  A = nebA;',
+    // ---- 背景星点 ----
+    '  vec2 bg = world * 52.0;',
+    '  vec2 bi = floor(bg);',
+    '  float bs = pow(h21(bi + 11.31), 40.0) * (1.0 - smoothstep(0.03, 0.26, length(fract(bg) - 0.5)));',
+    '  bs *= u_voidStar * 3.0;',
+    '  c += u_cVoidB * bs;',
+    '  A = max(A, bs * 0.9);',
+    '',
+    // ---- 眼睛 over 背景 ----
+    '  c = e.rgb * e.a + c * (1.0 - e.a);',
+    '  A = e.a + A * (1.0 - e.a);',
+    '  A *= u_alpha;',
+    '  gl_FragColor = vec4(c * A, A);',
+    '}'
+  ].join('\n');
+
+  /* ============================================================
+   * 引擎
+   * ============================================================ */
+  var canvas = document.getElementById('stage');
+  var gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true, depth: false })
+        || canvas.getContext('experimental-webgl');
+
+  if (!gl) {
+    document.getElementById('body').innerHTML =
+      '<div style="padding:30px 14px;color:#c98">此环境不支持 WebGL，捏脸台无法运行。</div>';
+    document.getElementById('badge').textContent = '需要 WebGL';
+    return;
+  }
+
+  function compile(type, src) {
+    var sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      console.error('shader 编译失败:', gl.getShaderInfoLog(sh));
+      return null;
+    }
+    return sh;
+  }
+  function link(vsSrc, fsSrc, tag) {
+    var v = compile(gl.VERTEX_SHADER, vsSrc), f = compile(gl.FRAGMENT_SHADER, fsSrc);
+    if (!v || !f) return null;
+    var p = gl.createProgram();
+    gl.attachShader(p, v); gl.attachShader(p, f); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      console.error('[' + tag + '] program 链接失败:', gl.getProgramInfoLog(p));
+      return null;
+    }
+    return p;
+  }
+
+  var prog = link(VERT, FRAG, 'particles');
+  var progSolid = link(SOLID_VERT, SOLID_FRAG, 'solid');
+  if (!prog || !progSolid) {
+    document.getElementById('body').innerHTML =
+      '<div style="padding:30px 14px;color:#c98">着色器编译失败，见控制台。</div>';
+    return;
+  }
+  gl.useProgram(prog);
+
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ONE, gl.ONE);
+  gl.clearColor(0, 0, 0, 0);
+  gl.disable(gl.DEPTH_TEST);
+
+  // 全屏四边形（实体眼用的载体）
+  var quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+  var ATTRS = [
+    ['a_void', 2, 0], ['a_home', 2, 2], ['a_arc', 2, 4],
+    ['a_tint', 3, 6], ['a_tintB', 3, 9],
+    ['a_p0', 4, 12], ['a_p1', 4, 16], ['a_side', 1, 20]
+  ];
+  var maxAttr = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
+
+  var buf = gl.createBuffer();
+  var count = 0;
+
+  // 属性位置是「按 program」查的，两个 program 各查一次
+  var P_ATTRS = ATTRS.map(function (a) {
+    return { loc: gl.getAttribLocation(prog, a[0]), size: a[1], off: a[2] };
+  });
+  var S_UV = gl.getAttribLocation(progSolid, 'a_uv');
+
+  // 切换 program 后必须重设，attribute location 会在两个 program 之间打架
+  function bindParticles() {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    for (var i = 0; i < P_ATTRS.length; i++) {
+      if (P_ATTRS[i].loc < 0) continue;
+      gl.enableVertexAttribArray(P_ATTRS[i].loc);
+      gl.vertexAttribPointer(P_ATTRS[i].loc, P_ATTRS[i].size, gl.FLOAT, false,
+        STRIDE * 4, P_ATTRS[i].off * 4);
+    }
+  }
+  function bindQuad() {
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.enableVertexAttribArray(S_UV);
+    gl.vertexAttribPointer(S_UV, 2, gl.FLOAT, false, 0, 0);
+  }
+
+  function upload() {
+    var baked = bake();
+    count = baked.count;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, baked.data, gl.STATIC_DRAW);
+    var el = document.getElementById('stat-count');
+    if (el) el.textContent = count.toLocaleString();
+  }
+
+  var U = {};
+  ['u_time', 'u_summon', 'u_observe', 'u_aspect', 'u_eyeScale', 'u_eyeSep', 'u_px', 'u_sizeBoost', 'u_gaze',
+   'u_lidH', 'u_lidP', 'u_lidLo', 'u_twkMul', 'u_swirlMul', 'u_arcMul',
+   'u_ringMul', 'u_glowMul', 'u_haloMul', 'u_hiltMul', 'u_hiltSize', 'u_lidMul', 'u_lidSize',
+   'u_solid', 'u_dust']
+    .forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+
+  var US = {};
+  ['u_aspect', 'u_eyeScale', 'u_eyeSep', 'u_lidH', 'u_lidP', 'u_lidLo', 'u_lidPlo',
+   'u_cornerT', 'u_cornerI',
+   'u_irisR', 'u_irisCy', 'u_pupilR', 'u_pupilSoft', 'u_gaze', 'u_aa', 'u_alpha',
+   'u_sclera', 'u_lidShadow', 'u_lidLineW', 'u_lidLineLum',
+   'u_lashLen', 'u_lashN', 'u_lashW', 'u_lashCurl', 'u_lashSpread', 'u_limbalDark', 'u_fiber', 'u_hiltSize', 'u_glow',
+   'u_irisLid', 'u_irisRim', 'u_glowFall',
+   'u_observe', 'u_pupilShrink', 'u_irisEmis', 'u_limbalLum', 'u_voidEye',
+   'u_time', 'u_lashGlow',
+   'u_spiralOn', 'u_spiralScale', 'u_spiralDens', 'u_spiralTurn', 'u_spiralW',
+   'u_neb', 'u_galaxy', 'u_flare', 'u_voidNeb', 'u_voidStar',
+   'u_cSclera', 'u_cIrisIn', 'u_cIrisMid', 'u_cIrisOut', 'u_cPupil', 'u_cLine', 'u_cHilt', 'u_cGlow',
+   'u_cSpiral', 'u_cNeb', 'u_cFlare', 'u_cVoidA', 'u_cVoidB']
+    .forEach(function (n) { US[n] = gl.getUniformLocation(progSolid, n); });
+
+  // 静默失效防线：uniform 名对不上时 getUniformLocation 返回 null，
+  // 未赋值的 uniform 默认 0 —— 会把对应那一层直接乘没，且完全不报错。
+  var MISSING_U = Object.keys(U).filter(function (k) { return !U[k]; })
+    .concat(Object.keys(US).filter(function (k) { return !US[k]; }));
+  if (MISSING_U.length) console.warn('[tuner] 未找到 uniform:', MISSING_U.join(', '));
+
+  var S = { summon: 1, observe: 0, tS: 1, tO: 0, manual: false, name: 'eyes' };
+  var gaze = { x: 0, y: 0 }, gazeT = { x: 0, y: 0 };
+  var aspect = 1, pxScale = 1, eyeScaleFit = CFG.eyeScale;
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    var h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0, 0, w, h);
+    aspect = w / h;
+    /* 眼对的半跨度（世界单位）= eyeScale * (eyeSep + 1)，换算到 NDC 要除以 aspect。
+     * 原来的 min(1, aspect/0.92) 在窄窗口（桌宠 660×600 → aspect 1.1）下恒等于 1，
+     * 等于完全没收 —— 两只眼睛会被窗口左右边缘各切掉一截。 */
+    var spanNdc = CFG.eyeScale * (CFG.eyeSep + 1) / aspect;
+    eyeScaleFit = CFG.eyeScale * Math.min(1, 0.86 / Math.max(spanNdc, 1e-3));
+    pxScale = h * 0.5;
+  }
+
+  var lastDraw = -1e9, raf = 0, prevT = null, fpsAcc = 0, fpsN = 0;
+
+  function sstep(a, b, x) {
+    var u = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  }
+  function mix3(a, b, m) {
+    return [a[0] + (b[0] - a[0]) * m, a[1] + (b[1] - a[1]) * m, a[2] + (b[2] - a[2]) * m];
+  }
+  function solidColors() {
+    var m = S.observe, out = {};
+    for (var key in LOOK_BASE) out[key] = mix3(tint(LOOK_BASE[key]), tintObs(LOOK_OBS[key]), m);
+    return out;
+  }
+
+  function draw(t) {
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // ---- 1) 实体眼先画，粒子的星尘再叠上去 ----
+    var L = CFG.look;
+    var sA = L.solid * sstep(0.78, 1.0, S.summon);
+    if (sA > 0.002) {
+      var C = solidColors();
+      gl.useProgram(progSolid);
+      bindQuad();
+      gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.uniform1f(US.u_aspect, aspect);
+      gl.uniform1f(US.u_eyeScale, eyeScaleFit);
+      gl.uniform1f(US.u_eyeSep, CFG.eyeSep);
+      gl.uniform1f(US.u_lidH, CFG.lidH);
+      gl.uniform1f(US.u_lidP, CFG.lidP);
+      gl.uniform1f(US.u_lidLo, CFG.lidH * CFG.lowerK);
+      gl.uniform1f(US.u_lidPlo, 0.62);
+      gl.uniform1f(US.u_cornerT, L.cornerT);
+      gl.uniform1f(US.u_cornerI, L.cornerI);
+      gl.uniform1f(US.u_irisR, CFG.irisR);
+      gl.uniform1f(US.u_irisCy, CFG.irisCy);
+      gl.uniform1f(US.u_pupilR, CFG.pupilR);
+      gl.uniform1f(US.u_pupilSoft, L.pupilSoft);
+      gl.uniform2f(US.u_gaze, gaze.x * 0.060, gaze.y * 0.060);
+      gl.uniform1f(US.u_aa, 1.0 / Math.max(1e-4, eyeScaleFit * pxScale));
+      gl.uniform1f(US.u_alpha, sA);
+      gl.uniform1f(US.u_sclera, L.sclera);
+      gl.uniform1f(US.u_lidShadow, L.lidShadow);
+      gl.uniform1f(US.u_lidLineW, L.lidLineW);
+      gl.uniform1f(US.u_lidLineLum, L.lidLineLum);
+      gl.uniform1f(US.u_lashLen, L.lashLen);
+      gl.uniform1f(US.u_lashN, L.lashN);
+      gl.uniform1f(US.u_lashW, L.lashW);
+      gl.uniform1f(US.u_lashCurl, L.lashCurl);
+      gl.uniform1f(US.u_lashSpread, L.lashSpread);
+      gl.uniform1f(US.u_limbalDark, L.limbalDark);
+      gl.uniform1f(US.u_fiber, L.fiber);
+      gl.uniform1f(US.u_hiltSize, L.hiltSize);
+      gl.uniform1f(US.u_glow, L.glow);
+      gl.uniform1f(US.u_irisLid, L.irisLid);
+      gl.uniform1f(US.u_irisRim, L.irisRim);
+      gl.uniform1f(US.u_glowFall, L.glowFall);
+      gl.uniform1f(US.u_observe, S.observe);
+      gl.uniform1f(US.u_pupilShrink, L.pupilShrink);
+      gl.uniform1f(US.u_irisEmis, L.irisEmis);
+      gl.uniform1f(US.u_limbalLum, L.limbalLum);
+      gl.uniform1f(US.u_voidEye, L.voidEye);
+      gl.uniform1f(US.u_time, t / 1000);
+      gl.uniform1f(US.u_lashGlow, L.lashGlow);
+      gl.uniform1f(US.u_spiralOn, L.spiralOn);
+      gl.uniform1f(US.u_spiralScale, L.spiralScale);
+      gl.uniform1f(US.u_spiralDens, L.spiralDens);
+      gl.uniform1f(US.u_spiralTurn, L.spiralTurn);
+      gl.uniform1f(US.u_spiralW, L.spiralW);
+      gl.uniform1f(US.u_neb, L.neb);
+      gl.uniform1f(US.u_galaxy, L.galaxy);
+      gl.uniform1f(US.u_flare, L.flare);
+      gl.uniform1f(US.u_voidNeb, L.voidNeb);
+      gl.uniform1f(US.u_voidStar, L.voidStar);
+      gl.uniform3fv(US.u_cSclera, C.sclera);
+      gl.uniform3fv(US.u_cIrisIn, C.irisIn);
+      gl.uniform3fv(US.u_cIrisMid, C.irisMid);
+      gl.uniform3fv(US.u_cIrisOut, C.irisOut);
+      gl.uniform3fv(US.u_cPupil, C.pupil);
+      gl.uniform3fv(US.u_cLine, C.line);
+      gl.uniform3fv(US.u_cHilt, C.hilt);
+      gl.uniform3fv(US.u_cGlow, C.glow);
+      gl.uniform3fv(US.u_cSpiral, C.spiral);
+      gl.uniform3fv(US.u_cNeb, C.neb);
+      gl.uniform3fv(US.u_cFlare, C.flare);
+      gl.uniform3fv(US.u_cVoidA, C.voidA);
+      gl.uniform3fv(US.u_cVoidB, C.voidB);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    // ---- 2) 粒子层 ----
+    gl.useProgram(prog);
+    bindParticles();
+    gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ONE, gl.ONE);
+    gl.uniform1f(U.u_solid, L.solid);
+    gl.uniform1f(U.u_dust, L.dust);
+    gl.uniform1f(U.u_time, t / 1000);
+    gl.uniform1f(U.u_summon, S.summon);
+    gl.uniform1f(U.u_observe, S.observe);
+    gl.uniform1f(U.u_aspect, aspect);
+    gl.uniform1f(U.u_eyeScale, eyeScaleFit);
+    gl.uniform1f(U.u_eyeSep, CFG.eyeSep);
+    gl.uniform1f(U.u_px, pxScale);
+    gl.uniform1f(U.u_sizeBoost, 1);
+    gl.uniform2f(U.u_gaze, gaze.x, gaze.y);
+    gl.uniform1f(U.u_lidH, CFG.lidH);
+    gl.uniform1f(U.u_lidP, CFG.lidP);
+    gl.uniform1f(U.u_lidLo, CFG.lidH * CFG.lowerK);
+    // CFG.u 的键是裸名（lidMul），uniform 名是 u_lidMul —— 拼的是 "u_" 不是 "u"。
+    // 拼错时 locate 全为 null，未赋值的 uniform 默认 0，会把整层（眼睑/高光/光环）乘没。
+    for (var k in CFG.u) {
+      var loc = U['u_' + k];
+      if (loc) gl.uniform1f(loc, CFG.u[k]);
+    }
+    gl.drawArrays(gl.POINTS, 0, count);
+
+    if (prevT !== null) {
+      fpsAcc += (t - prevT) / 1000; fpsN++;
+      if (fpsAcc >= 0.5) {
+        var el = document.getElementById('stat-fps');
+        if (el) el.textContent = (fpsN / fpsAcc).toFixed(0);
+        fpsAcc = 0; fpsN = 0;
+      }
+    }
+    prevT = t;
+  }
+
+  function step(now) {
+    var dt = Math.min(0.05, (now - lastDraw) / 1000);
+    if (lastDraw < -1e8) dt = 0;
+    if (!S.manual) {
+      var dS = S.tS > S.summon ? 1 : -1;
+      S.summon = Math.abs(S.tS - S.summon) > 1e-4
+        ? Math.max(0, Math.min(1, S.summon + dS * dt / CFG.summonDur)) : S.tS;
+      var dO = S.tO > S.observe ? 1 : -1;
+      S.observe = Math.abs(S.tO - S.observe) > 1e-4
+        ? Math.max(0, Math.min(1, S.observe + dO * dt / 0.85)) : S.tO;
+      syncScrub();
+    }
+    var k = Math.min(1, dt * 6);
+    gaze.x += (gazeT.x - gaze.x) * k;
+    gaze.y += (gazeT.y - gaze.y) * k;
+    lastDraw = now;
+  }
+
+  var frameMs = 1000 / CFG.fpsCap;
+  function loop(now) {
+    raf = 0;
+    if (document.hidden) return;
+    frameMs = 1000 / CFG.fpsCap;
+    if (now - lastDraw >= frameMs - 1.5) { step(now); draw(now); }
+    raf = requestAnimationFrame(loop);
+  }
+
+  /* ============================================================
+   * 面板
+   * ============================================================ */
+  var SPEC = [
+    { tab: '眼型', items: [
+      { k: 'eyeSep', n: '眼距', min: 0.60, max: 2.00, s: 0.01 },
+      { k: 'eyeScale', n: '整体大小', min: 0.20, max: 0.90, s: 0.01 },
+      { k: 'lidH', n: '上睑高度', min: 0.30, max: 0.90, s: 0.01, rebake: 1 },
+      { k: 'lidP', n: '眼型曲率（小＝眼角更尖）', min: 0.25, max: 1.20, s: 0.01, rebake: 1 },
+      { k: 'lowerK', n: '下睑比例', min: 0.40, max: 1.00, s: 0.01, rebake: 1 },
+      { k: 'look.cornerT', n: '外眼角上扬', min: 0, max: 1.20, s: 0.01 },
+      { k: 'look.cornerI', n: '内眼角收尖', min: 0, max: 1.20, s: 0.01 }
+    ]},
+    { tab: '虹膜', items: [
+      { k: 'irisR', n: '虹膜半径', min: 0.25, max: 0.80, s: 0.005, rebake: 1 },
+      { k: 'irisCy', n: '虹膜纵向偏移', min: -0.15, max: 0.15, s: 0.005, rebake: 1 },
+      { k: 'pupilR', n: '瞳孔半径', min: 0.04, max: 0.35, s: 0.005, rebake: 1 },
+      { k: 'look.limbalDark', n: '角膜缘暗环（实体）', min: 0, max: 1, s: 0.02 },
+      { k: 'look.fiber', n: '虹膜放射纤维（实体）', min: 0, max: 0.60, s: 0.01 },
+      { k: 'look.irisLid', n: '虹膜上睑投影（球体感）', min: 0, max: 1, s: 0.02 },
+      { k: 'look.irisRim', n: '瞳孔缘亮环', min: 0, max: 1, s: 0.02 },
+      { k: 'look.hiltSize', n: '高光半径（实体）', min: 0, max: 0.20, s: 0.002 },
+      { k: 'u.ringMul', n: '角膜缘环强度（粒子）', min: 0, max: 2, s: 0.05 },
+      { k: 'u.glowMul', n: '虹膜内辉（粒子）', min: 0, max: 2.5, s: 0.05 },
+      { k: 'u.hiltMul', n: '高光亮度（粒子）', min: 0, max: 2, s: 0.05 },
+      { k: 'u.hiltSize', n: '高光大小（粒子）', min: 0.4, max: 2, s: 0.05 },
+      { k: 'u.haloMul', n: '外发光晕（粒子）', min: 0, max: 3, s: 0.05 }
+    ]},
+    { tab: '星点', items: [
+      { k: 'counts.iris', n: '虹膜粒子数', min: 600, max: 5000, s: 50, rebake: 1, int: 1 },
+      { k: 'starRatio', n: '亮星占比', min: 0.20, max: 0.92, s: 0.01, rebake: 1 },
+      { k: 'starPow', n: '尺寸幂律（大＝更多碎星）', min: 1, max: 9, s: 0.1, rebake: 1 },
+      { k: 'starAlphaPow', n: '亮度幂律', min: 1, max: 7, s: 0.1, rebake: 1 },
+      { k: 'u.twkMul', n: '闪烁强度', min: 0, max: 2, s: 0.05 }
+    ]},
+    { tab: '眼睑', items: [
+      { k: 'look.lidLineW', n: '睑线粗细（实体）', min: 0, max: 0.090, s: 0.001 },
+      { k: 'look.lidLineLum', n: '睑线明度（低＝乌黑）', min: 0, max: 1, s: 0.01 },
+      { k: 'look.lashLen', n: '睫毛长度', min: 0, max: 0.60, s: 0.005 },
+      { k: 'look.lashN', n: '睫毛数量', min: 0, max: 18, s: 1, int: 1 },
+      { k: 'look.lashW', n: '睫毛根部粗细', min: 0.002, max: 0.035, s: 0.001 },
+      { k: 'look.lashCurl', n: '睫毛弯曲', min: 0, max: 2, s: 0.02 },
+      { k: 'look.lashSpread', n: '睫毛外张（扇形开合）', min: 0.2, max: 1.6, s: 0.02 },
+      { k: 'look.lashGlow', n: '睫毛柔光', min: 0, max: 1.2, s: 0.02 },
+      { k: 'counts.lid', n: '睑线粒子数', min: 400, max: 3500, s: 50, rebake: 1, int: 1 },
+      { k: 'u.lidSize', n: '睑线粒子粗细', min: 0.4, max: 2.2, s: 0.05 },
+      { k: 'u.lidMul', n: '睑线粒子亮度', min: 0.2, max: 1.5, s: 0.05 }
+    ]},
+    { tab: '实体眼', items: [
+      { k: 'look.solid', n: '实体眼强度（0＝纯粒子）', min: 0, max: 1, s: 0.01 },
+      { k: 'look.dust', n: '星尘残留（虹膜里的星点）', min: 0, max: 1, s: 0.01 },
+      { k: 'look.voidEye', n: '眼白虚空化（1＝只剩虹膜）', min: 0, max: 1, s: 0.02 },
+      { k: 'look.sclera', n: '眼白亮度（虚空化后失效）', min: 0, max: 1.6, s: 0.02 },
+      { k: 'look.lidShadow', n: '上睑投影（眼白上）', min: 0, max: 1, s: 0.02 },
+      { k: 'look.glow', n: '眼型外发光', min: 0, max: 1, s: 0.02 },
+      { k: 'look.glowFall', n: '外发光收束（大＝更贴轮廓）', min: 12, max: 90, s: 0.5 },
+      { k: 'look.pupilShrink', n: '观察态·瞳孔收缩', min: 0, max: 0.70, s: 0.01 },
+      { k: 'look.irisEmis', n: '观察态·虹膜自发光', min: 0, max: 2, s: 0.02 },
+      { k: 'look.limbalLum', n: '观察态·角膜缘亮环', min: 0, max: 1.5, s: 0.02 }
+    ]},
+    { tab: '星象', items: [
+      { k: 'look.spiralOn', n: '螺旋光纹强度', min: 0, max: 2, s: 0.02 },
+      { k: 'look.spiralScale', n: '螺旋密度', min: 2, max: 14, s: 0.05 },
+      { k: 'look.spiralDens', n: '螺旋·瓣数', min: 0.5, max: 4, s: 0.05 },
+      { k: 'look.spiralTurn', n: '螺旋·圈数', min: 2, max: 50, s: 0.5 },
+      { k: 'look.spiralW', n: '螺旋线宽（大＝更细）', min: 0.4, max: 4, s: 0.05 },
+      { k: 'look.neb', n: '星系虹膜·星云', min: 0, max: 1.5, s: 0.02 },
+      { k: 'look.galaxy', n: '星系虹膜·星团', min: 0, max: 1.2, s: 0.02 },
+      { k: 'look.flare', n: '十字星芒', min: 0, max: 1.5, s: 0.02 },
+      { k: 'look.voidNeb', n: '虚空星云浓度', min: 0, max: 1.2, s: 0.02 },
+      { k: 'look.voidStar', n: '虚空星点', min: 0, max: 2, s: 0.02 }
+    ]},
+    { tab: '配色', items: [
+      { k: 'hueBase', n: '常态色相偏移', min: -180, max: 180, s: 1, rebake: 1 },
+      { k: 'satBase', n: '常态饱和度', min: 0, max: 2, s: 0.02, rebake: 1 },
+      { k: 'hueObs', n: '观察态色相偏移', min: -120, max: 120, s: 1, rebake: 1 },
+      { k: 'satObs', n: '观察态饱和度', min: 0, max: 2, s: 0.02, rebake: 1 }
+    ]},
+    { tab: '编舞', items: [
+      { k: 'summonDur', n: '合聚时长（秒）', min: 0.4, max: 4.0, s: 0.05 },
+      { k: 'u.swirlMul', n: '旋涡强度', min: 0, max: 2.5, s: 0.05 },
+      { k: 'u.arcMul', n: '弧线强度', min: 0, max: 2.5, s: 0.05 },
+      { k: 'counts.voidDust', n: '虚空余尘', min: 0, max: 8000, s: 100, rebake: 1, int: 1 },
+      { k: 'fpsCap', n: '帧率上限', min: 24, max: 120, s: 1, int: 1 }
+    ]}
+  ];
+
+  var current = '眼型';
+  var tabsEl = document.getElementById('tabs');
+  var bodyEl = document.getElementById('body');
+
+  SPEC.forEach(function (g) {
+    var b = document.createElement('button');
+    b.textContent = g.tab;
+    b.onclick = function () { current = g.tab; renderTab(); };
+    tabsEl.appendChild(b);
+  });
+
+  function fmt(k, v) {
+    if (k === 'fpsCap' || k === 'counts.iris' || k === 'counts.lid' ||
+        k === 'counts.voidDust' || k === 'look.lashN') return String(Math.round(v));
+    if (Math.abs(v) >= 100) return v.toFixed(0);
+    if (Math.abs(v) >= 10) return v.toFixed(1);
+    if (Math.abs(v) >= 1) return v.toFixed(2);
+    return v.toFixed(3);
+  }
+
+  function renderTab() {
+    var btns = tabsEl.querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].textContent === current);
+
+    bodyEl.innerHTML = '';
+    var g = SPEC.filter(function (x) { return x.tab === current; })[0];
+    var wrap = document.createElement('div');
+    wrap.className = 'group';
+
+    g.items.forEach(function (it) {
+      var cur = getPath(CFG, it.k);
+      var div = document.createElement('div');
+      div.className = 'item';
+      div.innerHTML =
+        '<div class="line"><span class="n">' + it.n + '</span><span class="v" id="v-' + it.k + '">' + fmt(it.k, cur) + '</span></div>' +
+        '<input type="range" id="s-' + it.k + '" min="' + it.min + '" max="' + it.max + '" step="' + it.s + '" value="' + cur + '" />';
+      wrap.appendChild(div);
+    });
+    bodyEl.appendChild(wrap);
+
+    g.items.forEach(function (it) {
+      var input = document.getElementById('s-' + it.k);
+      var out = document.getElementById('v-' + it.k);
+      input.addEventListener('input', function () {
+        var v = parseFloat(input.value);
+        setPath(CFG, it.k, v);
+        out.textContent = fmt(it.k, v);
+        if (it.rebake) scheduleRebake(); else save();
+      });
+    });
+  }
+
+  var rebakeTimer = null;
+  function scheduleRebake() {
+    if (rebakeTimer) clearTimeout(rebakeTimer);
+    rebakeTimer = setTimeout(function () {
+      rebakeTimer = null;
+      upload();
+      if (maxAttr < ATTRS.length) logText('顶点属性不足：需要 8，本机 ' + maxAttr);
+      save();
+    }, 140);
+  }
+
+  /* ---------- 状态 / 手动 scrub ---------- */
+  var scrubS = document.getElementById('scrub-summon');
+  var scrubO = document.getElementById('scrub-observe');
+  var outS = document.getElementById('v-summon');
+  var outO = document.getElementById('v-observe');
+
+  function syncScrub() {
+    scrubS.value = S.summon;
+    outS.textContent = S.summon.toFixed(2);
+    scrubO.value = S.observe;
+    outO.textContent = S.observe.toFixed(2);
+  }
+  function onScrub() {
+    S.manual = true;
+    S.summon = parseFloat(scrubS.value);
+    S.observe = parseFloat(scrubO.value);
+    outS.textContent = S.summon.toFixed(2);
+    outO.textContent = S.observe.toFixed(2);
+    setActive(null);
+  }
+  scrubS.addEventListener('input', onScrub);
+  scrubO.addEventListener('input', onScrub);
+
+  function setActive(name) {
+    var bs = document.querySelectorAll('#body .rowbtns button, #panel .rowbtns button');
+    for (var i = 0; i < bs.length; i++) {
+      var s = bs[i].getAttribute('data-s');
+      if (s) bs[i].classList.toggle('on', s === name);
+    }
+  }
+  function setState(name) {
+    S.manual = false;
+    S.name = name;
+    S.tS = name === 'void' ? 0 : 1;
+    S.tO = name === 'observe' ? 1 : 0;
+    if (name === 'void') { S.observe = 0; }
+    setActive(name);
+    var bs = document.querySelectorAll('#panel [data-s]');
+    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].getAttribute('data-s') === name);
+  }
+  var stateBtns = document.querySelectorAll('#panel [data-s]');
+  for (var sb = 0; sb < stateBtns.length; sb++) {
+    (function (b) { b.addEventListener('click', function () { setState(b.getAttribute('data-s')); }); })(stateBtns[sb]);
+  }
+
+  /* ---------- 预设 ---------- */
+  var PRESETS = {
+    '原始': {},
+    // 诸神：照参考图配的定妆版 —— 螺旋涂满眼白 + 星系虹膜 + 长睫 + 星云虚空
+    '诸神': {
+      eyeSep: 1.58, eyeScale: 0.46, lidH: 0.70, lidP: 0.60, lowerK: 0.64,
+      irisR: 0.420, pupilR: 0.115,
+      look: {
+        voidEye: 1, cornerT: 0.55, cornerI: 0.45,
+        spiralOn: 0.95, spiralScale: 6.60, spiralDens: 1.00, spiralTurn: 22.0, spiralW: 3.00,
+        neb: 0.42, galaxy: 0.48, flare: 0.90, voidNeb: 0.22, voidStar: 0.55,
+        lashN: 13, lashLen: 0.22, lashW: 0.0095, lashCurl: 1.35, lashSpread: 1.00, lashGlow: 0.34,
+        fiber: 0.16, limbalDark: 0.40, irisRim: 0.30, irisLid: 0.55,
+        glow: 0.30, glowFall: 55, hiltSize: 0.062,
+        lidLineW: 0.014, lidLineLum: 0.20
+      }
+    },
+    '大眼萌': { lidH: 0.72, lidP: 0.85, irisR: 0.66, pupilR: 0.24, eyeSep: 1.28, starRatio: 0.62, u: { lidSize: 1.25 } },
+    '锐利': { lidH: 0.48, lidP: 0.34, lowerK: 0.60, irisR: 0.50, starRatio: 0.78, u: { lidMul: 1.2, haloMul: 0.4 } },
+    '深邃': { irisR: 0.44, pupilR: 0.26, irisCy: 0.0, starRatio: 0.80, starPow: 6.5, u: { glowMul: 0.5, haloMul: 0.5 } },
+    '银河': { starRatio: 0.86, starPow: 3.2, starAlphaPow: 1.6, counts: { iris: 4200 }, hueBase: 34, satBase: 1.35, u: { twkMul: 1.4 } },
+    '冰霜': { satBase: 0.35, hueObs: -18, satObs: 0.7, u: { glowMul: 1.7, haloMul: 2.0, ringMul: 1.5 } },
+    '血瞳': { hueBase: 190, satBase: 1.5, hueObs: 150, satObs: 1.6, u: { haloMul: 2.0 } }
+  };
+  var presetEl = document.getElementById('presets');
+  Object.keys(PRESETS).forEach(function (name) {
+    var b = document.createElement('button');
+    b.textContent = name;
+    b.onclick = function () { applyPreset(name); };
+    presetEl.appendChild(b);
+  });
+
+  function deepMerge(base, patch) {
+    var out = clone(base);
+    (function walk(dst, src) {
+      for (var k in src) {
+        if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) {
+          dst[k] = dst[k] || {};
+          walk(dst[k], src[k]);
+        } else dst[k] = src[k];
+      }
+    })(out, patch);
+    return out;
+  }
+  function applyPreset(name) {
+    CFG = deepMerge(DEFAULTS, PRESETS[name] || {});
+    upload(); renderTab(); save();
+    logText('套用预设：' + name);
+  }
+
+  /* ---------- 随机 / 重置 / 导出 ---------- */
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  document.getElementById('btn-random').onclick = function () {
+    var p = {
+      eyeSep: rand(1.0, 1.45), eyeScale: rand(0.42, 0.62),
+      lidH: rand(0.44, 0.76), lidP: rand(0.35, 1.0), lowerK: rand(0.50, 0.92),
+      irisR: rand(0.42, 0.68), irisCy: rand(-0.05, 0.08), pupilR: rand(0.09, 0.28),
+      starRatio: rand(0.45, 0.88), starPow: rand(1.6, 7.5), starAlphaPow: rand(1.2, 6.0),
+      hueBase: rand(-60, 80), satBase: rand(0.5, 1.8),
+      hueObs: rand(-40, 60), satObs: rand(0.6, 1.8),
+      u: {
+        ringMul: rand(0.4, 1.8), glowMul: rand(0.4, 2.0), haloMul: rand(0.2, 2.2),
+        hiltMul: rand(0.5, 1.6), hiltSize: rand(0.6, 1.6),
+        lidMul: rand(0.7, 1.3), lidSize: rand(0.7, 1.6),
+        twkMul: rand(0.4, 1.6), swirlMul: rand(0.4, 1.8), arcMul: rand(0.3, 1.8)
+      }
+    };
+    CFG = deepMerge(CFG, p);
+    upload(); renderTab(); save();
+    logText('随机了一版');
+  };
+  document.getElementById('btn-reset').onclick = function () {
+    CFG = clone(DEFAULTS);
+    upload(); renderTab(); save();
+    logText('已恢复默认');
+  };
+  document.getElementById('btn-copy').onclick = function () {
+    var txt = JSON.stringify(CFG, null, 2);
+    var ta = document.getElementById('log');
+    ta.value = txt;
+    ta.select();
+    try {
+      if (navigator.clipboard) navigator.clipboard.writeText(txt);
+      else document.execCommand('copy');
+      logText('配置已复制到剪贴板（' + txt.length + ' 字符）');
+    } catch (e) {
+      logText('自动复制失败，请手动全选文本框复制');
+    }
+  };
+  document.getElementById('btn-png').onclick = function () {
+    try {
+      var a = document.createElement('a');
+      a.download = 'eyes-' + Date.now() + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+      logText('已存图');
+    } catch (e) { logText('存图失败：' + e.message); }
+  };
+
+  function logText(s) {
+    var ta = document.getElementById('log');
+    ta.value = s;
+  }
+
+  /* ---------- 本地持久化 ---------- */
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(CFG)); } catch (e) { /* noop */ }
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) CFG = deepMerge(DEFAULTS, JSON.parse(raw));
+    } catch (e) { /* noop */ }
+  }
+
+  /* ---------- 折叠 / 交互 ---------- */
+  var folded = false;
+  document.getElementById('fold').onclick = function () {
+    folded = !folded;
+    document.getElementById('panel').classList.toggle('folded', folded);
+    this.textContent = folded ? '展开面板' : '收起面板';
+    setTimeout(resize, 220);
+  };
+  window.addEventListener('mousemove', function (ev) {
+    gazeT.x = Math.max(-1, Math.min(1, (ev.clientX / canvas.clientWidth - 0.5) * 2));
+    gazeT.y = Math.max(-1, Math.min(1, -((ev.clientY / canvas.clientHeight - 0.5) * 2)));
+  });
+  var spaceDown = false;
+  document.addEventListener('keydown', function (ev) {
+    if (ev.code === 'Space') { ev.preventDefault(); if (!spaceDown) { spaceDown = true; setState('eyes'); } }
+    else if (ev.key === 'o' || ev.key === 'O') setState(S.tO > 0.5 ? 'eyes' : 'observe');
+    else if (ev.key === 'v' || ev.key === 'V') setState('void');
+  });
+  document.addEventListener('keyup', function (ev) {
+    if (ev.code === 'Space') { spaceDown = false; setState('void'); }
+  });
+  window.addEventListener('resize', resize);
+  // 折叠面板会改 #stage 的 CSS 尺寸却不派发 window.resize；
+  // 只靠 setTimeout(resize,220) 会抓到过渡中的半途宽度，之后再不修正 → 画面被拉伸。
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+
+  /* ---------- 启动 ---------- */
+  load();
+  resize();
+  upload();
+  renderTab();
+  syncScrub();
+  setState('eyes');
+  document.getElementById('stat-attr').textContent = maxAttr;
+  if (maxAttr < ATTRS.length) logText('警告：本机顶点属性 ' + maxAttr + ' 个，少于需要的 8 个');
+  else if (MISSING_U.length) logText('警告：未找到 uniform → ' + MISSING_U.join(', '));
+  raf = requestAnimationFrame(loop);
+
+  // 调试出口：确认每类粒子真的烘进去了
+  window.__tuner = {
+    roles: function () {
+      var names = { 0: '虚空', 1: '眼睑', 2: '虹膜', 3: '瞳孔', 4: '光晕', 5: '高光', 6: '内辉' };
+      var out = {};
+      for (var k in ROLE_HIST) out[names[k] || k] = ROLE_HIST[k];
+      return { total: count, roles: out };
+    },
+    cfg: function () { return CFG; },
+    apply: function (fn) { fn(CFG); upload(); }
+  };
+})();
+</script>
+</body>
+</html>
