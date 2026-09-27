@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>阿罗德斯 · 形象设计稿 v1</title>
+<style>
+  :root{
+    --bg:#05070e; --panel:#0a0f1a; --panel2:#0d1421;
+    --line:rgba(122,170,255,.15); --line2:rgba(122,170,255,.28);
+    --tx:#c9d7eb; --tx2:#8c9fbb; --tx3:#5f7391;
+    --acc:#4ea8ff; --acc2:#9fd0ff; --warn:#e8b552;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.7;font-size:14px}
+  .wrap{max-width:1000px;margin:0 auto;padding:64px 32px 96px}
+  h1{font-size:26px;font-weight:500;margin:0 0 10px;letter-spacing:.02em;color:#e6eefb}
+  h2{font-size:15px;font-weight:500;margin:64px 0 6px;color:#e6eefb;letter-spacing:.04em}
+  h2 .n{color:var(--tx3);font-weight:400;margin-right:8px;font-variant-numeric:tabular-nums}
+  h3{font-size:13.5px;font-weight:500;margin:0 0 6px;color:var(--acc2)}
+  p{margin:0 0 12px;color:var(--tx2);font-size:13.5px}
+  .lead{font-size:15px;color:var(--tx);max-width:64ch}
+  .sub{color:var(--tx3);font-size:12.5px;letter-spacing:.03em}
+  .rule{height:1px;background:var(--line);margin:14px 0 22px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card .cap{padding:11px 16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--tx2);
+    display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .card .cap b{color:var(--acc2);font-weight:500}
+  img{display:block;width:100%;height:auto}
+
+  .hero{margin-top:28px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--tx3);font-weight:400;font-size:12px;letter-spacing:.05em}
+  td.num{font-variant-numeric:tabular-nums;text-align:right;color:var(--acc2)}
+  td.k{color:var(--tx)}
+  tr:last-child td{border-bottom:0}
+  .bar{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--acc),transparent);
+    min-width:2px;display:block}
+
+  .note{border-left:2px solid var(--line2);padding:2px 0 2px 14px;margin:16px 0;color:var(--tx2);font-size:13px}
+  .warn{border-left-color:var(--warn);color:#d9c294}
+
+  ul{margin:6px 0 12px;padding-left:20px;color:var(--tx2);font-size:13.5px}
+  li{margin-bottom:6px}
+  li b{color:var(--tx);font-weight:500}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--acc2);
+    background:rgba(78,168,255,.09);padding:1px 5px;border-radius:4px}
+
+  .frame{width:660px;max-width:100%;aspect-ratio:660/600;border:1px solid var(--line2);
+    border-radius:12px;overflow:hidden;background:#02040a}
+  .frame img{width:100%;height:100%;object-fit:cover}
+  .frameWrap{display:flex;justify-content:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="sub">阿罗德斯 · 桌宠形象 · 设计稿 v1 · 2026-09-26</div>
+  <h1>阿罗德斯形象：虚空中的一双宇宙之眼</h1>
+  <p class="lead">
+    没有面孔，没有身体，没有可上传的球。只有一双眼睛悬在星云虚空里，看着你。<br />
+    参考素材提供的三件事被完整保留了：<b>涂满螺旋的眼白</b>、<b>星系一样的虹膜</b>、<b>长而外张的睫毛</b>。
+  </p>
+
+  <div class="card hero">
+    <img src="./img/face-stars.png" alt="阿罗德斯主视觉：星瞳态" />
+    <div class="cap">
+      <span>主视觉 · <b>星瞳</b>（待机态）</span>
+      <span>1500×860 · SwiftShader 软渲染 · 21 fps</span>
+    </div>
+  </div>
+
+  <h2><span class="n">01</span>为什么是这个形态</h2>
+  <div class="rule"></div>
+  <p>
+    阿罗德斯的核心职责是<b>注视与陪伴</b>——它看你屏幕、看你做题、在你卡住的时候出声。
+    「注视」这件事，最短的表达路径就是一双眼睛。EmotionBall 小球能挤压变形，但它
+    表达不了「正在看着你」。
+  </p>
+  <div class="note">
+    眼睛并不比球体更少表情。眯眼、瞳孔缩放、睑下垂、视线游移、虹膜转向——五条通道，
+    可调维度比一个 squash/stretch 的球更多。
+  </div>
+  <p><b>为了这种简单，牺牲了三件事：</b></p>
+  <ul>
+    <li><b>放弃用户自定义上传形象。</b>参考图这套视觉是程序化生成的，接不了自定义模型。</li>
+    <li><b>放弃球体的「可爱」。</b>亲和力会掉一档，换来的是辨识度与神秘感。</li>
+    <li><b>放弃现成的 EmotionBall 代码。</b>现有实现整体作废，改由实体眼着色器接管。</li>
+  </ul>
+
+  <h2><span class="n">02</span>三层解剖</h2>
+  <div class="rule"></div>
+  <p>
+    形象由三层构成，每层都能单独关掉。下表是<b>实测消融数据</b>——在左眼方框内逐层关闭后
+    测平均亮度，看这一层到底在画面里占多少分量：
+  </p>
+  <table>
+    <thead>
+      <tr><th style="width:34%">层</th><th>做法</th><th style="width:16%;text-align:right">关掉后 Δ</th><th style="width:22%">影响</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="k">① 虚空星云</td><td>全屏 fbm 星云 + 稀疏星点，眼周提亮</td><td class="num">基准</td><td><span class="bar" style="width:100%"></span></td></tr>
+      <tr><td class="k">② 螺旋眼白</td><td>眼白 alpha 归零成虚空，螺旋光纹浮在虚空里</td><td class="num">−1.17</td><td><span class="bar" style="width:72%"></span></td></tr>
+      <tr><td class="k">③ 星系虹膜</td><td>极坐标旋涡 fbm + 稀疏星团 + 十字星芒</td><td class="num">−0.82</td><td><span class="bar" style="width:50%"></span></td></tr>
+      <tr><td class="k">④ 十字星芒</td><td>四角 exp 衰减，参考图 2 虹膜里那束星</td><td class="num">−1.12</td><td><span class="bar" style="width:69%"></span></td></tr>
+      <tr><td class="k">⑤ 睫毛</td><td>13 根锥形光丝，贝塞尔采样切 3 段递减</td><td class="num">−1.63</td><td><span class="bar" style="width:100%"></span></td></tr>
+      <tr><td class="k">⑥ 睑线</td><td>暗色眼型轮廓，睫毛的落点</td><td class="num">−0.90</td><td><span class="bar" style="width:55%"></span></td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    测量口径：截图后只取<b>左眼方框</b>（494×494 px）内的像素。<br />
+    早期版本用整帧平均，眼睛只占画面 3%，关掉睫毛才掉 0.2 —— 那点 Δ 判不出层有没有画，
+    会把「完全没生效」误判成「生效了但很淡」。
+  </div>
+
+  <div class="card" style="margin-top:22px">
+    <img src="./img/face-macro.png" alt="单眼特写：螺旋眼白、星系虹膜、睫毛" />
+    <div class="cap"><span>单眼特写 · 螺旋、星系、睫毛三层同时可见</span><span>494×494 px</span></div>
+  </div>
+
+  <h2><span class="n">03</span>三个状态</h2>
+  <div class="rule"></div>
+  <p>同一套几何，靠两个运动量（合聚 0→1、观察 0→1）驱动，不重烘、不换模型。</p>
+  <div class="grid3">
+    <div class="card">
+      <img src="./img/face-stars.png" alt="星瞳态" />
+      <div class="cap" style="display:block"><b>星瞳</b><br /><span class="sub">待机。瞳孔常态，虹膜蓝紫。</span></div>
+    </div>
+    <div class="card">
+      <img src="./img/face-observe.png" alt="观察态" />
+      <div class="cap" style="display:block"><b>观察</b><br /><span class="sub">瞳孔收缩 46%，虹膜自发光转亮天蓝。</span></div>
+    </div>
+    <div class="card">
+      <img src="./img/face-void.png" alt="虚空态" />
+      <div class="cap" style="display:block"><b>虚空</b><br /><span class="sub">全部收回星尘，只剩背景星云。</span></div>
+    </div>
+  </div>
+  <div class="note warn">
+    观察态的自发光必须<b>乘在底色上、加在星云之前</b>。放在星云之后乘，会把星团和星云一起
+    放大到饱和，虹膜退化成一个平的亮盘，参考图里那些星点会全部消失。
+  </div>
+
+  <h2><span class="n">04</span>桌宠窗口实景（660×600）</h2>
+  <div class="rule"></div>
+  <p>桌宠窗口固定 660×600。形象必须在这个尺寸里成立，否则再好看也不算数。</p>
+  <div class="frameWrap">
+    <div class="frame">
+      <img src="./img/face-pet660.png" alt="660×600 桌宠窗口实景" />
+    </div>
+  </div>
+  <div class="note warn">
+    窄窗口下必须按<b>眼对横跨宽度</b>收缩放，不能只按宽高比收。
+    原公式 <code>min(1, aspect/0.92)</code> 在 aspect=1.1 时恒等于 1，等于完全没收，
+    两只眼睛会被窗口左右边缘各切掉一截。
+  </div>
+
+  <h2><span class="n">05</span>全屏背景模式</h2>
+  <div class="rule"></div>
+  <p>
+    决策：<b>替换</b> EmotionBall，并<b>新增全屏透明背景窗</b>，让星云铺满整个桌面。
+  </p>
+  <p>
+    这引出一个必须先验的风险：<b>星云是直接画在用户桌面上的</b>。
+    桌面可能是 Word 的白底，也可能是深色 IDE。同一套配色要在两端都成立，
+    否则用户写文档时屏幕上会浮着一层灰。
+  </p>
+  <table>
+    <thead><tr><th style="width:22%">模拟桌面底</th><th style="text-align:right">无叠加</th><th style="text-align:right">有叠加</th><th style="text-align:right">变化</th></tr></thead>
+    <tbody>
+      <tr><td class="k">浅色（白底文档）</td><td class="num">189.2</td><td class="num">182.2</td><td class="num">−7.0</td></tr>
+      <tr><td class="k">中灰（深色 IDE）</td><td class="num">38.7</td><td class="num">43.4</td><td class="num">+4.7</td></tr>
+      <tr><td class="k">近黑（参考图那种）</td><td class="num">12.9</td><td class="num">19.6</td><td class="num">+6.7</td></tr>
+    </tbody>
+  </table>
+  <div class="note warn">
+    <b>结论：背景层必须是「加亮型」配色，不能是压暗型。</b><br />
+    第一版用了深色星云（<code>voidA #211a4c / voidB #6b61c7</code> 再乘暗系数），
+    结果在浅色桌面上把星点变成了<b>一层「黑芝麻」</b>，整片桌面被压暗 8.9。
+    改成加亮型（<code>voidA #574798 / voidB #b8a8ff</code>）后，暗点完全消失。<br />
+    <br />
+    这不是「加色混合」能解决的——Electron 透明窗最终仍按 source-over 合成，
+    暗色像素一定会压暗桌面。<b>唯一可靠的解法是让颜色本身朝亮的方向走</b>：
+    桌面亮时它淡到近乎隐形，桌面暗时它整片亮起来。<b>一套配色自动适配两端。</b><br />
+    <br />
+    剩余那 −7.0 来自眼睛本体（瞳孔与虹膜外圈必须是不透明的暗部），
+    这是「不透明眼睛覆盖在桌面上」的固有代价，不是背景层造成的。
+  </div>
+
+  <div class="grid2" style="margin-top:22px">
+    <div class="card">
+      <img src="./img/bg-dark-full.png" alt="深色桌面上的全屏背景效果" />
+      <div class="cap" style="display:block"><b>深色桌面</b><br /><span class="sub">星海 + 发光星云全部浮现。</span></div>
+    </div>
+    <div class="card">
+      <img src="./img/bg-light-full.png" alt="浅色桌面上的全屏背景效果" />
+      <div class="cap" style="display:block"><b>浅色桌面</b><br /><span class="sub">背景退成一层微光，只剩眼睛。</span></div>
+    </div>
+  </div>
+
+  <h2><span class="n">06</span>参数速查</h2>
+  <div class="rule"></div>
+  <table>
+    <thead><tr><th style="width:36%">旋钮</th><th>当前值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td class="k">眼距 / 整体大小</td><td class="num">1.58 / 0.46</td><td>眼裂不能塞满虹膜，否则看成两个圆盘</td></tr>
+      <tr><td class="k">上睑高度 / 下睑比例</td><td class="num">0.70 / 0.64</td><td>眼裂约 2.2 : 1</td></tr>
+      <tr><td class="k">虹膜半径</td><td class="num">0.420</td><td>&gt;0.50 会被上下睑切成桶形</td></tr>
+      <tr><td class="k">螺旋密度 / 圈数 / 线宽</td><td class="num">6.60 / 22 / 3.00</td><td>圈数 &lt;12 出来的是逗号不是螺旋</td></tr>
+      <tr><td class="k">星云 / 星团 / 星芒</td><td class="num">0.42 / 0.48 / 0.90</td><td>星团 &gt;1.0 变雪花噪点</td></tr>
+      <tr><td class="k">睫毛 数量/长度/粗细</td><td class="num">13 / 0.22 / 0.0095</td><td>数量设 0 即整段短路，不画睫毛</td></tr>
+      <tr><td class="k">角膜缘暗环</td><td class="num">0.40</td><td>&gt;0.6 会在虹膜外圈压出一圈贴上去的黑边</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:16px">
+    全部旋钮在 <code>prototype/particle-eyes/tuner.html</code> 里，新增「<b>星象</b>」标签页，
+    另附「<b>诸神</b>」预设一键回到本稿状态。
+  </p>
+
+  <h2><span class="n">07</span>已定方向与实施约束</h2>
+  <div class="rule"></div>
+  <table>
+    <thead><tr><th style="width:26%">决策</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td class="k">EmotionBall</td><td><b>替换</b>。桌宠形象改由实体眼着色器接管</td></tr>
+      <tr><td class="k">全屏背景窗</td><td><b>加</b>。星云铺满桌面，使用加亮型配色</td></tr>
+      <tr><td class="k">尺寸与位置</td><td>沿用默认（偏小、居中）。全屏窗只是背景，眼睛不该占满屏幕抢注意力</td></tr>
+    </tbody>
+  </table>
+  <p><b>由此产生三条硬约束：</b></p>
+  <ul>
+    <li><b>全屏窗必须点击穿透。</b>Electron 侧 <code>win.setIgnoreMouseEvents(true, { forward: true })</code>，否则整个桌面点不动。</li>
+    <li><b>眼睛留在 660×600 的桌宠窗，不搬进全屏窗。</b>两者职责不同——桌宠窗是交互面（悬停/点击/聊天），全屏窗是纯装饰。合并会让一个只该看的东西去接管输入，窗口层级与失败模式也会纠缠在一起。</li>
+    <li><b>全屏窗要有强度开关。</b>再好的自适应也挡不住用户想「安静一会儿」。</li>
+  </ul>
+  <p class="sub" style="margin-top:22px">
+    附：本稿所有图像由 <code>prototype/particle-eyes/shoot-face.cjs</code>（定妆图 + 分层消融）与
+    <code>check-bg-overlay.cjs</code>（三档桌面叠加实测）无头 Chrome + SwiftShader 生成，可重复出图；
+    数据见 <code>shots/face-report.txt</code>。
+  </p>
+
+</div>
+</body>
+</html>
